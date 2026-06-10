@@ -362,7 +362,7 @@
 
   function refreshConnectors() {
     connectorLayer.clearLayers();
-    if (!(isolate && selectedLayer)) return;
+    if (!selectedLayer) return; // satellite lines show on selection, isolate or not
     var geom = selectedLayer.feature && selectedLayer.feature.geometry;
     var parts = allPolygonParts(geom);
     if (!parts.length) return;

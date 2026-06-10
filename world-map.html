@@ -351,10 +351,12 @@
     }).addTo(connectorLayer);
     if (name && !seenNames[name]) {
       seenNames[name] = true;
+      var html = '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' +
+        escapeHtml(name) + '</a>';
       L.tooltip({
-        permanent: true, direction: "right", offset: [6, 0],
-        className: "map-label connector-label", opacity: 1, interactive: false
-      }).setLatLng(tip).setContent(escapeHtml(name)).addTo(connectorLayer);
+        permanent: true, interactive: true, direction: "right", offset: [6, 0],
+        className: "map-label connector-label", opacity: 1
+      }).setLatLng(tip).setContent(html).addTo(connectorLayer);
     }
   }
 

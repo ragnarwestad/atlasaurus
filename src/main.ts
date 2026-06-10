@@ -141,13 +141,14 @@ function refreshPolygons(): void {
 // ---------------------------------------------------------------------------
 function nearestSubunitName(iso: string | null, latlng: LatLng): string | null {
   const subs = (iso && subunitsByIso[iso]) || [];
-  let best: Subunit | null = null, bestD = SUBUNIT_MATCH_MAX_D2;
-  subs.forEach((s) => {
+  let best: Subunit | undefined;
+  let bestD = SUBUNIT_MATCH_MAX_D2;
+  for (const s of subs) {
     const dlat = s.lat - latlng[0], dlng = s.lng - latlng[1];
     const d = dlat * dlat + dlng * dlng;
     if (d < bestD) { bestD = d; best = s; }
-  });
-  return best ? best!.name : null;
+  }
+  return best ? best.name : null;
 }
 
 function addConnector(home: LatLng, tip: LatLng, name: string | null, seen: Record<string, boolean>): void {

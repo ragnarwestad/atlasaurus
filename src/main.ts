@@ -62,6 +62,9 @@ let showNames = false;
 let showCapitals = false;
 let showFlags = false;
 let isolate = false;
+// Set on a country click so the map's background-click deselect doesn't fire in
+// the same event dispatch (robust even if stopPropagation is ineffective).
+let suppressMapClick = false;
 
 // ---------------------------------------------------------------------------
 // Visibility / styling helpers
@@ -126,7 +129,9 @@ function refreshPolygons(): void {
     const el = (e.layer as any).getElement ? (e.layer as any).getElement() : null;
     if (st === null) {
       e.layer.setStyle(hiddenStyle);
-      if (el) el.style.pointerEvents = "none";
+      // Keep hidden countries clickable ("all" catches clicks even with 0
+      // opacity) so you can switch directly to another country in isolate mode.
+      if (el) el.style.pointerEvents = "all";
     } else {
       e.layer.setStyle(st);
       if (el) el.style.pointerEvents = "";
@@ -429,7 +434,12 @@ function loadBorders(): void {
         layerP.on({
           mouseover: () => { hoveredLayer = layerP; if (layerP !== selectedLayer) layerP.bringToFront(); refreshAll(); },
           mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshAll(); },
-          click: (e) => { L.DomEvent.stopPropagation(e); selectLayer(layerP, true); },
+          click: (e) => {
+            L.DomEvent.stop(e);
+            suppressMapClick = true;
+            setTimeout(() => { suppressMapClick = false; }, 0);
+            selectLayer(layerP, true);
+          },
         });
       },
     }).addTo(map);
@@ -461,7 +471,10 @@ nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; re
 const isoToggle = document.getElementById("isolate") as HTMLInputElement;
 isoToggle.addEventListener("change", () => { isolate = isoToggle.checked; refreshAll(); });
 
-map.on("click", deselect);     // background click clears selection
+map.on("click", () => {        // background click clears selection
+  if (suppressMapClick) return; // ignore the click that came from a country
+  deselect();
+});
 map.on("zoomend", updateFlagSizes);
 
 loadBorders();

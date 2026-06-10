@@ -79,22 +79,31 @@ function sameRealm(e: CountryEntry): boolean {
   const s = sovOf(selectedLayer), x = sovOf(e.layer);
   return !!s && s === x;
 }
-// Reveal names/capitals/flags on SELECTION only — not on hover. Revealing on
-// hover put an interactive label under the cursor, whose show/hide toggled the
-// element under the pointer and created a mouseover/mouseout loop that swallowed
-// clicks. Hover still highlights the polygon (see styleForLayer).
+// "Stable" reveal: country is selected (or a realm sibling). These labels are
+// interactive (clickable Wikipedia links) and don't toggle on hover.
 function isRevealed(e: CountryEntry): boolean {
   return e.layer === selectedLayer || sameRealm(e);
+}
+function isHovered(e: CountryEntry): boolean {
+  return e.layer === hoveredLayer;
 }
 function countryVisible(e: CountryEntry): boolean {
   return !(isolate && selectedLayer) || e.layer === selectedLayer || sameRealm(e);
 }
 
+// Names/capitals/flags show when their toggle is on, when the country is
+// selected, OR while hovered. Hover-only labels are made pointer-transparent
+// (the "hover-only" class) so they can't create a click-swallowing mouseover/
+// mouseout loop; stably-shown labels stay clickable.
 function refreshCountryLabels(): void {
   countries.forEach((e) => {
     if (!e.labelTooltip) return;
     const el = e.labelTooltip.getElement();
-    if (el) el.style.display = countryVisible(e) && (showNames || isRevealed(e)) ? "" : "none";
+    if (!el) return;
+    const stable = showNames || isRevealed(e);
+    const visible = countryVisible(e) && (stable || isHovered(e));
+    el.style.display = visible ? "" : "none";
+    el.classList.toggle("hover-only", visible && !stable);
   });
 }
 
@@ -102,21 +111,42 @@ function refreshCapitals(): void {
   capitalMarkers.forEach((m) => {
     const e = m._entry;
     const cv = e ? countryVisible(e) : !(isolate && selectedLayer);
-    const visible = cv && (showCapitals || (e ? isRevealed(e) : false));
+    const stable = e ? (showCapitals || isRevealed(e)) : showCapitals;
+    const hovered = e ? isHovered(e) : false;
+    const visible = cv && (stable || hovered);
     const has = capitalLayer.hasLayer(m);
     if (visible && !has) capitalLayer.addLayer(m);
     else if (!visible && has) capitalLayer.removeLayer(m);
+    if (visible) {
+      // Hover-only capitals are non-interactive (dot + label) to avoid the loop.
+      const hoverOnly = hovered && !stable;
+      const dot = (m as any).getElement ? (m as any).getElement() : null;
+      if (dot) dot.style.pointerEvents = hoverOnly ? "none" : "";
+      const tip = m.getTooltip && m.getTooltip();
+      const tel = tip && tip.getElement();
+      if (tel) tel.classList.toggle("hover-only", hoverOnly);
+    }
   });
 }
 
 function refreshFlags(): void {
   countries.forEach((e) => {
     if (!e.flagMarker) return;
-    const visible = countryVisible(e) && (showFlags || isRevealed(e));
+    const visible = countryVisible(e) && (showFlags || isRevealed(e) || isHovered(e));
     const has = flagLayer.hasLayer(e.flagMarker);
     if (visible && !has) flagLayer.addLayer(e.flagMarker);
     else if (!visible && has) flagLayer.removeLayer(e.flagMarker);
   });
+}
+
+// Lightweight refresh for hover: updates polygon styles + the reveal layers, but
+// NOT connectors (which depend only on selection). Crucially does no DOM
+// re-append of the polygon paths, so it never cancels an in-progress click.
+function refreshHover(): void {
+  refreshPolygons();
+  refreshCountryLabels();
+  refreshCapitals();
+  refreshFlags();
 }
 
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
@@ -436,10 +466,10 @@ function loadBorders(): void {
         const iso2 = /^[A-Za-z]{2}$/.test(a2) ? a2.toLowerCase() : null;
         countries.push({ name, layer: layerP, iso, iso2 });
         layerP.on({
-          // Hover only restyles polygons (no bringToFront, no label/marker
-          // add/remove) so it can never cancel a click by mutating the DOM.
-          mouseover: () => { hoveredLayer = layerP; refreshPolygons(); },
-          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshPolygons(); },
+          // Hover reveals this country's name/capital/flag (pointer-transparent,
+          // so it can't cancel clicks) and never calls bringToFront.
+          mouseover: () => { hoveredLayer = layerP; refreshHover(); },
+          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshHover(); },
           click: (e) => {
             L.DomEvent.stop(e);
             suppressMapClick = true;

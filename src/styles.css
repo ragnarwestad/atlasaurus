@@ -18,7 +18,9 @@ body { display: flex; font-family: system-ui, sans-serif; }
 }
 #cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input { cursor: pointer; }
 
-/* Flag markers */
+/* Flag markers — pointer-transparent so hovered flags never steal the cursor
+   from the polygon (which would break click-to-select). */
+.flag-icon, .flag-icon img { pointer-events: none; }
 .flag-icon { background: none !important; border: none !important; }
 .flag-icon img { display: block; box-shadow: 0 0 2px rgba(0,0,0,.55); border-radius: 2px; }
 
@@ -57,6 +59,10 @@ body { display: flex; font-family: system-ui, sans-serif; }
 /* Only the text itself is clickable; gaps stay click-through for panning. */
 .map-label a { pointer-events: auto; cursor: pointer; text-decoration: none; color: inherit; }
 .map-label a:hover { text-decoration: underline; }
+/* Hover-revealed labels are pointer-transparent so they can't trigger the
+   mouseover/mouseout loop that would swallow clicks. They become clickable
+   again once shown stably (country selected or the toggle is on). */
+.map-label.hover-only a { pointer-events: none; }
 .country-label {
   font: 600 12px system-ui, sans-serif; color: #1b3a5c;
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;

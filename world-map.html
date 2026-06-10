@@ -372,12 +372,16 @@
     var MAX_LINES = 60;
     var seenNames = {}, n = 0;
 
-    // (a) Detached parts WITHIN the same country feature (Kaliningrad, Alaska,
-    //     Hawaii …), labeled from the named sub-units where available.
+    // (a) Detached parts WITHIN the same country feature, but ONLY those we can
+    //     name from a Natural Earth sub-unit (Alaska, Hawaii, French Guiana,
+    //     Réunion …). Unnamed coastal islands (e.g. the many islets around
+    //     Greenland) are skipped — they add clutter without information.
     for (var i = 1; i < parts.length && n < MAX_LINES; i++) {
       if (parts[i].area < MIN_AREA) break; // parts are sorted largest-first
       var tip = centerOf(parts[i].rings);
-      addConnector(home, tip, nearestSubunitName(iso, tip), seenNames);
+      var nm = nearestSubunitName(iso, tip);
+      if (!nm) continue;
+      addConnector(home, tip, nm, seenNames);
       n++;
     }
 

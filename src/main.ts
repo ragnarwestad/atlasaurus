@@ -79,8 +79,12 @@ function sameRealm(e: CountryEntry): boolean {
   const s = sovOf(selectedLayer), x = sovOf(e.layer);
   return !!s && s === x;
 }
+// Reveal names/capitals/flags on SELECTION only — not on hover. Revealing on
+// hover put an interactive label under the cursor, whose show/hide toggled the
+// element under the pointer and created a mouseover/mouseout loop that swallowed
+// clicks. Hover still highlights the polygon (see styleForLayer).
 function isRevealed(e: CountryEntry): boolean {
-  return e.layer === selectedLayer || e.layer === hoveredLayer || sameRealm(e);
+  return e.layer === selectedLayer || sameRealm(e);
 }
 function countryVisible(e: CountryEntry): boolean {
   return !(isolate && selectedLayer) || e.layer === selectedLayer || sameRealm(e);
@@ -432,8 +436,10 @@ function loadBorders(): void {
         const iso2 = /^[A-Za-z]{2}$/.test(a2) ? a2.toLowerCase() : null;
         countries.push({ name, layer: layerP, iso, iso2 });
         layerP.on({
-          mouseover: () => { hoveredLayer = layerP; if (layerP !== selectedLayer) layerP.bringToFront(); refreshAll(); },
-          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshAll(); },
+          // Hover only restyles polygons (no bringToFront, no label/marker
+          // add/remove) so it can never cancel a click by mutating the DOM.
+          mouseover: () => { hoveredLayer = layerP; refreshPolygons(); },
+          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshPolygons(); },
           click: (e) => {
             L.DomEvent.stop(e);
             suppressMapClick = true;

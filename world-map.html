@@ -19,11 +19,14 @@
     width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 13px;
     border: 1px solid #ccc; border-radius: 6px;
   }
-  #cap-toggle, #name-toggle, #iso-toggle {
+  #cap-toggle, #name-toggle, #iso-toggle, #flag-toggle {
     display: flex; align-items: center; gap: 6px; margin-top: 9px;
     font-size: 13px; color: #333; cursor: pointer; user-select: none;
   }
-  #cap-toggle input, #name-toggle input, #iso-toggle input { cursor: pointer; }
+  #cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input { cursor: pointer; }
+  /* Flag markers */
+  .flag-icon { background: none !important; border: none !important; }
+  .flag-icon img { display: block; box-shadow: 0 0 2px rgba(0,0,0,.55); border-radius: 2px; }
   #count { font-size: 12px; color: #888; padding: 6px 14px; }
   #country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
   #country-list li {
@@ -83,6 +86,9 @@
     <label id="cap-toggle">
       <input type="checkbox" id="show-capitals" /> Show capitals on map
     </label>
+    <label id="flag-toggle">
+      <input type="checkbox" id="show-flags" /> Show flags on map
+    </label>
     <label id="iso-toggle">
       <input type="checkbox" id="isolate" /> Isolate selected country (hide others)
     </label>
@@ -123,10 +129,18 @@
   // Dashed lines from a selected country's main landmass to its satellites
   // (drawn only in isolate mode). Rebuilt by refreshConnectors().
   var connectorLayer = L.layerGroup().addTo(map);
+  // Country flag images (flagcdn), shown per the "Show flags" checkbox / reveal.
+  var flagLayer = L.layerGroup().addTo(map);
   var capToggle = document.getElementById("show-capitals");
   capToggle.addEventListener("change", function () {
     showCapitals = capToggle.checked;
     refreshCapitals();
+  });
+
+  var flagToggle = document.getElementById("show-flags");
+  flagToggle.addEventListener("change", function () {
+    showFlags = flagToggle.checked;
+    refreshFlags();
   });
 
   var nameToggle = document.getElementById("show-names");
@@ -267,6 +281,7 @@
   var hoveredLayer = null;
   var showNames = false;     // "Show country names" checkbox (default off)
   var showCapitals = false;  // "Show capitals" checkbox (default off)
+  var showFlags = false;     // "Show flags" checkbox (default off)
   var isolate = false;       // "Isolate selected country" checkbox (default off)
 
   function sovOf(layer) {
@@ -399,7 +414,17 @@
     }
   }
 
-  function refreshAll() { refreshPolygons(); refreshConnectors(); refreshCountryLabels(); refreshCapitals(); }
+  function refreshFlags() {
+    countries.forEach(function (e) {
+      if (!e.flagMarker) return;
+      var visible = countryVisible(e) && (showFlags || isRevealed(e));
+      var has = flagLayer.hasLayer(e.flagMarker);
+      if (visible && !has) flagLayer.addLayer(e.flagMarker);
+      else if (!visible && has) flagLayer.removeLayer(e.flagMarker);
+    });
+  }
+
+  function refreshAll() { refreshPolygons(); refreshConnectors(); refreshCountryLabels(); refreshCapitals(); refreshFlags(); }
 
   // Single-choice selection. toggle=true (map click) deselects if you click the
   // already-selected country.
@@ -492,7 +517,10 @@
         var name = pr.ADMIN || pr.NAME_LONG || pr.admin || pr.name || pr.NAME || feature.id || "Unknown";
         // ADM0_A3 is always populated; ISO_A3 is "-99" for some countries.
         var iso = pr.ADM0_A3 || pr.adm0_a3 || pr.ISO_A3 || pr.iso_a3 || feature.id || null;
-        countries.push({ name: name, layer: lyr, iso: iso });
+        // ISO 3166-1 alpha-2 (for flag images). *_EH variants fill the "-99" gaps.
+        var a2 = pr.ISO_A2_EH || pr.ISO_A2 || pr.WB_A2 || "";
+        var iso2 = /^[A-Za-z]{2}$/.test(a2) ? a2.toLowerCase() : null;
+        countries.push({ name: name, layer: lyr, iso: iso, iso2: iso2 });
         // The permanent country-name label (in placeCountryLabels) is the
         // Wikipedia link. Clicking inside the polygon toggles SELECTION (dark);
         // hovering shows a light highlight. The selected country keeps its dark
@@ -661,14 +689,29 @@
       catch (e) { parts = []; }
       if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;
 
+      var center = centerOf(parts[0].rings);
       var html = '<a href="' + wikiUrl(entry.name) + '" target="_blank" rel="noopener">' +
         escapeHtml(entry.name) + '</a>';
       entry.labelTooltip = L.tooltip({
         permanent: true, direction: "center", offset: [0, 0],
         className: "map-label country-label", opacity: 1, interactive: true
-      }).setLatLng(centerOf(parts[0].rings)).setContent(html).addTo(map);
+      }).setLatLng(center).setContent(html).addTo(map);
+
+      // Flag image, anchored just above the centroid so it doesn't sit on the
+      // name label. Visibility is managed by refreshFlags(); not added here.
+      if (entry.iso2) {
+        entry.flagMarker = L.marker(center, {
+          interactive: false, keyboard: false,
+          icon: L.divIcon({
+            className: "flag-icon",
+            html: '<img src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" width="24" height="18" alt="">',
+            iconSize: [24, 18], iconAnchor: [12, 26]
+          })
+        });
+      }
       entry.labelPlaced = true;
     });
+    refreshFlags();
   }
 })();
 </script>

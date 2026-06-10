@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>World Map — Countries, Borders & Capitals</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; font-family: system-ui, sans-serif; }
+  #sidebar {
+    width: 270px; flex: 0 0 270px; height: 100vh; box-sizing: border-box;
+    display: flex; flex-direction: column; border-right: 1px solid #d8d8d8;
+    background: #fff;
+  }
+  #sidebar header { padding: 12px 14px 8px; border-bottom: 1px solid #eee; }
+  #sidebar h1 { font-size: 15px; margin: 0 0 8px; color: #1b3a5c; }
+  #search {
+    width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 13px;
+    border: 1px solid #ccc; border-radius: 6px;
+  }
+  #cap-toggle, #name-toggle, #iso-toggle {
+    display: flex; align-items: center; gap: 6px; margin-top: 9px;
+    font-size: 13px; color: #333; cursor: pointer; user-select: none;
+  }
+  #cap-toggle input, #name-toggle input, #iso-toggle input { cursor: pointer; }
+  #count { font-size: 12px; color: #888; padding: 6px 14px; }
+  #country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  #country-list li {
+    padding: 7px 14px; cursor: pointer; font-size: 13px; color: #222;
+    border-bottom: 1px solid #f2f2f2; display: flex; justify-content: space-between;
+    gap: 8px; align-items: baseline;
+  }
+  #country-list li:hover { background: #eaf2fb; }
+  #country-list li .cap { font-size: 11px; color: #8a1d16; white-space: nowrap; }
+  #country-list a {
+    color: #3878c7; text-decoration: none; font-size: 11px; flex: 0 0 auto;
+  }
+  #country-list a:hover { text-decoration: underline; }
+  #map { flex: 1; height: 100vh; background: #aadaff; }
+  #status {
+    position: fixed; z-index: 1000; top: 50%; left: 60%;
+    transform: translate(-50%, -50%);
+    font: 15px/1.4 system-ui, sans-serif; color: #333;
+    background: rgba(255,255,255,.92); padding: 14px 18px;
+    border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  }
+  /* Permanent map labels: no box, just text */
+  .map-label {
+    background: transparent; border: none; box-shadow: none;
+    padding: 0; white-space: nowrap; pointer-events: none;
+  }
+  .map-label.leaflet-tooltip-top:before,
+  .map-label.leaflet-tooltip-bottom:before,
+  .map-label.leaflet-tooltip-left:before,
+  .map-label.leaflet-tooltip-right:before { display: none; }
+  /* Only the text itself is clickable; gaps stay click-through for panning. */
+  .map-label a { pointer-events: auto; cursor: pointer; text-decoration: none; color: inherit; }
+  .map-label a:hover { text-decoration: underline; }
+  .country-label {
+    font: 600 12px system-ui, sans-serif; color: #1b3a5c;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  }
+  .capital-label {
+    font: 500 11px system-ui, sans-serif; color: #8a1d16;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  }
+  .connector-label {
+    font: 600 10px system-ui, sans-serif; color: #8a3b00; font-style: italic;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  }
+  .leaflet-interactive { cursor: pointer; }
+</style>
+</head>
+<body>
+<aside id="sidebar">
+  <header>
+    <h1>Countries (A–Z)</h1>
+    <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+    <label id="name-toggle">
+      <input type="checkbox" id="show-names" /> Show country names on map
+    </label>
+    <label id="cap-toggle">
+      <input type="checkbox" id="show-capitals" /> Show capitals on map
+    </label>
+    <label id="iso-toggle">
+      <input type="checkbox" id="isolate" checked /> Isolate selected country (hide others)
+    </label>
+  </header>
+  <div id="count"></div>
+  <ul id="country-list"></ul>
+</aside>
+<div id="map"></div>
+<div id="status">Loading world data… (detailed borders, may take a few seconds)</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- polylabel: computes a polygon's "pole of inaccessibility" = a point
+     guaranteed inside the shape, used as the visual center for labels. -->
+<script src="https://cdn.jsdelivr.net/npm/polylabel@1.1.0/polylabel.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var statusEl = document.getElementById("status");
+  function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+  function hideStatus() { if (statusEl) { statusEl.remove(); statusEl = null; } }
+
+  var map = L.map("map", {
+    worldCopyJump: true,
+    minZoom: 2,
+    maxZoom: 8
+  }).setView([25, 10], 2);
+
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions">CARTO</a> · Borders & capitals: Natural Earth',
+    subdomains: "abcd",
+    maxZoom: 8
+  }).addTo(map);
+
+  // Capital dots + capital-name labels live in this group so they can be
+  // toggled together via the sidebar checkbox.
+  var capitalLayer = L.layerGroup().addTo(map);
+  // Dashed lines from a selected country's main landmass to its satellites
+  // (drawn only in isolate mode). Rebuilt by refreshConnectors().
+  var connectorLayer = L.layerGroup().addTo(map);
+  var capToggle = document.getElementById("show-capitals");
+  capToggle.addEventListener("change", function () {
+    showCapitals = capToggle.checked;
+    refreshCapitals();
+  });
+
+  var nameToggle = document.getElementById("show-names");
+  nameToggle.addEventListener("change", function () {
+    showNames = nameToggle.checked;
+    refreshCountryLabels();
+  });
+
+  var isoToggle = document.getElementById("isolate");
+  isoToggle.addEventListener("change", function () {
+    isolate = isoToggle.checked;
+    refreshAll();
+  });
+
+  // Click on empty map (ocean/background) clears the selection — an easy escape,
+  // especially in isolate mode where other countries are hidden. Country clicks
+  // stop propagation, so this only fires for true background clicks.
+  map.on("click", deselect);
+
+  // --- English Wikipedia title overrides for dataset country names ---
+  var WIKI_OVERRIDES = {
+    "United States of America": "United States",
+    "United States": "United States",
+    "United Republic of Tanzania": "Tanzania",
+    "Republic of Serbia": "Serbia",
+    "Republic of the Congo": "Republic of the Congo",
+    "Democratic Republic of the Congo": "Democratic Republic of the Congo",
+    "Macedonia": "North Macedonia",
+    "The former Yugoslav Republic of Macedonia": "North Macedonia",
+    "Swaziland": "Eswatini",
+    "Guinea Bissau": "Guinea-Bissau",
+    "Czech Republic": "Czech Republic",
+    "East Timor": "East Timor",
+    "Lao PDR": "Laos",
+    "Brunei Darussalam": "Brunei",
+    "Republic of Korea": "South Korea",
+    "Dem. Rep. Korea": "North Korea",
+    "Côte d'Ivoire": "Ivory Coast",
+    "Cote d'Ivoire": "Ivory Coast",
+    "Russian Federation": "Russia",
+    "Syrian Arab Republic": "Syria",
+    "Iran (Islamic Republic of)": "Iran",
+    "Bolivia (Plurinational State of)": "Bolivia",
+    "Venezuela (Bolivarian Republic of)": "Venezuela",
+    "Republic of Moldova": "Moldova",
+    "Viet Nam": "Vietnam",
+    "eSwatini": "Eswatini",
+    "Cabo Verde": "Cape Verde",
+    "Republic of Congo": "Republic of the Congo",
+    "Timor-Leste": "East Timor",
+    "Czechia": "Czech Republic",
+    "Republic of Korea": "South Korea",
+    "Lao People's Democratic Republic": "Laos",
+    "Brunei Darussalam ": "Brunei",
+    "The Gambia": "The Gambia",
+    "Federated States of Micronesia": "Federated States of Micronesia"
+  };
+
+  // Capital-city names that collide on Wikipedia and need disambiguation.
+  var CITY_OVERRIDES = {
+    "Kingston": "Kingston, Jamaica",
+    "Georgetown": "Georgetown, Guyana",
+    "Victoria": "Victoria, Seychelles",
+    "San José": "San José, Costa Rica",
+    "San Jose": "San José, Costa Rica",
+    "St. John's": "St. John's, Antigua and Barbuda",
+    "Saint John's": "St. John's, Antigua and Barbuda",
+    "Hamilton": "Hamilton, Bermuda"
+  };
+
+  function makeWikiUrl(title) {
+    return "https://en.wikipedia.org/wiki/" + encodeURIComponent(title.replace(/ /g, "_"));
+  }
+  function wikiUrl(name) {
+    if (!name) return null;
+    return makeWikiUrl(WIKI_OVERRIDES[name] || name);
+  }
+  function cityWikiUrl(name) {
+    if (!name) return null;
+    return makeWikiUrl(CITY_OVERRIDES[name] || name);
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function openWiki(name) {
+    var url = wikiUrl(name);
+    if (url) window.open(url, "_blank", "noopener");
+  }
+
+  // --- Fetch helper with fallback URLs ---
+  function fetchJson(urls) {
+    var i = 0;
+    function attempt() {
+      if (i >= urls.length) return Promise.reject(new Error("All sources failed"));
+      return fetch(urls[i]).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).catch(function () { i++; return attempt(); });
+    }
+    return attempt();
+  }
+
+  // 10m Ukraine point-of-view: includes all small island nations AND depicts
+  // Crimea as part of Ukraine (the internationally recognized / UN position,
+  // per UN GA Resolution 68/262), rather than Natural Earth's default de-facto
+  // map that assigns Crimea to Russia. Larger file (~20 MB) → slower first load.
+  var BORDER_URLS = [
+    "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_10m_admin_0_countries_ukr.geojson",
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries_ukr.geojson"
+  ];
+  var CAPITAL_URLS = [
+    "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_populated_places_simple.geojson",
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson"
+  ];
+  // Named sub-units (Alaska, Hawaii, French Guiana, Réunion, ...) — used only to
+  // label the satellite connector lines. Coverage is partial (e.g. Kaliningrad
+  // is not a named subunit, so its line stays unlabeled).
+  var SUBUNIT_URLS = [
+    "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_10m_admin_0_map_subunits.geojson",
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_map_subunits.geojson"
+  ];
+
+  // opacity (stroke) is set explicitly on every visible style so that restoring
+  // from hiddenStyle (opacity 0) always brings the blue borders back.
+  var baseStyle     = { color: "#3878c7", weight: 1,   opacity: 1, fillColor: "#7fb2e8", fillOpacity: 0.25 };
+  var hoverStyle    = { color: "#e0922b", weight: 1.5, opacity: 1, fillColor: "#ffd9a3", fillOpacity: 0.55 }; // light (hover)
+  var selectedStyle = { color: "#8a3b00", weight: 2.5, opacity: 1, fillColor: "#e8740c", fillOpacity: 0.65 }; // dark (selected)
+  var relatedStyle  = { color: "#a85a1a", weight: 1.5, opacity: 1, fillColor: "#f3b06a", fillOpacity: 0.5 };  // same-realm sibling
+  var hiddenStyle   = { opacity: 0, fillOpacity: 0 };                                                         // isolate: others hidden
+
+  var countries = [];        // { name, layer, iso, labelTooltip, capitalMarker }
+  var capitalMarkers = [];   // every capital marker (each tagged with ._entry)
+  var subunitsByIso = {};    // ADM0_A3 -> [{ name, lat, lng }] for satellite line labels
+  var territoriesBySov = {}; // SOV_A3 -> [{ name, adm0, lat, lng }] for sovereignty links
+  var selectedLayer = null;
+  var hoveredLayer = null;
+  var showNames = false;     // "Show country names" checkbox (default off)
+  var showCapitals = false;  // "Show capitals" checkbox (default off)
+  var isolate = true;        // "Isolate selected country" checkbox
+
+  function sovOf(layer) {
+    var p = (layer && layer.feature && layer.feature.properties) || {};
+    return p.SOV_A3 || p.sov_a3 || null;
+  }
+  // Same sovereign state (e.g. Denmark ↔ Greenland/Faroe), but a different unit.
+  function sameRealm(e) {
+    if (!selectedLayer || e.layer === selectedLayer) return false;
+    var s = sovOf(selectedLayer), x = sovOf(e.layer);
+    return !!s && s === x;
+  }
+
+  // Revealed = selected or hovered (its name/capital should show regardless of toggles).
+  function isRevealed(e) { return e.layer === selectedLayer || e.layer === hoveredLayer || sameRealm(e); }
+  // In isolate mode, once a country is selected only it and its realm siblings show.
+  function countryVisible(e) {
+    return !(isolate && selectedLayer) || e.layer === selectedLayer || sameRealm(e);
+  }
+
+  function refreshCountryLabels() {
+    countries.forEach(function (e) {
+      if (!e.labelTooltip) return;
+      var el = e.labelTooltip.getElement();
+      if (el) el.style.display = (countryVisible(e) && (showNames || isRevealed(e))) ? "" : "none";
+    });
+  }
+
+  function refreshCapitals() {
+    capitalMarkers.forEach(function (m) {
+      var e = m._entry;
+      var cv = e ? countryVisible(e) : !(isolate && selectedLayer);
+      var visible = cv && (showCapitals || (e && isRevealed(e)));
+      var has = capitalLayer.hasLayer(m);
+      if (visible && !has) capitalLayer.addLayer(m);
+      else if (!visible && has) capitalLayer.removeLayer(m);
+    });
+  }
+
+  function styleForLayer(e) {
+    if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) return null; // hidden
+    if (e.layer === selectedLayer) return selectedStyle;
+    if (sameRealm(e)) return relatedStyle;       // sibling territory of the selected sovereign
+    if (e.layer === hoveredLayer) return hoverStyle;
+    return baseStyle;
+  }
+
+  function refreshPolygons() {
+    countries.forEach(function (e) {
+      var st = styleForLayer(e);
+      var el = e.layer.getElement ? e.layer.getElement() : null;
+      if (st === null) {
+        e.layer.setStyle(hiddenStyle);
+        if (el) el.style.pointerEvents = "none"; // not hoverable/clickable while hidden
+      } else {
+        e.layer.setStyle(st);
+        if (el) el.style.pointerEvents = "";
+        // NOTE: do NOT bringToFront here — this runs on every hover refresh, and
+        // re-appending the path mid-interaction swallows clicks. We bring the
+        // selected layer to front once, in selectLayer().
+      }
+    });
+  }
+
+  // Draw dashed connector lines from the selected country's main landmass to
+  // each of its detached parts (satellites), only while isolate mode is active.
+  // Nearest named subunit to a point, within ~8°, for labeling a satellite line.
+  function nearestSubunitName(iso, latlng) {
+    var subs = (iso && subunitsByIso[iso]) || [];
+    var best = null, bestD = 64; // (8 deg)^2
+    subs.forEach(function (s) {
+      var dlat = s.lat - latlng[0], dlng = s.lng - latlng[1];
+      var d = dlat * dlat + dlng * dlng;
+      if (d < bestD) { bestD = d; best = s; }
+    });
+    return best ? best.name : null;
+  }
+
+  function addConnector(home, tip, name, seenNames) {
+    L.polyline([home, tip], {
+      color: "#8a3b00", weight: 1, opacity: 0.7, dashArray: "4 4", interactive: false
+    }).addTo(connectorLayer);
+    if (name && !seenNames[name]) {
+      seenNames[name] = true;
+      L.tooltip({
+        permanent: true, direction: "right", offset: [6, 0],
+        className: "map-label connector-label", opacity: 1, interactive: false
+      }).setLatLng(tip).setContent(escapeHtml(name)).addTo(connectorLayer);
+    }
+  }
+
+  function refreshConnectors() {
+    connectorLayer.clearLayers();
+    if (!(isolate && selectedLayer)) return;
+    var geom = selectedLayer.feature && selectedLayer.feature.geometry;
+    var parts = allPolygonParts(geom);
+    if (!parts.length) return;
+    var props = selectedLayer.feature.properties || {};
+    var iso = props.ADM0_A3 || props.adm0_a3 || null;
+    var sov = props.SOV_A3 || props.sov_a3 || null;
+    var home = centerOf(parts[0].rings);
+    var MIN_AREA = 0.03;  // deg^2 — ignore tiny specks
+    var MAX_LINES = 60;
+    var seenNames = {}, n = 0;
+
+    // (a) Detached parts WITHIN the same country feature (Kaliningrad, Alaska,
+    //     Hawaii …), labeled from the named sub-units where available.
+    for (var i = 1; i < parts.length && n < MAX_LINES; i++) {
+      if (parts[i].area < MIN_AREA) break; // parts are sorted largest-first
+      var tip = centerOf(parts[i].rings);
+      addConnector(home, tip, nearestSubunitName(iso, tip), seenNames);
+      n++;
+    }
+
+    // (b) Separate features under the SAME sovereign state (Greenland & Faroe
+    //     for Denmark; Falklands, Gibraltar, Bermuda … for the UK). These are
+    //     distinct features linked only by SOV_A3, not by shared geometry.
+    var terrs = (sov && territoriesBySov[sov]) || [];
+    for (var j = 0; j < terrs.length && n < MAX_LINES; j++) {
+      var t = terrs[j];
+      if (t.adm0 === iso) continue; // skip the sovereign country itself
+      addConnector(home, [t.lat, t.lng], t.name, seenNames);
+      n++;
+    }
+  }
+
+  function refreshAll() { refreshPolygons(); refreshConnectors(); refreshCountryLabels(); refreshCapitals(); }
+
+  // Single-choice selection. toggle=true (map click) deselects if you click the
+  // already-selected country.
+  function selectLayer(lyr, toggle) {
+    selectedLayer = (toggle && selectedLayer === lyr) ? null : lyr;
+    if (selectedLayer) selectedLayer.bringToFront();
+    refreshAll();
+  }
+  function deselect() {
+    if (selectedLayer) { selectedLayer = null; refreshAll(); }
+  }
+
+  function focusCountry(entry) {
+    try { map.fitBounds(entry.layer.getBounds(), { maxZoom: 6, padding: [40, 40] }); } catch (e) {}
+    selectLayer(entry.layer, false); // sidebar click always selects (no toggle)
+  }
+
+  function buildSidebar() {
+    countries.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var ul = document.getElementById("country-list");
+    var countEl = document.getElementById("count");
+    ul.innerHTML = "";
+    countries.forEach(function (entry) {
+      var li = document.createElement("li");
+      li.dataset.name = entry.name.toLowerCase();
+
+      var label = document.createElement("span");
+      label.textContent = entry.name;
+      label.title = "Zoom to " + entry.name + " on the map";
+      label.style.flex = "1";
+      label.addEventListener("click", function () { focusCountry(entry); });
+
+      var wiki = document.createElement("a");
+      wiki.textContent = "Wiki ↗";
+      wiki.href = wikiUrl(entry.name);
+      wiki.target = "_blank";
+      wiki.rel = "noopener";
+
+      li.appendChild(label);
+      li.appendChild(wiki);
+      ul.appendChild(li);
+    });
+    countEl.textContent = countries.length + " countries";
+
+    var search = document.getElementById("search");
+    search.addEventListener("input", function () {
+      var q = search.value.trim().toLowerCase();
+      var shown = 0;
+      Array.prototype.forEach.call(ul.children, function (li) {
+        var match = li.dataset.name.indexOf(q) !== -1;
+        li.style.display = match ? "" : "none";
+        if (match) shown++;
+      });
+      countEl.textContent = shown + " of " + countries.length + " countries";
+    });
+  }
+
+  // --- Load country borders ---
+  fetchJson(BORDER_URLS).then(function (geo) {
+    var layer = L.geoJSON(geo, {
+      // Keep sovereign states (and disputed/indeterminate territories like
+      // Western Sahara, Kosovo, N. Cyprus). Drop dependencies/territories
+      // tied to a parent state, e.g. "Ashmore and Cartier Islands" (Australia),
+      // French Polynesia, Puerto Rico, etc.
+      filter: function (feature) {
+        var p = feature.properties || {};
+        // Record EVERY feature (incl. dependencies we drop below) under its
+        // sovereign, so isolate mode can draw "sovereignty links" to separate
+        // territories like Greenland, Faroe, Falklands, Gibraltar, Bermuda.
+        var sov = p.SOV_A3 || p.sov_a3, adm0 = p.ADM0_A3 || p.adm0_a3;
+        var nm = p.ADMIN || p.NAME_LONG || p.NAME || p.name;
+        if (sov && adm0 && nm) {
+          try {
+            var prt = allPolygonParts(feature.geometry);
+            if (prt.length && prt[0].rings[0] && prt[0].rings[0].length >= 3) {
+              var c = centerOf(prt[0].rings);
+              (territoriesBySov[sov] = territoriesBySov[sov] || [])
+                .push({ name: nm, adm0: adm0, lat: c[0], lng: c[1] });
+            }
+          } catch (e) { /* skip */ }
+        }
+        var t = p.TYPE || "";
+        return t !== "Dependency" && t !== "Lease";
+      },
+      style: function () { return baseStyle; },
+      onEachFeature: function (feature, lyr) {
+        var pr = feature.properties || {};
+        // Prefer full proper names (ADMIN / NAME_LONG) over abbreviated NAME
+        // (e.g. "Marshall Is." vs "Marshall Islands") for labels + Wikipedia.
+        var name = pr.ADMIN || pr.NAME_LONG || pr.admin || pr.name || pr.NAME || feature.id || "Unknown";
+        // ADM0_A3 is always populated; ISO_A3 is "-99" for some countries.
+        var iso = pr.ADM0_A3 || pr.adm0_a3 || pr.ISO_A3 || pr.iso_a3 || feature.id || null;
+        countries.push({ name: name, layer: lyr, iso: iso });
+        // The permanent country-name label (in placeCountryLabels) is the
+        // Wikipedia link. Clicking inside the polygon toggles SELECTION (dark);
+        // hovering shows a light highlight. The selected country keeps its dark
+        // style on mouseout — only non-selected countries reset to base.
+        lyr.on({
+          mouseover: function () { hoveredLayer = lyr; if (lyr !== selectedLayer) lyr.bringToFront(); refreshAll(); },
+          mouseout:  function () { if (hoveredLayer === lyr) hoveredLayer = null; refreshAll(); },
+          click:     function (e) { L.DomEvent.stopPropagation(e); selectLayer(lyr, true); }
+        });
+      }
+    }).addTo(map);
+    map.borderLayer = layer;
+    buildSidebar();
+    placeCountryLabels();
+    refreshCountryLabels(); // honour default (names off) once labels exist
+    hideStatus();
+    loadCapitals();
+    loadSubunits();
+  }).catch(function (e) {
+    setStatus("Could not load country borders. Check your internet connection. (" + e.message + ")");
+  });
+
+  // --- Load capitals ---
+  function loadCapitals() {
+    fetchJson(CAPITAL_URLS).then(function (geo) {
+      var feats = (geo.features || []).filter(function (f) {
+        var p = f.properties || {};
+        var fc = (p.featurecla || "").toLowerCase();
+        // Primary national capital ONLY. This excludes:
+        //  - Admin-1 capitals (state/province), e.g. Denver, Atlanta
+        //  - "Admin-0 capital alt" (secondary/legislative capitals),
+        //    e.g. Valparaíso (Chile), Cape Town & Bloemfontein (South Africa).
+        return fc === "admin-0 capital";
+      });
+      // Safety net: keep only one marker per country (the first primary capital).
+      var seen = {};
+      feats = feats.filter(function (f) {
+        var c = (f.properties && (f.properties.adm0_a3 || f.properties.adm0name)) || f.properties.name;
+        if (seen[c]) return false;
+        seen[c] = true;
+        return true;
+      });
+      // Lookups so each capital can be linked to its country layer (for the
+      // hover/select reveal behaviour). ISO-3 is primary, country name fallback.
+      var entryByIso = {}, entryByName = {};
+      countries.forEach(function (e) {
+        if (e.iso) entryByIso[e.iso] = e;
+        entryByName[e.name.toLowerCase()] = e;
+      });
+
+      feats.forEach(function (f) {
+        var p = f.properties || {};
+        var coords = f.geometry && f.geometry.coordinates;
+        if (!coords) return;
+        var lat = coords[1], lng = coords[0];
+        var capName = p.name || p.nameascii || "Capital";
+        var cIso = p.adm0_a3 || p.sov_a3 || null;
+        var cCountry = (p.adm0name || p.sov0name || "").toLowerCase();
+
+        var marker = L.circleMarker([lat, lng], {
+          radius: 4, color: "#b3261e", weight: 1.5,
+          fillColor: "#ffffff", fillOpacity: 1
+        });
+        // Capital name sits to the right of the dot and links to the CITY's
+        // Wikipedia article.
+        var capLink = '<a href="' + cityWikiUrl(capName) + '" target="_blank" rel="noopener">' +
+          escapeHtml(capName) + '</a>';
+        marker.bindTooltip(capLink, {
+          permanent: true, interactive: true, direction: "right", offset: [6, 0],
+          className: "map-label capital-label", opacity: 1
+        });
+        // Link to its country entry, and let that entry reach its capital too.
+        var e = (cIso && entryByIso[cIso]) || entryByName[cCountry] || null;
+        marker._entry = e;
+        if (e) e.capitalMarker = marker;
+        capitalMarkers.push(marker);
+      });
+      refreshCapitals(); // honour the current checkbox / reveal state
+    }).catch(function () { /* capitals optional; borders still work */ });
+  }
+
+  // --- Load named sub-units (for labeling satellite connector lines) ---
+  function loadSubunits() {
+    fetchJson(SUBUNIT_URLS).then(function (geo) {
+      (geo.features || []).forEach(function (f) {
+        var p = f.properties || {};
+        var iso = p.ADM0_A3 || p.adm0_a3 || null;
+        var name = p.SUBUNIT || p.NAME || p.GEOUNIT || p.name || null;
+        if (!iso || !name) return;
+        var parts = allPolygonParts(f.geometry);
+        if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;
+        var c = centerOf(parts[0].rings); // [lat, lng]
+        (subunitsByIso[iso] = subunitsByIso[iso] || []).push({ name: name, lat: c[0], lng: c[1] });
+      });
+      refreshConnectors(); // re-label if a country is already selected
+    }).catch(function () { /* names optional; lines still drawn unlabeled */ });
+  }
+
+  // --- Geometry helpers for placing labels at the visual center ---
+  function ringArea(ring) {
+    var s = 0;
+    for (var i = 0, n = ring.length, j = n - 1; i < n; j = i++) {
+      s += (ring[j][0] * ring[i][1]) - (ring[i][0] * ring[j][1]);
+    }
+    return Math.abs(s / 2);
+  }
+  // "Unwrap" longitudes so a ring that crosses the antimeridian (±180°) stays
+  // continuous. Without this, antimeridian-crossing parts (Alaska, Chukotka)
+  // get a bogus ~360°-wide bounding box, which both (a) breaks the largest-
+  // polygon pick and (b) sends polylabel into the middle of the Pacific.
+  function normRing(ring) {
+    var out = [[ring[0][0], ring[0][1]]];
+    for (var i = 1; i < ring.length; i++) {
+      var cur = ring[i][0], d = cur - out[i - 1][0];
+      if (d > 180) cur -= 360; else if (d < -180) cur += 360;
+      out.push([cur, ring[i][1]]);
+    }
+    return out;
+  }
+  function wrapLng(lng) { return ((lng + 180) % 360 + 360) % 360 - 180; }
+
+  // Visual center (pole of inaccessibility) of a set of unwrapped rings, wrapped
+  // back into [-180,180]. Shared by labels and connector lines.
+  function centerOf(rings) {
+    var PL = window.polylabel; if (PL && PL.default) PL = PL.default;
+    try {
+      var p = PL ? PL(rings, 1.0) : ringCentroid(rings[0]); // [lng, lat]
+      return [p[1], wrapLng(p[0])];
+    } catch (e) {
+      var c = ringCentroid(rings[0]);
+      return [c[1], wrapLng(c[0])];
+    }
+  }
+
+  // All polygon parts of a feature as { rings, area }, longitudes unwrapped,
+  // sorted largest-first. parts[0] is the main landmass; later large parts
+  // (Alaska, Svalbard, Kaliningrad, big islands) get reveal-only labels.
+  function allPolygonParts(geom) {
+    if (!geom) return [];
+    var polys = geom.type === "Polygon" ? [geom.coordinates]
+      : geom.type === "MultiPolygon" ? geom.coordinates : [];
+    return polys.map(function (poly) {
+      var norm = poly.map(normRing);
+      return { rings: norm, area: ringArea(norm[0]) };
+    }).sort(function (a, b) { return b.area - a.area; });
+  }
+
+  // Simple average-of-vertices centroid (last-resort fallback if polylabel
+  // is unavailable or errors). Operates in the same unwrapped space.
+  function ringCentroid(ring) {
+    var x = 0, y = 0, m = ring.length - 1; // skip the closing duplicate point
+    if (m < 1) m = ring.length;
+    for (var i = 0; i < m; i++) { x += ring[i][0]; y += ring[i][1]; }
+    return [x / m, y / m];
+  }
+
+  // Place each country's name label at the visual center (pole of
+  // inaccessibility) of its LARGEST landmass. Coordinates are computed in
+  // unwrapped space then wrapped back — we never use getBounds(), whose center
+  // lands mid-Atlantic for antimeridian-spanning countries like USA/Russia.
+  function placeCountryLabels() {
+    countries.forEach(function (entry) {
+      if (entry.labelPlaced) return;
+      var parts;
+      try { parts = allPolygonParts(entry.layer.feature && entry.layer.feature.geometry); }
+      catch (e) { parts = []; }
+      if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;
+
+      var html = '<a href="' + wikiUrl(entry.name) + '" target="_blank" rel="noopener">' +
+        escapeHtml(entry.name) + '</a>';
+      entry.labelTooltip = L.tooltip({
+        permanent: true, direction: "center", offset: [0, 0],
+        className: "map-label country-label", opacity: 1, interactive: true
+      }).setLatLng(centerOf(parts[0].rings)).setContent(html).addTo(map);
+      entry.labelPlaced = true;
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+allowBuilds:
+  esbuild: true
 # Allow esbuild (used by Vite) to run its install build script, and skip the
 # pre-run dependency check (pnpm 10/11 otherwise aborts `pnpm build` with
 # ERR_PNPM_IGNORED_BUILDS over esbuild's install script).

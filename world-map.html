@@ -424,6 +424,25 @@
     });
   }
 
+  // Flags scale with zoom (bigger when zoomed in), like the map features.
+  function flagIcon(iso2, zoom) {
+    var scale = Math.min(1 + (zoom - 2) * 0.35, 3); // 24px at z2 → up to ~72px
+    var w = Math.round(24 * scale), h = Math.round(18 * scale);
+    return L.divIcon({
+      className: "flag-icon",
+      html: '<img src="https://flagcdn.com/48x36/' + iso2 + '.png" width="' + w +
+        '" height="' + h + '" alt="">',
+      iconSize: [w, h], iconAnchor: [w / 2, h + 8] // sit just above the centroid
+    });
+  }
+  function updateFlagSizes() {
+    var z = map.getZoom();
+    countries.forEach(function (e) {
+      if (e.flagMarker && e.iso2) e.flagMarker.setIcon(flagIcon(e.iso2, z));
+    });
+  }
+  map.on("zoomend", updateFlagSizes);
+
   function refreshAll() { refreshPolygons(); refreshConnectors(); refreshCountryLabels(); refreshCapitals(); refreshFlags(); }
 
   // Single-choice selection. toggle=true (map click) deselects if you click the
@@ -701,12 +720,7 @@
       // name label. Visibility is managed by refreshFlags(); not added here.
       if (entry.iso2) {
         entry.flagMarker = L.marker(center, {
-          interactive: false, keyboard: false,
-          icon: L.divIcon({
-            className: "flag-icon",
-            html: '<img src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" width="24" height="18" alt="">',
-            iconSize: [24, 18], iconAnchor: [12, 26]
-          })
+          interactive: false, keyboard: false, icon: flagIcon(entry.iso2, map.getZoom())
         });
       }
       entry.labelPlaced = true;

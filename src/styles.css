@@ -76,3 +76,17 @@ body { display: flex; font-family: system-ui, sans-serif; }
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
 }
 .leaflet-interactive { cursor: pointer; }
+
+/* Hover info panel — shows the hovered country's flag/name/capital off-map, so
+   it never interferes with the polygon's hover/click (no flicker). */
+#hoverinfo {
+  position: fixed; z-index: 1100; left: 286px; bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.2); pointer-events: none;
+  font: 14px system-ui, sans-serif; color: #1b3a5c; max-width: 320px;
+}
+#hoverinfo[hidden] { display: none; }
+#hoverinfo img { width: 32px; height: 24px; box-shadow: 0 0 2px rgba(0,0,0,.45); border-radius: 2px; flex: 0 0 auto; }
+#hoverinfo .hi-name { font-weight: 600; }
+#hoverinfo .hi-cap { color: #8a1d16; font-size: 12px; }

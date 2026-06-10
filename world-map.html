@@ -84,7 +84,7 @@
       <input type="checkbox" id="show-capitals" /> Show capitals on map
     </label>
     <label id="iso-toggle">
-      <input type="checkbox" id="isolate" checked /> Isolate selected country (hide others)
+      <input type="checkbox" id="isolate" /> Isolate selected country (hide others)
     </label>
   </header>
   <div id="count"></div>
@@ -267,7 +267,7 @@
   var hoveredLayer = null;
   var showNames = false;     // "Show country names" checkbox (default off)
   var showCapitals = false;  // "Show capitals" checkbox (default off)
-  var isolate = true;        // "Isolate selected country" checkbox
+  var isolate = false;       // "Isolate selected country" checkbox (default off)
 
   function sovOf(layer) {
     var p = (layer && layer.feature && layer.feature.properties) || {};

@@ -1,0 +1,23 @@
+{
+  "name": "world-map",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Interactive world map: countries, capitals, flags and Wikipedia links.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "polylabel": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.0"
+  }
+}

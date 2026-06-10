@@ -1,0 +1,72 @@
+html, body { margin: 0; height: 100%; }
+body { display: flex; font-family: system-ui, sans-serif; }
+
+#sidebar {
+  width: 270px; flex: 0 0 270px; height: 100vh; box-sizing: border-box;
+  display: flex; flex-direction: column; border-right: 1px solid #d8d8d8;
+  background: #fff;
+}
+#sidebar header { padding: 12px 14px 8px; border-bottom: 1px solid #eee; }
+#sidebar h1 { font-size: 15px; margin: 0 0 8px; color: #1b3a5c; }
+#search {
+  width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 13px;
+  border: 1px solid #ccc; border-radius: 6px;
+}
+#cap-toggle, #name-toggle, #iso-toggle, #flag-toggle {
+  display: flex; align-items: center; gap: 6px; margin-top: 9px;
+  font-size: 13px; color: #333; cursor: pointer; user-select: none;
+}
+#cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input { cursor: pointer; }
+
+/* Flag markers */
+.flag-icon { background: none !important; border: none !important; }
+.flag-icon img { display: block; box-shadow: 0 0 2px rgba(0,0,0,.55); border-radius: 2px; }
+
+#count { font-size: 12px; color: #888; padding: 6px 14px; }
+#country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+#country-list li {
+  padding: 7px 14px; cursor: pointer; font-size: 13px; color: #222;
+  border-bottom: 1px solid #f2f2f2; display: flex; justify-content: space-between;
+  gap: 8px; align-items: baseline;
+}
+#country-list li:hover { background: #eaf2fb; }
+#country-list li .cap { font-size: 11px; color: #8a1d16; white-space: nowrap; }
+#country-list a {
+  color: #3878c7; text-decoration: none; font-size: 11px; flex: 0 0 auto;
+}
+#country-list a:hover { text-decoration: underline; }
+
+#map { flex: 1; height: 100vh; background: #aadaff; }
+#status {
+  position: fixed; z-index: 1000; top: 50%; left: 60%;
+  transform: translate(-50%, -50%);
+  font: 15px/1.4 system-ui, sans-serif; color: #333;
+  background: rgba(255,255,255,.92); padding: 14px 18px;
+  border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.18);
+}
+
+/* Permanent map labels: no box, just text */
+.map-label {
+  background: transparent; border: none; box-shadow: none;
+  padding: 0; white-space: nowrap; pointer-events: none;
+}
+.map-label.leaflet-tooltip-top:before,
+.map-label.leaflet-tooltip-bottom:before,
+.map-label.leaflet-tooltip-left:before,
+.map-label.leaflet-tooltip-right:before { display: none; }
+/* Only the text itself is clickable; gaps stay click-through for panning. */
+.map-label a { pointer-events: auto; cursor: pointer; text-decoration: none; color: inherit; }
+.map-label a:hover { text-decoration: underline; }
+.country-label {
+  font: 600 12px system-ui, sans-serif; color: #1b3a5c;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+.capital-label {
+  font: 500 11px system-ui, sans-serif; color: #8a1d16;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+.connector-label {
+  font: 600 10px system-ui, sans-serif; color: #8a3b00; font-style: italic;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+.leaflet-interactive { cursor: pointer; }

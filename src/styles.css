@@ -104,8 +104,17 @@ body { display: flex; font-family: system-ui, sans-serif; }
   text-transform: uppercase; color: #5a6b7a;
 }
 .filter-sort { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 9px; }
-.filter-sort #search { flex: 2 1 140px; width: auto; margin-top: 0; }
+.filter-sort .search-wrap { flex: 2 1 140px; position: relative; display: flex; }
+.filter-sort #search { width: 100%; margin-top: 0; padding-right: 26px; }
 .filter-sort #sort-row { flex: 1 1 120px; margin-top: 0; }
+#search::-webkit-search-cancel-button { display: none; }
+#search-clear {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border: none; background: none; cursor: pointer;
+  color: #9aa6b1; font-size: 17px; line-height: 1; padding: 0; border-radius: 50%;
+}
+#search-clear:hover { color: #444; background: #eef2f6; }
+#search-clear[hidden] { display: none; }
 #search {
   width: 100%; box-sizing: border-box; margin-top: 9px; padding: 7px 9px;
   font-size: 13px; border: 1px solid #ccc; border-radius: 6px;

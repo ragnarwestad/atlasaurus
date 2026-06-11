@@ -39,7 +39,10 @@
           <button type="button" class="sb-tab" data-tab="continents">Continents (<span id="cont-num">0</span>)</button>
         </div>
         <div class="filter-sort">
-          <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+          <span class="search-wrap">
+            <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+            <button id="search-clear" type="button" title="Clear filter" aria-label="Clear filter" hidden>×</button>
+          </span>
           <label id="sort-row">Sort
             <select id="sort">
               <option value="name">Name (A–Z)</option>

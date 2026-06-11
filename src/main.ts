@@ -771,7 +771,7 @@ function setActiveTab(tab: "countries" | "continents"): void {
   const countries$ = tab === "countries";
   (document.getElementById("country-list") as HTMLElement).hidden = !countries$;
   (document.getElementById("continent-list") as HTMLElement).hidden = countries$;
-  (document.getElementById("search") as HTMLElement).style.display = countries$ ? "" : "none";
+  (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
 
   buildContinentList(); // reflect cleared expand/selection state
   refreshAll();         // restyle map, panels, reveals (toggle scope depends on tab)
@@ -1420,7 +1420,15 @@ document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
 });
 
 const searchInput = document.getElementById("search") as HTMLInputElement;
-searchInput.addEventListener("input", applyFilter);
+const searchClear = document.getElementById("search-clear") as HTMLButtonElement;
+function syncSearchClear(): void { searchClear.hidden = searchInput.value === ""; }
+searchInput.addEventListener("input", () => { applyFilter(); syncSearchClear(); });
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  applyFilter();
+  syncSearchClear();
+  searchInput.focus();
+});
 
 const sortSelect = document.getElementById("sort") as HTMLSelectElement;
 sortSelect.addEventListener("change", () => {

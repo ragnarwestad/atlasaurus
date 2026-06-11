@@ -40,13 +40,21 @@
         <div class="sb-tabs">
           <button type="button" id="list-fold" class="list-fold" title="Show / hide the list" aria-label="Show / hide the list"><span class="fold-caret"></span></button>
           <button type="button" class="sb-tab active" data-tab="countries">Countries (<span id="count-num">0</span>)</button>
-          <button type="button" class="sb-tab" data-tab="continents">Continents (<span id="cont-num">0</span>)</button>
+          <button type="button" class="sb-tab" data-tab="continents">Regions (<span id="cont-num">0</span>)</button>
         </div>
         <div class="filter-sort">
           <span class="search-wrap">
             <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
             <button id="search-clear" type="button" title="Clear filter" aria-label="Clear filter" hidden>×</button>
           </span>
+          <label id="scheme-row" hidden>Group by
+            <select id="scheme">
+              <option value="continent">Continents</option>
+              <option value="unRegion">UN regions</option>
+              <option value="subregion">UN subregions</option>
+              <option value="wbRegion">World Bank regions</option>
+            </select>
+          </label>
           <label id="sort-row">Sort
             <select id="sort">
               <option value="name">Name (A–Z)</option>
@@ -122,8 +130,9 @@
       <h3>Explore</h3>
       <ul>
         <li><b>Countries</b> tab — search the list; click a country to zoom in and select it.</li>
-        <li><b>Continents</b> tab — click a continent to highlight its countries and see
-            totals; expand it to list them.</li>
+        <li><b>Regions</b> tab — click a region to highlight its countries and see totals;
+            expand it to list them. <b>Group by</b> switches the division: continents,
+            UN regions, UN subregions (Caribbean, Western Europe…), or World Bank regions.</li>
         <li><b>Sort</b> by name, population or area (the value is shown after the name).</li>
         <li><b>Hover</b> a country for a flag · name · capital tooltip at the cursor.</li>
         <li><b>Select</b> a country for a fact panel (population, area, GDP, currency,

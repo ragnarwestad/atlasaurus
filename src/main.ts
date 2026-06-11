@@ -72,6 +72,24 @@ let showCapitals = false;
 let showFlags = false;
 let isolate = false;
 
+// Region grouping scheme for the Explore "Regions" tab. The quiz always uses
+// standard continents. Non-continent schemes read straight from the Natural
+// Earth feature properties we already load (REGION_UN / SUBREGION / REGION_WB).
+type GroupScheme = "continent" | "unRegion" | "subregion" | "wbRegion";
+let groupScheme: GroupScheme = "continent";
+const SCHEME_PROP: Record<Exclude<GroupScheme, "continent">, string> = {
+  unRegion: "REGION_UN", subregion: "SUBREGION", wbRegion: "REGION_WB",
+};
+const SCHEME_LABEL: Record<GroupScheme, string> = {
+  continent: "Continent", unRegion: "UN region", subregion: "UN subregion", wbRegion: "World Bank region",
+};
+function groupOf(e: CountryEntry): string {
+  if (groupScheme === "continent") return e.continent || "Other";
+  const p = (e.layer.feature && e.layer.feature.properties) || {};
+  const v = p[SCHEME_PROP[groupScheme]];
+  return (v != null && String(v).trim()) ? String(v).trim() : "Other";
+}
+
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
 let quizType: "name" | "flag" | "capital" | "continent" | "neighbour" = "name";
@@ -112,7 +130,7 @@ function countryVisible(e: CountryEntry): boolean {
   if (mode === "quiz") return true; // everything visible/clickable in the quiz
   // A selected continent takes precedence: keep showing all its members (the
   // selected country, if any, is one of them).
-  if (isolate && selectedContinent) return (e.continent || "Other") === selectedContinent;
+  if (isolate && selectedContinent) return groupOf(e) === selectedContinent;
   if (isolate && selectedLayer) return e.layer === selectedLayer || sameRealm(e);
   return true;
 }
@@ -121,7 +139,7 @@ function countryVisible(e: CountryEntry): boolean {
 //  - Countries tab: global (all countries).
 //  - Continents tab: only the selected continent's members (nothing if none).
 function inToggleScope(e: CountryEntry): boolean {
-  if (activeTab === "continents") return selectedContinent != null && (e.continent || "Other") === selectedContinent;
+  if (activeTab === "continents") return selectedContinent != null && groupOf(e) === selectedContinent;
   return true;
 }
 
@@ -369,7 +387,7 @@ function renderContinentInfo(name: string): void {
     countryInfoEl.style.bottom = "";
   }
   currentInfoContinent = name;
-  const members = countries.filter((e) => (e.continent || "Other") === name && !e.isLandmass);
+  const members = countries.filter((e) => groupOf(e) === name && !e.isLandmass);
   let pop = 0, gdp = 0, area = 0, topName = "", topPop = -1;
   members.forEach((e) => {
     const p = ((e.layer as any).feature && (e.layer as any).feature.properties) || {};
@@ -384,12 +402,15 @@ function renderContinentInfo(name: string): void {
   if (gdp) rows.push(["GDP", "$" + fmtInt(gdp) + " M"]);
   if (topName) rows.push(["Most populous", escapeHtml(topName)]);
   const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
-  const titleLink = name !== "Other"
+  // Link geographic names to Wikipedia; World Bank names ("Latin America &
+  // Caribbean" etc.) aren't article titles, so show them as plain text.
+  const linkable = name !== "Other" && groupScheme !== "wbRegion";
+  const titleLink = linkable
     ? '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + ' <span class="ext">↗</span></a>'
     : escapeHtml(name);
   countryInfoEl.innerHTML =
     '<div class="ci-head"><div><div class="ci-title">' + titleLink + "</div>" +
-    '<div class="ci-sub">Continent</div></div>' +
+    '<div class="ci-sub">' + SCHEME_LABEL[groupScheme] + "</div></div>" +
     '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' +
     "<dl>" + dl + "</dl>";
   countryInfoEl.hidden = false;
@@ -438,12 +459,12 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
   // Hidden in isolate mode: continent context wins (hide non-members); else the
   // single-country context (hide everything but it and its realm siblings).
   if (isolate && selectedContinent) {
-    if ((e.continent || "Other") !== selectedContinent) return null;
+    if (groupOf(e) !== selectedContinent) return null;
   } else if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) {
     return null;
   }
   if (e.layer === selectedLayer) return selectedStyle;                                   // selected country (orange)
-  if (selectedContinent && (e.continent || "Other") === selectedContinent) return continentStyle; // continent member (green)
+  if (selectedContinent && groupOf(e) === selectedContinent) return continentStyle; // region member (green)
   if (sameRealm(e)) return relatedStyle;
   if (e.layer === hoveredLayer) return hoverStyle;
   return baseStyle;
@@ -586,7 +607,7 @@ function selectContinent(name: string): void {
   if (selectedContinent) {
     let b: L.LatLngBounds | null = null;
     countries.forEach((e) => {
-      if ((e.continent || "Other") !== selectedContinent) return;
+      if (groupOf(e) !== selectedContinent) return;
       try {
         const lb = e.layer.getBounds();
         b = b ? b.extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
@@ -617,6 +638,8 @@ function updateListVisibility(): void {
   (document.getElementById("continent-list") as HTMLElement).hidden = !listExpanded || countries$;
   (document.querySelector(".filter-sort") as HTMLElement).style.display = listExpanded ? "" : "none";
   (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
+  // The "Group by" scheme picker belongs only to the Regions tab.
+  (document.getElementById("scheme-row") as HTMLElement).hidden = countries$ || !listExpanded;
   const sec = document.querySelector(".sb-tabsec") as HTMLElement;
   if (sec) sec.classList.toggle("collapsed", !listExpanded);
 }
@@ -713,8 +736,8 @@ function buildContinentList(): void {
   const counts: Record<string, number> = {};
   const byCont: Record<string, CountryEntry[]> = {};
   countries.forEach((e) => {
-    const g = e.continent || "Other";
-    if (e.isLandmass) { counts[g] = counts[g] || 0; return; } // list the continent, 0 countries
+    const g = groupOf(e);
+    if (e.isLandmass) { counts[g] = counts[g] || 0; return; } // list the group, 0 countries
     counts[g] = (counts[g] || 0) + 1;
     (byCont[g] = byCont[g] || []).push(e);
   });
@@ -950,8 +973,8 @@ function loadBorders(): void {
               else { if (locMode === "map") handleGuess(entry); }
               return;
             }
-            // The Antarctica landmass selects its continent, not a "country".
-            if (isLandmass) selectContinent(continent); else selectLayer(layerP, true);
+            // The Antarctica landmass selects its region group, not a "country".
+            if (isLandmass) selectContinent(groupOf(entry)); else selectLayer(layerP, true);
           },
         });
       },
@@ -1459,6 +1482,16 @@ sortSelect.addEventListener("change", () => {
   // Area needs the country dataset; load it first if sorting by area.
   if (sortBy === "area" && !countryData) loadCountryData().then(buildSidebar).catch(buildSidebar);
   else buildSidebar();
+});
+
+const schemeSelect = document.getElementById("scheme") as HTMLSelectElement;
+schemeSelect.addEventListener("change", () => {
+  groupScheme = schemeSelect.value as GroupScheme;
+  // Group names differ per scheme, so any current region selection is stale.
+  selectedContinent = null;
+  expandedContinent = null;
+  buildContinentList();
+  refreshAll();
 });
 
 map.on("click", () => {        // background click clears selection

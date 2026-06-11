@@ -51,6 +51,7 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png
 const capitalLayer = L.layerGroup().addTo(map);    // capital dots + name labels
 const connectorLayer = L.layerGroup().addTo(map);  // satellite/sovereignty lines
 const flagLayer = L.layerGroup().addTo(map);       // flag images
+const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 
 // ---------------------------------------------------------------------------
 // State
@@ -893,6 +894,14 @@ function renderQuizPrompt(): void {
 function renderQuizScore(): void {
   quizScoreEl.textContent = quizTotal ? "Score: " + quizCorrect + " / " + quizTotal : "";
 }
+function layerCenter(entry: CountryEntry): LatLng | null {
+  try {
+    const parts = allPolygonParts((entry.layer as any).feature && (entry.layer as any).feature.geometry);
+    if (parts.length) return centerOf(parts[0].rings);
+  } catch { /* ignore */ }
+  return null;
+}
+
 function nextQuestion(): void {
   const pool = realCountries();
   if (!pool.length) return;
@@ -901,6 +910,7 @@ function nextQuestion(): void {
   quizTarget = t;
   quizGuess = null;
   quizAnswered = false;
+  quizLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   quizFeedbackEl.textContent = "Click it on the map.";
@@ -913,6 +923,7 @@ function handleGuess(entry: CountryEntry): void {
   quizAnswered = true;
   quizTotal++;
   const ok = entry === quizTarget;
+  quizLayer.clearLayers();
   if (ok) {
     quizCorrect++;
     quizFeedbackEl.className = "correct";
@@ -920,14 +931,22 @@ function handleGuess(entry: CountryEntry): void {
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
-      '. <a href="#" class="quiz-zoom">' + escapeHtml(quizTarget.name) + "</a> is shown in green.";
+      '. <a href="#" class="quiz-zoom">' + escapeHtml(quizTarget.name) + "</a> is the right one.";
     const z = quizFeedbackEl.querySelector(".quiz-zoom");
     if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
+    // Draw a line from the guess to the correct country so its location is clear
+    // even when it's a tiny island. (No auto-zoom — use the link for that.)
+    const a = layerCenter(entry), b = layerCenter(quizTarget);
+    if (a && b) {
+      L.polyline([a, b], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
+      L.circleMarker(b, { radius: 6, color: "#1b7a3d", weight: 2, fillColor: "#54c47e", fillOpacity: 1 })
+        .bindTooltip(escapeHtml(quizTarget.name), { permanent: false, direction: "top" }).addTo(quizLayer);
+      L.circleMarker(a, { radius: 5, color: "#9c1b12", weight: 2, fillColor: "#e8675c", fillOpacity: 1 }).addTo(quizLayer);
+    }
   }
   renderQuizScore();
   quizNextBtn.disabled = false;
   refreshPolygons();
-  zoomToTarget(5); // overview of the correct location; click the name to zoom right in
 }
 
 function zoomToTarget(maxZoom: number): void {
@@ -940,7 +959,9 @@ function setMode(m: "explore" | "quiz"): void {
   (document.getElementById("explore-panel") as HTMLElement).hidden = m !== "explore";
   (document.getElementById("quiz-panel") as HTMLElement).hidden = m !== "quiz";
   hideHoverInfo();
-  if (m === "quiz") {
+  if (m === "explore") {
+    quizLayer.clearLayers();
+  } else {
     selectedLayer = null; selectedContinent = null; expandedContinent = null;
     if (!quizStarted) { quizStarted = true; quizCorrect = 0; quizTotal = 0; nextQuestion(); }
     renderQuizScore();

@@ -107,8 +107,9 @@ body { display: flex; font-family: system-ui, sans-serif; }
   width: 100%; box-sizing: border-box; margin-top: 9px; padding: 7px 9px;
   font-size: 13px; border: 1px solid #ccc; border-radius: 6px;
 }
+.map-toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 9px; }
 #cap-toggle, #name-toggle, #iso-toggle, #flag-toggle {
-  display: flex; align-items: center; gap: 6px; margin-top: 9px;
+  display: flex; align-items: center; gap: 6px;
   font-size: 13px; color: #333; cursor: pointer; user-select: none;
 }
 #cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input { cursor: pointer; }

@@ -17,6 +17,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
   font-size: 13px; color: #333; cursor: pointer; user-select: none;
 }
 #cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input, #group-toggle input { cursor: pointer; }
+/* Set the grouping control apart from the map-display toggles, just above the list. */
+#group-toggle { margin-top: 12px; padding-top: 11px; border-top: 1px solid #e6ebf0; font-weight: 600; color: #1b3a5c; }
 
 /* Flag markers — pointer-transparent so hovered flags never steal the cursor
    from the polygon (which would break click-to-select). */

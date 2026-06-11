@@ -383,6 +383,12 @@ const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South Ame
 const collapsedGroups: Record<string, boolean> = {};
 let groupByContinent = true;
 
+// Collapse every continent — so enabling grouping lands on a clean overview of
+// the continents, not a long expanded list.
+function collapseAllContinents(): void {
+  countries.forEach((e) => { collapsedGroups[e.continent || "Other"] = true; });
+}
+
 function makeCountryLi(entry: CountryEntry, group: string): HTMLLIElement {
   const li = document.createElement("li");
   li.className = "country";
@@ -415,11 +421,13 @@ function applyFilter(): void {
   let shown = 0;
   const visibleByGroup: Record<string, number> = {};
 
+  const searching = q.length > 0;
   ul.querySelectorAll<HTMLElement>("li.country").forEach((li) => {
     const g = li.dataset.group || "";
     const matches = (li.dataset.name || "").indexOf(q) !== -1;
     if (matches) { shown++; if (g) visibleByGroup[g] = (visibleByGroup[g] || 0) + 1; }
-    li.style.display = matches && !(g && collapsedGroups[g]) ? "" : "none";
+    // While searching, show matches even inside collapsed continents.
+    li.style.display = matches && (searching || !(g && collapsedGroups[g])) ? "" : "none";
   });
   ul.querySelectorAll<HTMLElement>("li.grp").forEach((h) => {
     h.style.display = (visibleByGroup[h.dataset.group || ""] || 0) > 0 ? "" : "none";
@@ -623,6 +631,7 @@ function loadBorders(): void {
     }).addTo(map);
 
     (map as any).borderLayer = layer;
+    if (groupByContinent) collapseAllContinents(); // start collapsed (continent overview)
     buildSidebar();
     placeCountryLabels();
     refreshCountryLabels(); // honour default (names off) once labels exist
@@ -650,7 +659,11 @@ const isoToggle = document.getElementById("isolate") as HTMLInputElement;
 isoToggle.addEventListener("change", () => { isolate = isoToggle.checked; refreshAll(); });
 
 const groupToggle = document.getElementById("group-continents") as HTMLInputElement;
-groupToggle.addEventListener("change", () => { groupByContinent = groupToggle.checked; buildSidebar(); });
+groupToggle.addEventListener("change", () => {
+  groupByContinent = groupToggle.checked;
+  if (groupByContinent) collapseAllContinents(); // focus on the continents
+  buildSidebar();
+});
 
 const searchInput = document.getElementById("search") as HTMLInputElement;
 searchInput.addEventListener("input", applyFilter);

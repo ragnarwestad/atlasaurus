@@ -322,15 +322,33 @@ function updateInfoPanel(): void {
   currentInfoContinent = null;
 }
 
+function isNarrow(): boolean { return window.matchMedia("(max-width: 700px)").matches; }
+
+// On a fresh selection, default the bottom sheet to collapsed on small screens
+// (so it doesn't cover the map) and drop any leftover drag offset.
+function defaultPanelLayout(isNew: boolean): void {
+  if (!isNew) return;
+  if (isNarrow()) {
+    countryInfoEl.classList.add("collapsed");
+    countryInfoEl.style.left = "";
+    countryInfoEl.style.top = "";
+    countryInfoEl.style.bottom = "";
+  } else {
+    countryInfoEl.classList.remove("collapsed");
+  }
+}
+
 function renderCountryInfo(): void {
   currentInfoContinent = null;
   const props = ((selectedLayer as any).feature && (selectedLayer as any).feature.properties) || {};
   const entry = entryForLayer(selectedLayer);
   const code: string | null = props.ADM0_A3 || props.adm0_a3 || null;
+  const isNew = code !== currentInfoCode;
   currentInfoCode = code;
   const conn = selectedLayer ? computeConnectors(selectedLayer) : null;
   const territories = conn ? conn.items.map((i) => i.name).sort((a, b) => a.localeCompare(b)) : [];
   renderInfo(props, entry, (countryData && code) ? countryData[code] || null : null, territories);
+  defaultPanelLayout(isNew);
 
   // Lazy-load area/currency/languages the first time, then re-render.
   if (!countryData) {
@@ -342,6 +360,14 @@ function renderCountryInfo(): void {
 
 function renderContinentInfo(name: string): void {
   currentInfoCode = null;
+  if (name !== currentInfoContinent && isNarrow()) {
+    // Continent panel has no collapse toggle — just clear any drag offset so it
+    // sits as a proper full-width bottom sheet (and isn't a leftover strip).
+    countryInfoEl.classList.remove("collapsed");
+    countryInfoEl.style.left = "";
+    countryInfoEl.style.top = "";
+    countryInfoEl.style.bottom = "";
+  }
   currentInfoContinent = name;
   const members = countries.filter((e) => (e.continent || "Other") === name && !e.isLandmass);
   let pop = 0, gdp = 0, area = 0, topName = "", topPop = -1;

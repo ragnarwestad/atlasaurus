@@ -32,6 +32,15 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .sb-tab:hover { color: #3878c7; }
 .sb-tab.active { color: #1b3a5c; border-bottom-color: #3878c7; }
 
+#sort-row {
+  display: flex; align-items: center; gap: 6px; margin-top: 9px;
+  font-size: 12px; color: #5a6b7a;
+}
+#sort-row select {
+  flex: 1; padding: 5px 6px; font-size: 13px; border: 1px solid #ccc; border-radius: 6px;
+  background: #fff; color: #222; cursor: pointer;
+}
+
 /* Continent list (headers + expandable member countries) */
 #continent-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 #continent-list li.cont-head {

@@ -490,6 +490,21 @@ function focusCountry(entry: CountryEntry): void {
 const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 let activeTab: "countries" | "continents" = "countries";
 let expandedContinent: string | null = null; // which continent's countries are shown in the Continents tab
+let sortBy: "name" | "population" | "area" = "name";
+
+function popOf(e: CountryEntry): number {
+  const p = ((e.layer as any).feature && (e.layer as any).feature.properties) || {};
+  return p.POP_EST || 0;
+}
+function areaOf(e: CountryEntry): number {
+  return (countryData && e.iso && countryData[e.iso] && countryData[e.iso].area) || 0;
+}
+// Comparator for the current sort: population/area descending, else A–Z.
+function cmpCountries(a: CountryEntry, b: CountryEntry): number {
+  if (sortBy === "population") return popOf(b) - popOf(a) || a.name.localeCompare(b.name);
+  if (sortBy === "area") return areaOf(b) - areaOf(a) || a.name.localeCompare(b.name);
+  return a.name.localeCompare(b.name);
+}
 
 function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   const li = document.createElement("li");
@@ -551,10 +566,17 @@ function buildContinentList(): void {
     counts[g] = (counts[g] || 0) + 1;
     (byCont[g] = byCont[g] || []).push(e);
   });
-  const order = Object.keys(counts).sort((a, b) => {
-    const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
-  });
+  const order = Object.keys(counts);
+  if (sortBy === "name") {
+    order.sort((a, b) => {
+      const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+  } else {
+    // Sort continents by total population / area of their members (descending).
+    const metric = (g: string) => (byCont[g] || []).reduce((s, e) => s + (sortBy === "population" ? popOf(e) : areaOf(e)), 0);
+    order.sort((a, b) => metric(b) - metric(a) || a.localeCompare(b));
+  }
 
   const cl = document.getElementById("continent-list")!;
   cl.innerHTML = "";
@@ -574,7 +596,7 @@ function buildContinentList(): void {
     cl.appendChild(head);
 
     if (expandedContinent === g) {
-      (byCont[g] || []).sort((a, b) => a.name.localeCompare(b.name)).forEach((entry) => {
+      (byCont[g] || []).slice().sort(cmpCountries).forEach((entry) => {
         const li = makeCountryLi(entry);
         li.classList.add("cont-member");
         cl.appendChild(li);
@@ -585,11 +607,10 @@ function buildContinentList(): void {
 }
 
 function buildSidebar(): void {
-  // Flat A–Z country list (Countries tab) — excludes the Antarctica landmass.
+  // Flat country list (Countries tab) — excludes the Antarctica landmass.
   const ul = document.getElementById("country-list")!;
   ul.innerHTML = "";
-  realCountries().sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((entry) => ul.appendChild(makeCountryLi(entry)));
+  realCountries().sort(cmpCountries).forEach((entry) => ul.appendChild(makeCountryLi(entry)));
   document.getElementById("count-num")!.textContent = String(realCountries().length);
 
   buildContinentList();
@@ -819,6 +840,14 @@ document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
 
 const searchInput = document.getElementById("search") as HTMLInputElement;
 searchInput.addEventListener("input", applyFilter);
+
+const sortSelect = document.getElementById("sort") as HTMLSelectElement;
+sortSelect.addEventListener("change", () => {
+  sortBy = sortSelect.value as "name" | "population" | "area";
+  // Area needs the country dataset; load it first if sorting by area.
+  if (sortBy === "area" && !countryData) loadCountryData().then(buildSidebar).catch(buildSidebar);
+  else buildSidebar();
+});
 
 map.on("click", () => {        // background click clears selection
   if (suppressMapClick) return; // ignore the click that came from a country

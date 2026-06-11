@@ -53,6 +53,7 @@ const connectorLayer = L.layerGroup().addTo(map);  // satellite/sovereignty line
 const flagLayer = L.layerGroup().addTo(map);       // flag images
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
+const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
 
 // ---------------------------------------------------------------------------
 // State
@@ -605,6 +606,7 @@ function refreshAll(): void {
   refreshFlags();
   updateInfoPanel();
   markActiveContinent();
+  updateRegionLabels();
 }
 
 /** Single-country selection; toggle=true (map click) deselects the same country.
@@ -1166,6 +1168,41 @@ function showContinentLabels(): void {
     if (!pos) return;
     L.tooltip({ permanent: true, direction: "center", interactive: false, className: "map-label quiz-cont-label" })
       .setLatLng(pos).setContent(escapeHtml(c)).addTo(quizContLayer);
+  });
+}
+
+// Area-weighted centre of a region's member countries, with a circular mean for
+// longitude so regions straddling the antimeridian don't land in mid-ocean.
+function groupLabelPos(members: CountryEntry[]): [number, number] | null {
+  let sx = 0, sy = 0, slat = 0, w = 0;
+  members.forEach((e) => {
+    const c = layerCenter(e);
+    if (!c) return;
+    let wt = 1;
+    try { const b = e.layer.getBounds(); wt = Math.max(0.01, (b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest())); } catch { /* keep 1 */ }
+    const r = (c[1] * Math.PI) / 180;
+    sx += wt * Math.cos(r); sy += wt * Math.sin(r); slat += wt * c[0]; w += wt;
+  });
+  if (!w) return null;
+  return [slat / w, (Math.atan2(sy, sx) * 180) / Math.PI];
+}
+
+// Explore Regions tab: draw each region's name on the map (like the continent
+// quiz). Cleared in the quiz and on the Countries tab.
+function updateRegionLabels(): void {
+  regionLabelLayer.clearLayers();
+  if (mode !== "explore" || activeTab !== "continents") return;
+  const byGroup: Record<string, CountryEntry[]> = {};
+  realCountries().forEach((e) => { const g = groupOf(e); if (g !== "Other") (byGroup[g] = byGroup[g] || []).push(e); });
+  Object.keys(byGroup).forEach((g) => {
+    const pos = (groupScheme === "continent" && CONTINENT_LABEL_POS[g]) || groupLabelPos(byGroup[g]);
+    if (!pos) return;
+    const hue = regionHue[g];
+    const html = hue != null
+      ? '<span style="color:hsl(' + hue + ',55%,30%)">' + escapeHtml(g) + "</span>"
+      : escapeHtml(g);
+    L.tooltip({ permanent: true, direction: "center", interactive: false, className: "map-label region-name-label" })
+      .setLatLng(pos).setContent(html).addTo(regionLabelLayer);
   });
 }
 

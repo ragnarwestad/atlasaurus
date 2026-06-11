@@ -64,6 +64,10 @@ body { display: flex; font-family: system-ui, sans-serif; }
   letter-spacing: .08em; opacity: .85;
   text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff;
 }
+.region-name-label {
+  font: 800 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em;
+  opacity: .9; text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff;
+}
 .quiz-actions { display: flex; gap: 8px; margin-top: 6px; }
 .quiz-actions button {
   flex: 1; padding: 8px; font: 600 13px system-ui, sans-serif; cursor: pointer;

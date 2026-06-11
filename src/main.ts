@@ -919,12 +919,20 @@ function handleGuess(entry: CountryEntry): void {
     quizFeedbackEl.textContent = "✓ Correct!";
   } else {
     quizFeedbackEl.className = "wrong";
-    quizFeedbackEl.textContent = "✗ That's " + entry.name + ". " + quizTarget.name + " is shown in green.";
+    quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
+      '. <a href="#" class="quiz-zoom">' + escapeHtml(quizTarget.name) + "</a> is shown in green.";
+    const z = quizFeedbackEl.querySelector(".quiz-zoom");
+    if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
   }
   renderQuizScore();
   quizNextBtn.disabled = false;
   refreshPolygons();
-  try { map.fitBounds(quizTarget.layer.getBounds(), { maxZoom: 5, padding: [50, 50] }); } catch { /* ignore */ }
+  zoomToTarget(5); // overview of the correct location; click the name to zoom right in
+}
+
+function zoomToTarget(maxZoom: number): void {
+  if (!quizTarget) return;
+  try { map.fitBounds(quizTarget.layer.getBounds(), { maxZoom, padding: [50, 50] }); } catch { /* ignore */ }
 }
 function setMode(m: "explore" | "quiz"): void {
   mode = m;

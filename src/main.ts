@@ -351,7 +351,7 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
       } else if (quizType === "neighbour") {
         if (e === quizTarget) return selectedStyle;          // the anchor country (orange)
         if (quizNeighbourSet.has(e)) return quizCorrectStyle; // its neighbours (green)
-        if (quizGuess && e === quizGuess) return quizWrongStyle; // wrong guess (red)
+        if (nbSelected.has(e)) return quizWrongStyle;        // a wrong pick (red)
         return baseStyle; // answered → no per-country hover
       } else {
         if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
@@ -365,6 +365,8 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         const hot = hoveredContinent && (e.continent || "Other") === hoveredContinent;
         return hot ? { ...st, fillOpacity: 0.82, weight: 1.5 } : st;
       }
+    } else if (quizType === "neighbour" && nbSelected.has(e)) {
+      return relatedStyle; // your current picks (before checking)
     }
     if (e.layer === hoveredLayer) return hoverStyle;
     return baseStyle;
@@ -869,7 +871,7 @@ function loadBorders(): void {
             setTimeout(() => { suppressMapClick = false; }, 0);
             if (mode === "quiz") {
               if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
-              else if (quizType === "neighbour") handleNeighbourGuess(entry);
+              else if (quizType === "neighbour") { if (!entry.isLandmass && entry !== quizTarget) toggleNbPick(entry); }
               else handleGuess(entry);
               return;
             }
@@ -985,14 +987,22 @@ function nextQuestion(): void {
     renderContinentChoices();
     showContinentLabels();
     quizChoicesEl.hidden = false;
+    nbBox.hidden = true;
     quizFeedbackEl.textContent = "Pick its continent — buttons or click a country on the map.";
   } else if (quizType === "neighbour") {
     quizChoicesEl.hidden = true;
     quizContLayer.clearLayers();
-    quizFeedbackEl.textContent = "Click a country that borders it.";
+    nbSelected = new Set();
+    nbInput.value = ""; nbInput.disabled = false;
+    nbResults.innerHTML = "";
+    renderNbChips();
+    nbCheck.disabled = false;
+    nbBox.hidden = false;
+    quizFeedbackEl.textContent = "Add every country that borders it (search or click the map), then Check.";
   } else {
     quizChoicesEl.hidden = true;
     quizContLayer.clearLayers();
+    nbBox.hidden = true;
     quizFeedbackEl.textContent = "Click it on the map.";
   }
   quizNextBtn.disabled = true;
@@ -1071,27 +1081,83 @@ function answerContinent(name: string): void {
   if (c) addQuizDot(quizTarget, c, "correct");
 }
 
-function handleNeighbourGuess(entry: CountryEntry): void {
-  if (mode !== "quiz" || quizType !== "neighbour" || !quizTarget || quizAnswered || entry.isLandmass) return;
-  if (entry === quizTarget) return; // clicking the prompt country itself — ignore
-  quizGuess = entry;
+// --- Neighbour quiz: pick all bordering countries (search box + map clicks),
+//     then Check ---
+const nbBox = document.getElementById("nb-box") as HTMLElement;
+const nbInput = document.getElementById("nb-input") as HTMLInputElement;
+const nbResults = document.getElementById("nb-results")!;
+const nbChips = document.getElementById("nb-chips")!;
+const nbCheck = document.getElementById("nb-check") as HTMLButtonElement;
+let nbSelected = new Set<CountryEntry>();
+
+function renderNbResults(query: string): void {
+  const q = query.trim().toLowerCase();
+  nbResults.innerHTML = "";
+  if (!q || !quizTarget) return;
+  realCountries()
+    .filter((c) => c !== quizTarget && !nbSelected.has(c) && c.name.toLowerCase().indexOf(q) !== -1)
+    .slice(0, 8)
+    .forEach((c) => {
+      const li = document.createElement("li");
+      const flag = c.iso2 ? '<img src="https://flagcdn.com/20x15/' + c.iso2 + '.png" alt="">' : "";
+      li.innerHTML = flag + "<span>" + escapeHtml(c.name) + "</span>";
+      li.addEventListener("click", () => addNbPick(c));
+      nbResults.appendChild(li);
+    });
+}
+function renderNbChips(): void {
+  nbChips.innerHTML = "";
+  nbSelected.forEach((c) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = c.name + " ";
+    const x = document.createElement("button");
+    x.type = "button"; x.textContent = "×"; x.title = "Remove";
+    x.addEventListener("click", () => { nbSelected.delete(c); renderNbChips(); refreshPolygons(); });
+    chip.appendChild(x);
+    nbChips.appendChild(chip);
+  });
+}
+function addNbPick(c: CountryEntry): void {
+  if (quizAnswered) return;
+  nbSelected.add(c);
+  nbInput.value = "";
+  renderNbResults("");
+  renderNbChips();
+  refreshPolygons();
+}
+function toggleNbPick(c: CountryEntry): void {
+  if (quizAnswered) return;
+  if (nbSelected.has(c)) nbSelected.delete(c); else nbSelected.add(c);
+  renderNbChips();
+  refreshPolygons();
+}
+function nbCheckAnswers(): void {
+  if (mode !== "quiz" || quizType !== "neighbour" || !quizTarget || quizAnswered) return;
   quizAnswered = true;
   quizTotal++;
-  const ok = quizNeighbourSet.has(entry);
+  const missed = Array.from(quizNeighbourSet).filter((n) => !nbSelected.has(n));
+  const wrong = Array.from(nbSelected).filter((p) => !quizNeighbourSet.has(p));
+  const ok = missed.length === 0 && wrong.length === 0;
   if (ok) quizCorrect++;
+  const total = quizNeighbourSet.size;
+  let msg = (ok ? "✓ " : "✗ ") + "Found " + (total - missed.length) + " of " + total +
+    " neighbours of " + quizTarget.name + ".";
+  if (wrong.length) msg += " Wrong: " + wrong.map((w) => w.name).join(", ") + ".";
+  if (missed.length) msg += " Missed: " + missed.map((m) => m.name).join(", ") + ".";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + entry.name + " borders " + quizTarget.name + "."
-    : "✗ " + entry.name + " doesn't border " + quizTarget.name + ".";
+  quizFeedbackEl.textContent = msg;
   renderQuizScore();
+  nbInput.disabled = true;
+  nbCheck.disabled = true;
   quizNextBtn.disabled = false;
   refreshPolygons();
-  // Reveal: anchor country (blue) + all neighbours (green) + wrong guess (red).
+  // Reveal on the map: anchor (blue), all neighbours (green), wrong picks (red).
   quizLayer.clearLayers();
   const tc = layerCenter(quizTarget);
   if (tc) addQuizDot(quizTarget, tc, "target");
   quizNeighbourSet.forEach((n) => { const c = layerCenter(n); if (c) addQuizDot(n, c, "correct"); });
-  if (!ok) { const gc = layerCenter(entry); if (gc) addQuizDot(entry, gc, "wrong"); }
+  wrong.forEach((w) => { const c = layerCenter(w); if (c) addQuizDot(w, c, "wrong"); });
   try {
     let b = quizTarget.layer.getBounds();
     quizNeighbourSet.forEach((n) => { try { b = b.extend(n.layer.getBounds()); } catch { /* ignore */ } });
@@ -1180,6 +1246,8 @@ document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
 });
 quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
 quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
+nbInput.addEventListener("input", () => renderNbResults(nbInput.value));
+nbCheck.addEventListener("click", nbCheckAnswers);
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
     quizType = b.dataset.qtype as "name" | "flag" | "capital" | "continent" | "neighbour";

@@ -22,14 +22,15 @@
         <input type="checkbox" id="isolate" /> Isolate selected country (hide others)
       </label>
     </section>
-    <section class="sb-group">
-      <h2 class="sb-title" id="count">Countries</h2>
-      <label id="group-toggle">
-        <input type="checkbox" id="group-continents" checked /> Group by continent
-      </label>
+    <section class="sb-group sb-tabsec">
+      <div class="sb-tabs">
+        <button type="button" class="sb-tab active" data-tab="countries">Countries (<span id="count-num">0</span>)</button>
+        <button type="button" class="sb-tab" data-tab="continents">Continents (<span id="cont-num">0</span>)</button>
+      </div>
       <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
     </section>
     <ul id="country-list"></ul>
+    <ul id="continent-list" hidden></ul>
   </aside>
   <div id="map"></div>
   <div id="status">Loading world data… (detailed borders, may take a few seconds)</div>

@@ -447,12 +447,6 @@ function selectContinent(name: string): void {
   refreshAll();
 }
 
-// Highlight the active continent's header in the sidebar.
-function markActiveContinent(): void {
-  document.querySelectorAll<HTMLElement>("#country-list li.grp").forEach((h) => {
-    h.classList.toggle("active", h.dataset.group === selectedContinent);
-  });
-}
 function focusCountry(entry: CountryEntry): void {
   try { map.fitBounds(entry.layer.getBounds(), { maxZoom: 6, padding: [40, 40] }); } catch {}
   selectLayer(entry.layer, false); // sidebar click always selects (no toggle)
@@ -462,20 +456,12 @@ function focusCountry(entry: CountryEntry): void {
 // Sidebar
 // ---------------------------------------------------------------------------
 const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Other"];
-const collapsedGroups: Record<string, boolean> = {};
-let groupByContinent = true;
+let activeTab: "countries" | "continents" = "countries";
 
-// Collapse every continent — so enabling grouping lands on a clean overview of
-// the continents, not a long expanded list.
-function collapseAllContinents(): void {
-  countries.forEach((e) => { collapsedGroups[e.continent || "Other"] = true; });
-}
-
-function makeCountryLi(entry: CountryEntry, group: string): HTMLLIElement {
+function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   const li = document.createElement("li");
   li.className = "country";
   li.dataset.name = entry.name.toLowerCase();
-  if (group) li.dataset.group = group;
 
   const label = document.createElement("span");
   label.textContent = entry.name;
@@ -494,89 +480,69 @@ function makeCountryLi(entry: CountryEntry, group: string): HTMLLIElement {
   return li;
 }
 
-// Apply the search box + collapsed-group state to the rendered list.
+// Filter the flat country list by the search box; update the Countries tab count.
 function applyFilter(): void {
   const ul = document.getElementById("country-list")!;
-  const countEl = document.getElementById("count")!;
   const search = document.getElementById("search") as HTMLInputElement;
   const q = search.value.trim().toLowerCase();
   let shown = 0;
-  const visibleByGroup: Record<string, number> = {};
-
-  const searching = q.length > 0;
   ul.querySelectorAll<HTMLElement>("li.country").forEach((li) => {
-    const g = li.dataset.group || "";
     const matches = (li.dataset.name || "").indexOf(q) !== -1;
-    if (matches) { shown++; if (g) visibleByGroup[g] = (visibleByGroup[g] || 0) + 1; }
-    // While searching, show matches even inside collapsed continents.
-    li.style.display = matches && (searching || !(g && collapsedGroups[g])) ? "" : "none";
+    if (matches) shown++;
+    li.style.display = matches ? "" : "none";
   });
-  ul.querySelectorAll<HTMLElement>("li.grp").forEach((h) => {
-    h.style.display = (visibleByGroup[h.dataset.group || ""] || 0) > 0 ? "" : "none";
+  const countNum = document.getElementById("count-num")!;
+  countNum.textContent = q ? shown + " of " + countries.length : String(countries.length);
+}
+
+// Highlight the active continent's row in the Continents tab.
+function markActiveContinent(): void {
+  document.querySelectorAll<HTMLElement>("#continent-list li").forEach((li) => {
+    li.classList.toggle("active", li.dataset.group === selectedContinent);
   });
-  countEl.textContent = q
-    ? "Countries (" + shown + " of " + countries.length + ")"
-    : "Countries (" + countries.length + ")";
 }
 
 function buildSidebar(): void {
+  // Flat A–Z country list.
   const ul = document.getElementById("country-list")!;
   ul.innerHTML = "";
+  countries.slice().sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((entry) => ul.appendChild(makeCountryLi(entry)));
 
-  if (groupByContinent) {
-    const groups: Record<string, CountryEntry[]> = {};
-    countries.forEach((e) => {
-      const g = e.continent || "Other";
-      (groups[g] = groups[g] || []).push(e);
-    });
-    const order = Object.keys(groups).sort((a, b) => {
-      const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
-    });
-    order.forEach((g) => {
-      const header = document.createElement("li");
-      header.className = "grp" + (collapsedGroups[g] ? " collapsed" : "");
-      header.dataset.group = g;
+  // Continent list (sorted by a sensible order), with member counts.
+  const counts: Record<string, number> = {};
+  countries.forEach((e) => { const g = e.continent || "Other"; counts[g] = (counts[g] || 0) + 1; });
+  const order = Object.keys(counts).sort((a, b) => {
+    const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+  });
+  const cl = document.getElementById("continent-list")!;
+  cl.innerHTML = "";
+  order.forEach((g) => {
+    const li = document.createElement("li");
+    li.dataset.group = g;
+    li.title = "Show all of " + g + " on the map";
+    li.innerHTML = "<span>" + escapeHtml(g) + '</span><span class="cnt">' + counts[g] + "</span>";
+    li.addEventListener("click", () => selectContinent(g));
+    cl.appendChild(li);
+  });
 
-      // Caret toggles collapse; the rest of the header selects the continent.
-      const caret = document.createElement("span");
-      caret.className = "caret";
-      caret.textContent = "▾";
-      caret.title = "Expand / collapse";
-      caret.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        collapsedGroups[g] = !collapsedGroups[g];
-        header.classList.toggle("collapsed", collapsedGroups[g]);
-        applyFilter();
-      });
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "grp-name";
-      nameSpan.textContent = g;
-      const left = document.createElement("span");
-      left.className = "grp-left";
-      left.appendChild(caret);
-      left.appendChild(nameSpan);
-
-      const cnt = document.createElement("span");
-      cnt.className = "cnt";
-      cnt.textContent = String(groups[g].length);
-
-      header.appendChild(left);
-      header.appendChild(cnt);
-      header.title = "Show all of " + g + " on the map";
-      header.addEventListener("click", () => selectContinent(g));
-
-      ul.appendChild(header);
-      groups[g].sort((a, b) => a.name.localeCompare(b.name))
-        .forEach((entry) => ul.appendChild(makeCountryLi(entry, g)));
-    });
-  } else {
-    countries.slice().sort((a, b) => a.name.localeCompare(b.name))
-      .forEach((entry) => ul.appendChild(makeCountryLi(entry, "")));
-  }
+  document.getElementById("count-num")!.textContent = String(countries.length);
+  document.getElementById("cont-num")!.textContent = String(order.length);
 
   applyFilter();
   markActiveContinent();
+}
+
+function setActiveTab(tab: "countries" | "continents"): void {
+  activeTab = tab;
+  document.querySelectorAll<HTMLElement>(".sb-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === tab);
+  });
+  const countries$ = tab === "countries";
+  (document.getElementById("country-list") as HTMLElement).hidden = !countries$;
+  (document.getElementById("continent-list") as HTMLElement).hidden = countries$;
+  (document.getElementById("search") as HTMLElement).style.display = countries$ ? "" : "none";
 }
 
 // ---------------------------------------------------------------------------
@@ -736,8 +702,8 @@ function loadBorders(): void {
     }).addTo(map);
 
     (map as any).borderLayer = layer;
-    if (groupByContinent) collapseAllContinents(); // start with a clean continent overview
     buildSidebar();
+    setActiveTab("countries");
     placeCountryLabels();
     refreshCountryLabels(); // honour default (names off) once labels exist
     hideStatus();
@@ -763,11 +729,8 @@ nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; re
 const isoToggle = document.getElementById("isolate") as HTMLInputElement;
 isoToggle.addEventListener("change", () => { isolate = isoToggle.checked; refreshAll(); });
 
-const groupToggle = document.getElementById("group-continents") as HTMLInputElement;
-groupToggle.addEventListener("change", () => {
-  groupByContinent = groupToggle.checked;
-  if (groupByContinent) collapseAllContinents(); // focus on the continents
-  buildSidebar();
+document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
+  btn.addEventListener("click", () => setActiveTab((btn.dataset.tab as "countries" | "continents")));
 });
 
 const searchInput = document.getElementById("search") as HTMLInputElement;

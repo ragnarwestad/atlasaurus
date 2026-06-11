@@ -16,11 +16,30 @@ body { display: flex; font-family: system-ui, sans-serif; }
   width: 100%; box-sizing: border-box; margin-top: 9px; padding: 7px 9px;
   font-size: 13px; border: 1px solid #ccc; border-radius: 6px;
 }
-#cap-toggle, #name-toggle, #iso-toggle, #flag-toggle, #group-toggle {
+#cap-toggle, #name-toggle, #iso-toggle, #flag-toggle {
   display: flex; align-items: center; gap: 6px; margin-top: 9px;
   font-size: 13px; color: #333; cursor: pointer; user-select: none;
 }
-#cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input, #group-toggle input { cursor: pointer; }
+#cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input { cursor: pointer; }
+
+/* Countries / Continents tabs */
+.sb-tabs { display: flex; gap: 6px; }
+.sb-tab {
+  flex: 1; padding: 6px 6px; font: 600 12px system-ui, sans-serif; cursor: pointer;
+  background: #eef2f6; border: 1px solid #e1e7ec; border-radius: 6px; color: #5a6b7a;
+}
+.sb-tab.active { background: #3878c7; border-color: #3878c7; color: #fff; }
+.sb-tab span { font-weight: 600; }
+
+/* Continent list */
+#continent-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+#continent-list li {
+  padding: 10px 14px; cursor: pointer; font-size: 13px; color: #222;
+  border-bottom: 1px solid #f2f2f2; display: flex; justify-content: space-between; align-items: baseline;
+}
+#continent-list li:hover { background: #eaf2fb; }
+#continent-list li.active { background: #d6efe9; color: #176b5d; font-weight: 600; }
+#continent-list li .cnt { color: #9aa7b3; font-weight: 600; }
 
 /* Flag markers — pointer-transparent so hovered flags never steal the cursor
    from the polygon (which would break click-to-select). */
@@ -35,23 +54,6 @@ body { display: flex; font-family: system-ui, sans-serif; }
   gap: 8px; align-items: baseline;
 }
 #country-list li.country:hover { background: #eaf2fb; }
-/* Continent group headers (collapsible) */
-#country-list li.grp {
-  padding: 7px 14px; font: 700 11px system-ui, sans-serif; letter-spacing: .04em;
-  text-transform: uppercase; color: #5a6b7a; background: #eef2f6; cursor: pointer;
-  position: sticky; top: 0; z-index: 1; user-select: none;
-  display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 1px solid #e1e7ec; border-top: 1px solid #e1e7ec;
-}
-#country-list li.grp:hover { background: #e4eaf0; }
-#country-list li.grp .grp-left { display: flex; align-items: center; gap: 6px; }
-#country-list li.grp .cnt { color: #9aa7b3; font-weight: 600; }
-#country-list li.grp .caret { display: inline-block; transition: transform .15s; font-size: 9px; padding: 2px; cursor: pointer; }
-#country-list li.grp.collapsed .caret { transform: rotate(-90deg); }
-/* Active = its countries are highlighted on the map */
-#country-list li.grp.active { background: #d6efe9; color: #176b5d; }
-#country-list li.grp.active .cnt { color: #3a9b89; }
-#country-list li .cap { font-size: 11px; color: #8a1d16; white-space: nowrap; }
 #country-list a {
   color: #3878c7; text-decoration: none; font-size: 11px; flex: 0 0 auto;
 }

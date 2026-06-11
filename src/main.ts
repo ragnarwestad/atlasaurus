@@ -98,11 +98,19 @@ function countryVisible(e: CountryEntry): boolean {
   return true;
 }
 
+// Scope of the "Show names/capitals/flags" toggles:
+//  - Countries tab: global (all countries).
+//  - Continents tab: only the selected continent's members (nothing if none).
+function inToggleScope(e: CountryEntry): boolean {
+  if (activeTab === "continents") return selectedContinent != null && (e.continent || "Other") === selectedContinent;
+  return true;
+}
+
 function refreshCountryLabels(): void {
   countries.forEach((e) => {
     if (!e.labelTooltip) return;
     const el = e.labelTooltip.getElement();
-    if (el) el.style.display = countryVisible(e) && (showNames || isRevealed(e)) ? "" : "none";
+    if (el) el.style.display = countryVisible(e) && ((showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
   });
 }
 
@@ -110,7 +118,8 @@ function refreshCapitals(): void {
   capitalMarkers.forEach((m) => {
     const e = m._entry;
     const cv = e ? countryVisible(e) : !(isolate && selectedLayer);
-    const visible = cv && (showCapitals || (e ? isRevealed(e) : false));
+    const byToggle = e ? (showCapitals && inToggleScope(e)) : (showCapitals && activeTab === "countries");
+    const visible = cv && (byToggle || (e ? isRevealed(e) : false));
     const has = capitalLayer.hasLayer(m);
     if (visible && !has) capitalLayer.addLayer(m);
     else if (!visible && has) capitalLayer.removeLayer(m);
@@ -120,7 +129,7 @@ function refreshCapitals(): void {
 function refreshFlags(): void {
   countries.forEach((e) => {
     if (!e.flagMarker) return;
-    const visible = countryVisible(e) && (showFlags || isRevealed(e));
+    const visible = countryVisible(e) && ((showFlags && inToggleScope(e)) || isRevealed(e));
     const has = flagLayer.hasLayer(e.flagMarker);
     if (visible && !has) flagLayer.addLayer(e.flagMarker);
     else if (!visible && has) flagLayer.removeLayer(e.flagMarker);
@@ -583,6 +592,10 @@ function setActiveTab(tab: "countries" | "continents"): void {
   (document.getElementById("country-list") as HTMLElement).hidden = !countries$;
   (document.getElementById("continent-list") as HTMLElement).hidden = countries$;
   (document.getElementById("search") as HTMLElement).style.display = countries$ ? "" : "none";
+  // The toggles' scope depends on the active tab, so re-evaluate the reveals.
+  refreshCountryLabels();
+  refreshCapitals();
+  refreshFlags();
 }
 
 // ---------------------------------------------------------------------------

@@ -47,6 +47,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .quiz-label { font: 600 12px system-ui, sans-serif; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
 .quiz-label-correct { color: #1b7a3d; }
 .quiz-label-wrong { color: #9c1b12; }
+.quiz-label-target { color: #1b3a5c; }
 .quiz-label .quiz-dot-flag { width: 20px; height: 15px; vertical-align: middle; box-shadow: 0 0 2px rgba(0,0,0,.5); border-radius: 2px; }
 /* Continent name labels on the map during the continent quiz */
 .quiz-cont-label {

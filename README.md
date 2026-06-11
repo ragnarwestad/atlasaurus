@@ -42,9 +42,10 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
 
 - Two modes (top of the sidebar):
   - **Explore** — everything below.
-  - **Quiz** — find a country on the map (prompted by name, flag or capital) for
-    instant right/wrong feedback with a running score; or a "Continent" round where
-    you pick a country's continent from buttons.
+  - **Quiz** — several rounds with a running score: find a country on the map
+    (prompted by name, flag or capital); pick a country's continent; or click a
+    country that borders the prompted one ("Neighbour"). Answers are revealed on
+    the map (correct green, wrong red) with country flags/names.
 - All countries with borders and one national capital each.
 - **Sidebar, two tabs:**
   - **Countries** — searchable list; click a country to zoom + select it.

@@ -58,6 +58,7 @@ const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name label
 // State
 // ---------------------------------------------------------------------------
 const countries: CountryEntry[] = [];
+const byIso: Record<string, CountryEntry> = {}; // ADM0_A3 → entry (for neighbour lookups)
 const capitalMarkers: CapitalMarker[] = [];
 const subunitsByIso: Record<string, Subunit[]> = {};
 const territoriesBySov: Record<string, Territory[]> = {};
@@ -73,8 +74,9 @@ let isolate = false;
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
-let quizType: "name" | "flag" | "capital" | "continent" = "name";
+let quizType: "name" | "flag" | "capital" | "continent" | "neighbour" = "name";
 let quizStarted = false;
+let quizNeighbourSet = new Set<CountryEntry>();
 let quizTarget: CountryEntry | null = null;
 let quizGuess: CountryEntry | null = null;
 let quizAnswered = false;
@@ -185,7 +187,7 @@ function hideHoverInfo(): void {
 
 // --- Selected-country fact panel (population/GDP/region from Natural Earth,
 //     area/currency/languages from REST Countries, fetched + cached on select) ---
-interface RestInfo { area?: number; currencies?: string; languages?: string; continent?: string; }
+interface RestInfo { area?: number; currencies?: string; languages?: string; continent?: string; borders?: string[]; }
 const countryInfoEl = document.getElementById("countryinfo")!;
 let currentInfoCode: string | null = null;
 let currentInfoContinent: string | null = null;
@@ -214,7 +216,7 @@ function loadCountryData(): Promise<Record<string, RestInfo>> {
         : undefined;
       const languages = c.languages ? Object.values(c.languages).join(", ") : undefined;
       const continent = Array.isArray(c.continents) && c.continents.length ? c.continents[0] : c.region;
-      map[c.cca3] = { area: c.area, currencies, languages, continent };
+      map[c.cca3] = { area: c.area, currencies, languages, continent, borders: Array.isArray(c.borders) ? c.borders : [] };
     });
     countryData = map;
     return map;
@@ -346,6 +348,11 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         if (quizContCorrect && cont === quizContCorrect) return quizCorrectStyle; // correct continent (green)
         if (quizContWrong && cont === quizContWrong) return quizWrongStyle;       // guessed continent (red)
         return baseStyle; // answered → no per-country hover in continent quiz
+      } else if (quizType === "neighbour") {
+        if (e === quizTarget) return selectedStyle;          // the anchor country (orange)
+        if (quizNeighbourSet.has(e)) return quizCorrectStyle; // its neighbours (green)
+        if (quizGuess && e === quizGuess) return quizWrongStyle; // wrong guess (red)
+        return baseStyle; // answered → no per-country hover
       } else {
         if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
         if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
@@ -849,6 +856,7 @@ function loadBorders(): void {
         if (isLandmass) continent = "Antarctica";
         const entry: CountryEntry = { name, layer: layerP, iso, iso2, continent, isLandmass };
         countries.push(entry);
+        if (iso) byIso[iso] = entry;
         layerP.on({
           // Hover only restyles the polygon (and, in Explore, shows the off-map
           // info panel) — no on-map labels, no bringToFront — so it can never
@@ -861,6 +869,7 @@ function loadBorders(): void {
             setTimeout(() => { suppressMapClick = false; }, 0);
             if (mode === "quiz") {
               if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
+              else if (quizType === "neighbour") handleNeighbourGuess(entry);
               else handleGuess(entry);
               return;
             }
@@ -923,8 +932,8 @@ function renderQuizPrompt(): void {
     quizPromptEl.innerHTML = quizTarget.capitalName
       ? '<span class="quiz-cap-tag">capital</span> <span>' + escapeHtml(quizTarget.capitalName) + "</span>"
       : "(no capital)";
-  } else if (quizType === "continent") {
-    // Continent quiz: show the country (flag + name); pick its continent.
+  } else if (quizType === "continent" || quizType === "neighbour") {
+    // Show the country (flag + name); pick its continent / click a neighbour.
     const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
     quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
   } else {
@@ -943,10 +952,22 @@ function layerCenter(entry: CountryEntry): LatLng | null {
   return null;
 }
 
+// Neighbouring countries (mledoze `borders`, resolved to entries we have).
+function neighbourEntries(entry: CountryEntry): CountryEntry[] {
+  const codes = (countryData && entry.iso && countryData[entry.iso] && countryData[entry.iso].borders) || [];
+  return codes.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
+}
+
 function nextQuestion(): void {
+  // The neighbour quiz needs the borders dataset; load it first if necessary.
+  if (quizType === "neighbour" && !countryData) {
+    loadCountryData().then(() => nextQuestion()).catch(() => { /* ignore */ });
+    return;
+  }
   // Restrict the pool to countries that have what the prompt needs.
   const pool = quizType === "flag" ? realCountries().filter((c) => c.iso2)
     : quizType === "capital" ? realCountries().filter((c) => c.capitalName)
+    : quizType === "neighbour" ? realCountries().filter((c) => neighbourEntries(c).length > 0)
     : realCountries();
   if (!pool.length) return;
   let t = quizTarget;
@@ -956,6 +977,7 @@ function nextQuestion(): void {
   quizAnswered = false;
   quizContCorrect = null;
   quizContWrong = null;
+  quizNeighbourSet = quizType === "neighbour" && t ? new Set(neighbourEntries(t)) : new Set();
   quizLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
@@ -964,6 +986,10 @@ function nextQuestion(): void {
     showContinentLabels();
     quizChoicesEl.hidden = false;
     quizFeedbackEl.textContent = "Pick its continent — buttons or click a country on the map.";
+  } else if (quizType === "neighbour") {
+    quizChoicesEl.hidden = true;
+    quizContLayer.clearLayers();
+    quizFeedbackEl.textContent = "Click a country that borders it.";
   } else {
     quizChoicesEl.hidden = true;
     quizContLayer.clearLayers();
@@ -1042,8 +1068,37 @@ function answerContinent(name: string): void {
   refreshPolygons();
   quizLayer.clearLayers();
   const c = layerCenter(quizTarget);
-  if (c) addQuizDot(quizTarget, c, true);
+  if (c) addQuizDot(quizTarget, c, "correct");
 }
+
+function handleNeighbourGuess(entry: CountryEntry): void {
+  if (mode !== "quiz" || quizType !== "neighbour" || !quizTarget || quizAnswered || entry.isLandmass) return;
+  if (entry === quizTarget) return; // clicking the prompt country itself — ignore
+  quizGuess = entry;
+  quizAnswered = true;
+  quizTotal++;
+  const ok = quizNeighbourSet.has(entry);
+  if (ok) quizCorrect++;
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = ok
+    ? "✓ Correct! " + entry.name + " borders " + quizTarget.name + "."
+    : "✗ " + entry.name + " doesn't border " + quizTarget.name + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  refreshPolygons();
+  // Reveal: anchor country (blue) + all neighbours (green) + wrong guess (red).
+  quizLayer.clearLayers();
+  const tc = layerCenter(quizTarget);
+  if (tc) addQuizDot(quizTarget, tc, "target");
+  quizNeighbourSet.forEach((n) => { const c = layerCenter(n); if (c) addQuizDot(n, c, "correct"); });
+  if (!ok) { const gc = layerCenter(entry); if (gc) addQuizDot(entry, gc, "wrong"); }
+  try {
+    let b = quizTarget.layer.getBounds();
+    quizNeighbourSet.forEach((n) => { try { b = b.extend(n.layer.getBounds()); } catch { /* ignore */ } });
+    map.fitBounds(b, { maxZoom: 6, padding: [50, 50] });
+  } catch { /* ignore */ }
+}
+
 function handleGuess(entry: CountryEntry): void {
   if (mode !== "quiz" || !quizTarget || quizAnswered || entry.isLandmass) return;
   quizGuess = entry;
@@ -1056,7 +1111,7 @@ function handleGuess(entry: CountryEntry): void {
     quizCorrect++;
     quizFeedbackEl.className = "correct";
     quizFeedbackEl.textContent = "✓ Correct! It's " + quizTarget.name + ".";
-    if (tCenter) addQuizDot(quizTarget, tCenter, true); // labelled green dot
+    if (tCenter) addQuizDot(quizTarget, tCenter, "correct"); // labelled green dot
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
@@ -1068,8 +1123,8 @@ function handleGuess(entry: CountryEntry): void {
     const gCenter = layerCenter(entry);
     if (gCenter && tCenter) {
       L.polyline([gCenter, tCenter], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
-      addQuizDot(quizTarget, tCenter, true);  // green: the right answer
-      addQuizDot(entry, gCenter, false);      // red: your guess
+      addQuizDot(quizTarget, tCenter, "correct");  // green: the right answer
+      addQuizDot(entry, gCenter, "wrong");         // red: your guess
     }
   }
   renderQuizScore();
@@ -1077,18 +1132,22 @@ function handleGuess(entry: CountryEntry): void {
   refreshPolygons();
 }
 
-function addQuizDot(entry: CountryEntry, latlng: LatLng, correct: boolean): void {
-  // Always show flag + name on the dots once a guess is made (both quiz modes).
+type DotKind = "correct" | "wrong" | "target";
+const DOT_COLORS: Record<DotKind, { stroke: string; fill: string }> = {
+  correct: { stroke: "#1b7a3d", fill: "#54c47e" },
+  wrong: { stroke: "#9c1b12", fill: "#e8675c" },
+  target: { stroke: "#1b3a5c", fill: "#3878c7" },
+};
+function addQuizDot(entry: CountryEntry, latlng: LatLng, kind: DotKind): void {
+  // Always show flag + name on the dots once a guess is made.
   const flag = entry.iso2
     ? '<img class="quiz-dot-flag" src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" alt=""> '
     : "";
+  const col = DOT_COLORS[kind];
   L.circleMarker(latlng, {
-    radius: correct ? 6 : 5,
-    color: correct ? "#1b7a3d" : "#9c1b12", weight: 2,
-    fillColor: correct ? "#54c47e" : "#e8675c", fillOpacity: 1,
+    radius: kind === "wrong" ? 5 : 6, color: col.stroke, weight: 2, fillColor: col.fill, fillOpacity: 1,
   }).bindTooltip(flag + escapeHtml(entry.name), {
-    permanent: true, direction: "top",
-    className: "map-label quiz-label " + (correct ? "quiz-label-correct" : "quiz-label-wrong"),
+    permanent: true, direction: "top", className: "map-label quiz-label quiz-label-" + kind,
   }).addTo(quizLayer);
 }
 
@@ -1123,7 +1182,7 @@ quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(
 quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
-    quizType = b.dataset.qtype as "name" | "flag" | "capital";
+    quizType = b.dataset.qtype as "name" | "flag" | "capital" | "continent" | "neighbour";
     document.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
     if (mode === "quiz") nextQuestion();
   });

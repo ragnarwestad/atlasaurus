@@ -120,13 +120,27 @@ function refreshFlags(): void {
   });
 }
 
-// --- Off-map hover info panel (flag + name + capital) ---
+// --- Hover info panel that floats next to the cursor (flag + name + capital) ---
 const hoverInfoEl = document.getElementById("hoverinfo")!;
+let lastMouseX = 0, lastMouseY = 0;
+
+function positionHoverInfo(x: number, y: number): void {
+  const pad = 12;
+  const r = hoverInfoEl.getBoundingClientRect();
+  let left = x + 16;            // default: to the lower-right of the cursor
+  let top = y + 18;
+  if (left + r.width + pad > window.innerWidth) left = x - r.width - 16;   // flip left near right edge
+  if (top + r.height + pad > window.innerHeight) top = y - r.height - 18;  // flip up near bottom edge
+  hoverInfoEl.style.left = Math.max(pad, left) + "px";
+  hoverInfoEl.style.top = Math.max(pad, top) + "px";
+}
+
 function showHoverInfo(e: CountryEntry): void {
   const flag = e.iso2 ? '<img src="https://flagcdn.com/32x24/' + e.iso2 + '.png" alt="">' : "";
   const cap = e.capitalName ? '<span class="hi-cap">· ' + escapeHtml(e.capitalName) + "</span>" : "";
   hoverInfoEl.innerHTML = flag + '<span class="hi-name">' + escapeHtml(e.name) + "</span> " + cap;
   hoverInfoEl.hidden = false;
+  positionHoverInfo(lastMouseX, lastMouseY);
 }
 function hideHoverInfo(): void {
   hoverInfoEl.hidden = true;
@@ -496,5 +510,12 @@ map.on("click", () => {        // background click clears selection
   deselect();
 });
 map.on("zoomend", updateFlagSizes);
+
+// Track the cursor so the hover info panel can float next to it.
+map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => {
+  lastMouseX = ev.clientX;
+  lastMouseY = ev.clientY;
+  if (!hoverInfoEl.hidden) positionHoverInfo(lastMouseX, lastMouseY);
+});
 
 loadBorders();

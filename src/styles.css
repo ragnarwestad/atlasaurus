@@ -80,11 +80,11 @@ body { display: flex; font-family: system-ui, sans-serif; }
 /* Hover info panel — shows the hovered country's flag/name/capital off-map, so
    it never interferes with the polygon's hover/click (no flicker). */
 #hoverinfo {
-  position: fixed; z-index: 1100; left: 286px; bottom: 16px;
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(255,255,255,.95); padding: 8px 12px; border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.2); pointer-events: none;
-  font: 14px system-ui, sans-serif; color: #1b3a5c; max-width: 320px;
+  position: fixed; z-index: 1100; left: 0; top: 0; /* positioned at the cursor via JS */
+  display: flex; align-items: center; gap: 9px;
+  background: rgba(255,255,255,.96); padding: 6px 10px; border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25); pointer-events: none;
+  font: 13px system-ui, sans-serif; color: #1b3a5c; max-width: 300px; white-space: nowrap;
 }
 #hoverinfo[hidden] { display: none; }
 #hoverinfo img { width: 32px; height: 24px; box-shadow: 0 0 2px rgba(0,0,0,.45); border-radius: 2px; flex: 0 0 auto; }

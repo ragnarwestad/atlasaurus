@@ -7,9 +7,8 @@
 </head>
 <body>
   <aside id="sidebar">
-    <header>
-      <h1>Countries</h1>
-      <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+    <section class="sb-group">
+      <h2 class="sb-title">Map</h2>
       <label id="name-toggle">
         <input type="checkbox" id="show-names" /> Show country names
       </label>
@@ -22,11 +21,14 @@
       <label id="iso-toggle">
         <input type="checkbox" id="isolate" /> Isolate selected country (hide others)
       </label>
-    </header>
-    <div id="count"></div>
-    <label id="group-toggle">
-      <input type="checkbox" id="group-continents" checked /> Group by continent
-    </label>
+    </section>
+    <section class="sb-group">
+      <h2 class="sb-title" id="count">Countries</h2>
+      <label id="group-toggle">
+        <input type="checkbox" id="group-continents" checked /> Group by continent
+      </label>
+      <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+    </section>
     <ul id="country-list"></ul>
   </aside>
   <div id="map"></div>

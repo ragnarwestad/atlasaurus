@@ -6,22 +6,21 @@ body { display: flex; font-family: system-ui, sans-serif; }
   display: flex; flex-direction: column; border-right: 1px solid #d8d8d8;
   background: #fff;
 }
-#sidebar header { padding: 12px 14px 8px; border-bottom: 1px solid #eee; }
-#sidebar h1 { font-size: 15px; margin: 0 0 8px; color: #1b3a5c; }
+/* Two sections: "Map" (display toggles) and "Countries" (grouping + filter + list). */
+.sb-group { padding: 11px 14px; border-bottom: 1px solid #e6ebf0; }
+.sb-title {
+  margin: 0; font: 700 11px system-ui, sans-serif; letter-spacing: .06em;
+  text-transform: uppercase; color: #5a6b7a;
+}
 #search {
-  width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 13px;
-  border: 1px solid #ccc; border-radius: 6px;
+  width: 100%; box-sizing: border-box; margin-top: 9px; padding: 7px 9px;
+  font-size: 13px; border: 1px solid #ccc; border-radius: 6px;
 }
 #cap-toggle, #name-toggle, #iso-toggle, #flag-toggle, #group-toggle {
   display: flex; align-items: center; gap: 6px; margin-top: 9px;
   font-size: 13px; color: #333; cursor: pointer; user-select: none;
 }
 #cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input, #group-toggle input { cursor: pointer; }
-/* The grouping control sits just under the country count, above the list. */
-#group-toggle {
-  margin: 0; padding: 8px 14px; border-top: 1px solid #e6ebf0;
-  border-bottom: 1px solid #e6ebf0; font-weight: 600; color: #1b3a5c;
-}
 
 /* Flag markers — pointer-transparent so hovered flags never steal the cursor
    from the polygon (which would break click-to-select). */
@@ -29,7 +28,6 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .flag-icon { background: none !important; border: none !important; }
 .flag-icon img { display: block; box-shadow: 0 0 2px rgba(0,0,0,.55); border-radius: 2px; }
 
-#count { font-size: 12px; color: #888; padding: 6px 14px; }
 #country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 #country-list li {
   padding: 7px 14px; cursor: pointer; font-size: 13px; color: #222;

@@ -1359,6 +1359,23 @@ document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
     if (mode === "quiz") nextQuestion();
   });
 });
+// Top-level quiz category: "Country" (sub-types By name/flag/capital/Neighbour) or
+// "Continent" (its own round — no sub-types).
+const quizTypeEl = document.getElementById("quiz-type") as HTMLElement;
+function setQuizCat(cat: "country" | "continent"): void {
+  document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
+  quizTypeEl.hidden = cat !== "country";
+  if (cat === "continent") {
+    quizType = "continent";
+  } else {
+    const active = document.querySelector<HTMLElement>(".qt-btn.active");
+    quizType = (active && (active.dataset.qtype as "name" | "flag" | "capital" | "neighbour")) || "name";
+  }
+  if (mode === "quiz") nextQuestion();
+}
+document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => {
+  b.addEventListener("click", () => setQuizCat(b.dataset.cat as "country" | "continent"));
+});
 
 const capToggle = document.getElementById("show-capitals") as HTMLInputElement;
 capToggle.addEventListener("change", () => { showCapitals = capToggle.checked; refreshCapitals(); });

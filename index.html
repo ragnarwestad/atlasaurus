@@ -48,12 +48,15 @@
 
     <div id="quiz-panel" hidden>
       <div class="sb-group">
-        <h2 class="sb-title">Find the country</h2>
+        <h2 class="sb-title">Find the</h2>
+        <div class="sb-tabs" id="quiz-cat">
+          <button type="button" class="qc-tab active" data-cat="country">Country</button>
+          <button type="button" class="qc-tab" data-cat="continent">Continent</button>
+        </div>
         <div id="quiz-type">
           <button type="button" class="qt-btn active" data-qtype="name">By name</button>
           <button type="button" class="qt-btn" data-qtype="flag">By flag</button>
           <button type="button" class="qt-btn" data-qtype="capital">By capital</button>
-          <button type="button" class="qt-btn" data-qtype="continent">Continent</button>
           <button type="button" class="qt-btn" data-qtype="neighbour">Neighbour</button>
         </div>
         <div id="quiz-prompt"></div>
@@ -116,7 +119,7 @@
 
       <h3>Quiz</h3>
       <p>Switch to the <b>Quiz</b> tab (top of the sidebar) for several rounds with a
-         running score:</p>
+         running score. Pick what to find — <b>Country</b> or <b>Continent</b>:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.
             <b>By flag / By capital</b> — answer by <b>Click on map</b> or

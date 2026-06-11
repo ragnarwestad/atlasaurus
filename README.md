@@ -41,23 +41,32 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
 ## Features
 
 - All countries with borders and one national capital each.
-- Country, capital and territory names link to English Wikipedia.
-- Sidebar with two tabs: **Countries** (searchable A–Z list; click to zoom/select)
-  and **Continents** (click a continent to highlight all its member countries on
-  the map and show aggregate facts: countries, population, area, GDP).
-- Toggles: country names, capitals, flags, and "isolate selected country".
-- Hover/select reveal: hovering or selecting a country shows its name, capital
-  and flag even when those toggles are off.
-- Selecting a country draws dashed connector lines to its "satellites":
+- **Sidebar, two tabs:**
+  - **Countries** — searchable list; click a country to zoom + select it.
+  - **Continents** — the seven continents (incl. Antarctica); click one to
+    highlight all its members on the map and show aggregate facts, and expand it
+    to list its member countries.
+  - **Sort** by Name, Population or Area (applies to both tabs); when sorting by
+    population/area the value is shown after each name (compact, 2 decimals).
+- **Map display toggles:** country names, capitals, flags, and "Isolate selected".
+  On the Continents tab these toggles apply only to the selected continent.
+- **Hover** shows a small panel that follows the cursor (flag · name · capital);
+  the hovered country is highlighted.
+- **Select a country** (map or list) to: highlight it, open a fact panel
+  (capital, population, area, GDP, currency, languages, region; the title links to
+  Wikipedia), and draw dashed connector lines to its "satellites":
   - detached parts of the same country (Alaska, Hawaii, French Guiana, Réunion…),
     labelled from Natural Earth sub-units;
-  - separate territories under the same sovereign state (Greenland & Faroe for
-    Denmark; Falklands, Gibraltar, Bermuda… for the UK).
-- **Isolate** mode hides all other countries to highlight a country and its parts.
-- Flags scale with zoom; click the background (ocean) to clear the selection.
-- Hovering a country shows a small floating panel (flag · name · capital) at the cursor.
-- Selecting a country opens a fact panel: capital, population, area, GDP, currency,
-  languages, region — plus a Wikipedia link.
+  - separate territories under the same sovereign (Greenland & Faroe for Denmark;
+    Falklands, Gibraltar, Bermuda… for the UK).
+  The fact panel also lists those territories (scrollable, each Wikipedia-linked).
+- Selecting a country **inside a highlighted continent** keeps the continent green
+  with the country shown selected (orange) on top.
+- **Isolate** mode hides all other countries to focus on the selection (a country
+  and its parts, or a continent's members).
+- Flags scale with zoom (smaller when zoomed out); click the background (ocean) to
+  clear the selection.
+- Country/capital/territory/continent names all link to English Wikipedia.
 
 ## Data sources (loaded at runtime via jsDelivr)
 
@@ -66,10 +75,10 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
 - **Capitals:** Natural Earth `ne_50m_populated_places_simple` (`Admin-0 capital`).
 - **Sub-units:** Natural Earth `ne_10m_admin_0_map_subunits` (satellite labels).
 - **Flags:** [flagcdn.com](https://flagcdn.com) by ISO 3166-1 alpha-2 code.
-- **Country facts:** population, GDP, region come from the Natural Earth border
-  properties; area, currency and languages from the
-  [mledoze/countries](https://github.com/mledoze/countries) static dataset
-  (loaded once, on the first selection).
+- **Country facts:** population, GDP and region come from the Natural Earth border
+  properties; area, currency, languages and the authoritative **continent**
+  assignment from the [mledoze/countries](https://github.com/mledoze/countries)
+  static dataset (loaded once at startup, then cached).
 
 ## Libraries
 
@@ -82,4 +91,8 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
 - Crimea follows the internationally recognized border (Ukrainian).
 - Dependencies/territories are filtered out of the base map to reduce clutter,
   but are reachable via the sovereignty connector lines.
+- **Antarctica** is shown as a continent (landmass + Continents tab), not listed
+  as a country.
+- Continents come from mledoze, so every country falls into one of the seven
+  (Natural Earth's "Seven seas (open ocean)" islands are reassigned).
 - Some capital links use disambiguation overrides (e.g. Kingston → Kingston, Jamaica).

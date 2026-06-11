@@ -345,6 +345,7 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         const cont = e.continent || "Other";
         if (quizContCorrect && cont === quizContCorrect) return quizCorrectStyle; // correct continent (green)
         if (quizContWrong && cont === quizContWrong) return quizWrongStyle;       // guessed continent (red)
+        return baseStyle; // answered → no per-country hover in continent quiz
       } else {
         if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
         if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)

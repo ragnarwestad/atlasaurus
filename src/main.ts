@@ -607,6 +607,20 @@ function focusCountry(entry: CountryEntry): void {
 // ---------------------------------------------------------------------------
 const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 let activeTab: "countries" | "continents" = "countries";
+let listExpanded = true; // the Countries/Continents list section is foldable
+
+// Single source of truth for what the list section shows, given the active tab
+// and whether the section is expanded. Collapsing hides the filter row + lists.
+function updateListVisibility(): void {
+  const countries$ = activeTab === "countries";
+  (document.getElementById("country-list") as HTMLElement).hidden = !listExpanded || !countries$;
+  (document.getElementById("continent-list") as HTMLElement).hidden = !listExpanded || countries$;
+  (document.querySelector(".filter-sort") as HTMLElement).style.display = listExpanded ? "" : "none";
+  (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
+  const sec = document.querySelector(".sb-tabsec") as HTMLElement;
+  if (sec) sec.classList.toggle("collapsed", !listExpanded);
+}
+function setListExpanded(on: boolean): void { listExpanded = on; updateListVisibility(); }
 let expandedContinent: string | null = null; // which continent's countries are shown in the Continents tab
 let sortBy: "name" | "population" | "area" = "name";
 
@@ -768,10 +782,7 @@ function setActiveTab(tab: "countries" | "continents"): void {
   document.querySelectorAll<HTMLElement>(".sb-tab").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === tab);
   });
-  const countries$ = tab === "countries";
-  (document.getElementById("country-list") as HTMLElement).hidden = !countries$;
-  (document.getElementById("continent-list") as HTMLElement).hidden = countries$;
-  (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
+  updateListVisibility();
 
   buildContinentList(); // reflect cleared expand/selection state
   refreshAll();         // restyle map, panels, reveals (toggle scope depends on tab)
@@ -1416,8 +1427,11 @@ const isoToggle = document.getElementById("isolate") as HTMLInputElement;
 isoToggle.addEventListener("change", () => { isolate = isoToggle.checked; refreshAll(); });
 
 document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
-  btn.addEventListener("click", () => setActiveTab((btn.dataset.tab as "countries" | "continents")));
+  btn.addEventListener("click", () => { setActiveTab(btn.dataset.tab as "countries" | "continents"); setListExpanded(true); });
 });
+document.getElementById("list-fold")!.addEventListener("click", () => setListExpanded(!listExpanded));
+// Save space on small screens: start with the list folded away.
+setListExpanded(!isNarrow());
 
 const searchInput = document.getElementById("search") as HTMLInputElement;
 const searchClear = document.getElementById("search-clear") as HTMLButtonElement;

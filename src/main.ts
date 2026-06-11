@@ -65,6 +65,7 @@ const territoriesBySov: Record<string, Territory[]> = {};
 let selectedLayer: L.Polygon | null = null;
 let selectedContinent: string | null = null;
 let hoveredLayer: L.Polygon | null = null;
+let hoveredContinent: string | null = null;
 let showNames = false;
 let showCapitals = false;
 let showFlags = false;
@@ -349,9 +350,13 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
       }
     } else if (quizType === "continent") {
-      // Tint each continent so the clickable regions are obvious.
+      // Tint each continent so the clickable regions are obvious; hovering any
+      // country deepens the shade of its WHOLE continent.
       const st = CONTINENT_QUIZ_STYLES[e.continent || "Other"];
-      if (st) return e.layer === hoveredLayer ? { ...st, weight: 2, fillOpacity: 0.72 } : st;
+      if (st) {
+        const hot = hoveredContinent && (e.continent || "Other") === hoveredContinent;
+        return hot ? { ...st, fillOpacity: 0.82, weight: 1.5 } : st;
+      }
     }
     if (e.layer === hoveredLayer) return hoverStyle;
     return baseStyle;
@@ -847,8 +852,8 @@ function loadBorders(): void {
           // Hover only restyles the polygon (and, in Explore, shows the off-map
           // info panel) — no on-map labels, no bringToFront — so it can never
           // cancel a click.
-          mouseover: () => { hoveredLayer = layerP; refreshPolygons(); if (mode === "explore") showHoverInfo(entry); },
-          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
+          mouseover: () => { hoveredLayer = layerP; hoveredContinent = entry.continent || "Other"; refreshPolygons(); if (mode === "explore") showHoverInfo(entry); },
+          mouseout: () => { if (hoveredLayer === layerP) { hoveredLayer = null; hoveredContinent = null; } refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
           click: (e) => {
             L.DomEvent.stop(e);
             suppressMapClick = true;

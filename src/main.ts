@@ -206,7 +206,7 @@ function entryForLayer(layer: L.Layer | null): CountryEntry | null {
   return layer ? (countries.find((e) => e.layer === layer) || null) : null;
 }
 
-function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo | null): string {
+function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo | null, territories: string[]): string {
   const name = props.FORMAL_EN || props.NAME_LONG || props.ADMIN || (entry && entry.name) || "Unknown";
   const longName = props.NAME_LONG && props.NAME_LONG !== name ? props.NAME_LONG : "";
   const flag = entry && entry.iso2 ? '<img src="https://flagcdn.com/40x30/' + entry.iso2 + '.png" alt="">' : "";
@@ -221,6 +221,16 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
   if (region) rows.push(["Region", escapeHtml(region)]);
   if (props.INCOME_GRP) rows.push(["Income group", escapeHtml(String(props.INCOME_GRP).replace(/^\d+\.\s*/, ""))]);
   const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
+
+  let terrBlock = "";
+  if (territories.length) {
+    const links = territories
+      .map((n) => '<a href="' + wikiUrl(n) + '" target="_blank" rel="noopener">' + escapeHtml(n) + "</a>")
+      .join(", ");
+    terrBlock = '<div class="ci-terr"><div class="ci-terr-h">Territories (' + territories.length +
+      ')</div><div class="ci-terr-list">' + links + "</div></div>";
+  }
+
   return (
     '<div class="ci-head">' + flag +
       '<div><div class="ci-title">' + escapeHtml(name) + "</div>" +
@@ -228,13 +238,13 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
       "</div>" +
       '<button class="ci-close" title="Close" aria-label="Close">×</button>' +
     "</div>" +
-    "<dl>" + dl + "</dl>" +
+    "<dl>" + dl + "</dl>" + terrBlock +
     '<a class="ci-wiki" href="' + wikiUrl(entry ? entry.name : name) + '" target="_blank" rel="noopener">Wikipedia ↗</a>'
   );
 }
 
-function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | null): void {
-  countryInfoEl.innerHTML = buildInfoHTML(props, entry, extra);
+function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | null, territories: string[]): void {
+  countryInfoEl.innerHTML = buildInfoHTML(props, entry, extra, territories);
   countryInfoEl.hidden = false;
   const close = countryInfoEl.querySelector(".ci-close");
   if (close) close.addEventListener("click", deselect);
@@ -255,12 +265,14 @@ function renderCountryInfo(): void {
   const entry = entryForLayer(selectedLayer);
   const code: string | null = props.ADM0_A3 || props.adm0_a3 || null;
   currentInfoCode = code;
-  renderInfo(props, entry, (countryData && code) ? countryData[code] || null : null);
+  const conn = selectedLayer ? computeConnectors(selectedLayer) : null;
+  const territories = conn ? conn.items.map((i) => i.name).sort((a, b) => a.localeCompare(b)) : [];
+  renderInfo(props, entry, (countryData && code) ? countryData[code] || null : null, territories);
 
   // Lazy-load area/currency/languages the first time, then re-render.
   if (!countryData) {
     loadCountryData().then((map) => {
-      if (currentInfoCode === code && selectedLayer) renderInfo(props, entry, code ? map[code] || null : null);
+      if (currentInfoCode === code && selectedLayer) renderInfo(props, entry, code ? map[code] || null : null, territories);
     }).catch(() => { /* extra fields optional */ });
   }
 }
@@ -351,54 +363,54 @@ function nearestSubunitName(iso: string | null, latlng: LatLng): string | null {
   return best ? best.name : null;
 }
 
-// Draw a connector ONLY when it has a unique name. This guarantees every line
-// carries a label (no unnamed lines) and avoids duplicates — e.g. Mafia/Pemba,
-// which both match the "Zanzibar" sub-unit, no longer get a label-less line.
-// Returns true if a line was drawn.
-function addConnector(home: LatLng, tip: LatLng, name: string | null, seen: Record<string, boolean>): boolean {
-  if (!name || seen[name]) return false;
-  seen[name] = true;
-  L.polyline([home, tip], {
-    color: "#8a3b00", weight: 1, opacity: 0.7, dashArray: "4 4", interactive: false,
-  }).addTo(connectorLayer);
-  const html = '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>";
-  L.tooltip({
-    permanent: true, interactive: true, direction: "right", offset: [6, 0],
-    className: "map-label connector-label", opacity: 1,
-  }).setLatLng(tip).setContent(html).addTo(connectorLayer);
-  return true;
-}
+interface Connector { tip: LatLng; name: string; }
 
-function refreshConnectors(): void {
-  connectorLayer.clearLayers();
-  if (!selectedLayer) return; // satellite lines show on selection, isolate or not
-  const feat = (selectedLayer as any).feature;
+// Compute a country's associated territories — each with a UNIQUE name, so
+// every connector carries a label (no unnamed/duplicate lines). Two sources:
+//  (a) named detached parts of the same feature (Alaska, Hawaii, Réunion …);
+//  (b) separate features under the same sovereign (Greenland, Falklands …).
+function computeConnectors(layer: L.Polygon): { home: LatLng; items: Connector[] } | null {
+  const feat = (layer as any).feature;
   const parts = allPolygonParts(feat && feat.geometry);
-  if (!parts.length) return;
+  if (!parts.length) return null;
   const props = (feat && feat.properties) || {};
   const iso = props.ADM0_A3 || props.adm0_a3 || null;
   const sov = props.SOV_A3 || props.sov_a3 || null;
   const home = centerOf(parts[0].rings);
   const seen: Record<string, boolean> = {};
-  let n = 0;
+  const items: Connector[] = [];
 
-  // (a) Detached parts WITHIN the same country feature, but only those we can
-  //     name from a sub-unit (Alaska, Hawaii, French Guiana, Réunion …).
-  //     Unnamed coastal islets (e.g. around Greenland) are skipped as clutter.
-  for (let i = 1; i < parts.length && n < CONNECTOR_MAX_LINES; i++) {
+  for (let i = 1; i < parts.length && items.length < CONNECTOR_MAX_LINES; i++) {
     if (parts[i].area < CONNECTOR_MIN_AREA) break; // sorted largest-first
     const tip = centerOf(parts[i].rings);
-    if (addConnector(home, tip, nearestSubunitName(iso, tip), seen)) n++;
+    const name = nearestSubunitName(iso, tip);
+    if (name && !seen[name]) { seen[name] = true; items.push({ tip, name }); }
   }
-
-  // (b) Separate features under the SAME sovereign (Greenland & Faroe for
-  //     Denmark; Falklands, Gibraltar, Bermuda … for the UK).
   const terrs = (sov && territoriesBySov[sov]) || [];
-  for (let j = 0; j < terrs.length && n < CONNECTOR_MAX_LINES; j++) {
+  for (let j = 0; j < terrs.length && items.length < CONNECTOR_MAX_LINES; j++) {
     const t = terrs[j];
-    if (t.adm0 === iso) continue; // skip the sovereign country itself
-    if (addConnector(home, [t.lat, t.lng], t.name, seen)) n++;
+    if (t.adm0 === iso || seen[t.name]) continue; // skip the sovereign itself / dupes
+    seen[t.name] = true;
+    items.push({ tip: [t.lat, t.lng], name: t.name });
   }
+  return { home, items };
+}
+
+function refreshConnectors(): void {
+  connectorLayer.clearLayers();
+  if (!selectedLayer) return; // lines show on selection, isolate or not
+  const c = computeConnectors(selectedLayer);
+  if (!c) return;
+  c.items.forEach((it) => {
+    L.polyline([c.home, it.tip], {
+      color: "#8a3b00", weight: 1, opacity: 0.7, dashArray: "4 4", interactive: false,
+    }).addTo(connectorLayer);
+    const html = '<a href="' + wikiUrl(it.name) + '" target="_blank" rel="noopener">' + escapeHtml(it.name) + "</a>";
+    L.tooltip({
+      permanent: true, interactive: true, direction: "right", offset: [6, 0],
+      className: "map-label connector-label", opacity: 1,
+    }).setLatLng(it.tip).setContent(html).addTo(connectorLayer);
+  });
 }
 
 // ---------------------------------------------------------------------------

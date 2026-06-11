@@ -145,5 +145,10 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #countryinfo dl { margin: 0; padding: 10px 14px 6px; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; }
 #countryinfo dt { color: #8a8a8a; }
 #countryinfo dd { margin: 0; }
+#countryinfo .ci-terr { padding: 0 14px 8px; }
+#countryinfo .ci-terr-h { font-size: 11px; color: #8a8a8a; margin-bottom: 3px; }
+#countryinfo .ci-terr-list { max-height: 120px; overflow-y: auto; font-size: 12px; line-height: 1.6; }
+#countryinfo .ci-terr-list a { color: #8a3b00; text-decoration: none; }
+#countryinfo .ci-terr-list a:hover { text-decoration: underline; }
 #countryinfo .ci-wiki { display: inline-block; margin: 4px 14px 14px; color: #3878c7; text-decoration: none; }
 #countryinfo .ci-wiki:hover { text-decoration: underline; }

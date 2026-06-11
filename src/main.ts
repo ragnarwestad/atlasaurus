@@ -825,15 +825,19 @@ function loadBorders(): void {
     setActiveTab("countries");
     placeCountryLabels();
 
-    // Natural Earth leaves some ocean island states without a continent
-    // ("Seven seas (open ocean)" → "Other"). Reassign continents from the
-    // authoritative mledoze dataset so every country lands in one of the seven.
+    // Natural Earth already splits North/South America correctly, but leaves some
+    // ocean island states without a continent ("Seven seas (open ocean)" → "Other").
+    // Only fix those orphans from mledoze (and only to one of our known seven), so
+    // we never merge the Americas or disturb NE's good assignments.
     loadCountryData().then((data) => {
       let changed = false;
       countries.forEach((e) => {
-        if (e.isLandmass || !e.iso) return;
+        if (e.isLandmass || !e.iso || e.continent !== "Other") return;
         const d = data[e.iso];
-        if (d && d.continent && d.continent !== e.continent) { e.continent = d.continent; changed = true; }
+        if (d && d.continent && CONTINENT_ORDER.indexOf(d.continent) !== -1) {
+          e.continent = d.continent;
+          changed = true;
+        }
       });
       if (changed) buildSidebar();
     }).catch(() => { /* keep Natural Earth continents if unavailable */ });

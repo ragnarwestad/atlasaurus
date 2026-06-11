@@ -68,6 +68,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #nb-box, #loc-box { margin-top: 12px; }
 #nb-box[hidden], #loc-box[hidden] { display: none; }
 #nb-mode, #loc-mode { display: flex; gap: 14px; margin-bottom: 10px; font-size: 13px; color: #41525f; }
+#loc-mode[hidden] { display: none; }
 #nb-mode label, #loc-mode label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 #nb-mode input, #loc-mode input { margin: 0; }
 #nb-box.map-mode #nb-input, #nb-box.map-mode #nb-results,

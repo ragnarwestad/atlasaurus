@@ -1046,6 +1046,15 @@ function nextQuestion(): void {
     locInput.value = ""; locInput.disabled = false;
     locResults.innerHTML = "";
     locBox.hidden = false;
+    // "By name" already gives you the name, so searching for it is pointless —
+    // hide the mode picker and force map clicks. Flag/capital keep both options.
+    const nameOnly = quizType === "name";
+    locModeEl.hidden = nameOnly;
+    if (nameOnly) {
+      locMode = "map";
+      const mapRadio = document.querySelector<HTMLInputElement>('#loc-mode input[value="map"]');
+      if (mapRadio) mapRadio.checked = true;
+    }
     applyLocMode();
   }
   quizNextBtn.disabled = true;
@@ -1148,6 +1157,7 @@ function applyNbMode(): void {
 // --- Locate quizzes (name / flag / capital): answer by clicking the map or by
 //     searching for the country by name. The two are mutually exclusive. ---
 const locBox = document.getElementById("loc-box") as HTMLElement;
+const locModeEl = document.getElementById("loc-mode") as HTMLElement;
 const locInput = document.getElementById("loc-input") as HTMLInputElement;
 const locResults = document.getElementById("loc-results")!;
 let locMode: "map" | "search" = "map";

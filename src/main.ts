@@ -960,8 +960,8 @@ function handleGuess(entry: CountryEntry): void {
 }
 
 function addQuizDot(entry: CountryEntry, latlng: LatLng, correct: boolean): void {
-  // In the flag quiz, also show each involved country's flag on the map.
-  const flag = quizType === "flag" && entry.iso2
+  // Always show flag + name on the dots once a guess is made (both quiz modes).
+  const flag = entry.iso2
     ? '<img class="quiz-dot-flag" src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" alt=""> '
     : "";
   L.circleMarker(latlng, {

@@ -71,7 +71,7 @@ let isolate = false;
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
-let quizType: "name" | "flag" | "capital" = "name";
+let quizType: "name" | "flag" | "capital" | "continent" = "name";
 let quizStarted = false;
 let quizTarget: CountryEntry | null = null;
 let quizGuess: CountryEntry | null = null;
@@ -840,7 +840,7 @@ function loadBorders(): void {
             L.DomEvent.stop(e);
             suppressMapClick = true;
             setTimeout(() => { suppressMapClick = false; }, 0);
-            if (mode === "quiz") { handleGuess(entry); return; }
+            if (mode === "quiz") { if (quizType !== "continent") handleGuess(entry); return; }
             // The Antarctica landmass selects its continent, not a "country".
             if (isLandmass) selectContinent(continent); else selectLayer(layerP, true);
           },
@@ -884,6 +884,7 @@ function loadBorders(): void {
 const quizPromptEl = document.getElementById("quiz-prompt")!;
 const quizFeedbackEl = document.getElementById("quiz-feedback")!;
 const quizScoreEl = document.getElementById("quiz-score")!;
+const quizChoicesEl = document.getElementById("quiz-choices")!;
 const quizNextBtn = document.getElementById("quiz-next") as HTMLButtonElement;
 const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
 
@@ -899,6 +900,10 @@ function renderQuizPrompt(): void {
     quizPromptEl.innerHTML = quizTarget.capitalName
       ? '<span class="quiz-cap-tag">capital</span> <span>' + escapeHtml(quizTarget.capitalName) + "</span>"
       : "(no capital)";
+  } else if (quizType === "continent") {
+    // Continent quiz: show the country (flag + name); pick its continent.
+    const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
+    quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
   } else {
     // Name quiz: just the name (no flag — that would give it away).
     quizPromptEl.innerHTML = "<span>" + escapeHtml(quizTarget.name) + "</span>";
@@ -929,9 +934,59 @@ function nextQuestion(): void {
   quizLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
-  quizFeedbackEl.textContent = "Click it on the map.";
+  if (quizType === "continent") {
+    renderContinentChoices();
+    quizChoicesEl.hidden = false;
+    quizFeedbackEl.textContent = "Which continent is it in?";
+  } else {
+    quizChoicesEl.hidden = true;
+    quizFeedbackEl.textContent = "Click it on the map.";
+  }
   quizNextBtn.disabled = true;
   refreshPolygons();
+}
+
+function renderContinentChoices(): void {
+  const present = Array.from(new Set(realCountries().map((c) => c.continent || "Other")))
+    .filter((c) => c !== "Other")
+    .sort((a, b) => {
+      const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+  quizChoicesEl.innerHTML = "";
+  present.forEach((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = c;
+    b.dataset.continent = c;
+    b.addEventListener("click", () => answerContinent(c));
+    quizChoicesEl.appendChild(b);
+  });
+}
+
+function answerContinent(name: string): void {
+  if (mode !== "quiz" || quizType !== "continent" || !quizTarget || quizAnswered) return;
+  quizAnswered = true;
+  quizTotal++;
+  const correct = quizTarget.continent || "Other";
+  const ok = name === correct;
+  if (ok) quizCorrect++;
+  quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+    btn.disabled = true;
+    const c = btn.dataset.continent;
+    if (c === correct) btn.classList.add("correct");
+    else if (c === name && !ok) btn.classList.add("wrong");
+  });
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = ok
+    ? "✓ Correct! " + quizTarget.name + " is in " + correct + "."
+    : "✗ " + quizTarget.name + " is in " + correct + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  // Reveal where it is on the map.
+  quizLayer.clearLayers();
+  const c = layerCenter(quizTarget);
+  if (c) addQuizDot(quizTarget, c, true);
 }
 function handleGuess(entry: CountryEntry): void {
   if (mode !== "quiz" || !quizTarget || quizAnswered || entry.isLandmass) return;

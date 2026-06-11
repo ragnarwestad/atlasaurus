@@ -944,7 +944,7 @@ function handleGuess(entry: CountryEntry): void {
   if (ok) {
     quizCorrect++;
     quizFeedbackEl.className = "correct";
-    quizFeedbackEl.textContent = "✓ Correct!";
+    quizFeedbackEl.textContent = "✓ Correct! It's " + quizTarget.name + ".";
     if (tCenter) addQuizDot(quizTarget, tCenter, true); // labelled green dot
   } else {
     quizFeedbackEl.className = "wrong";

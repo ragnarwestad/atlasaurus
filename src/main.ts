@@ -155,7 +155,7 @@ function hideHoverInfo(): void {
 
 // --- Selected-country fact panel (population/GDP/region from Natural Earth,
 //     area/currency/languages from REST Countries, fetched + cached on select) ---
-interface RestInfo { area?: number; currencies?: string; languages?: string; }
+interface RestInfo { area?: number; currencies?: string; languages?: string; continent?: string; }
 const countryInfoEl = document.getElementById("countryinfo")!;
 let currentInfoCode: string | null = null;
 let currentInfoContinent: string | null = null;
@@ -183,7 +183,8 @@ function loadCountryData(): Promise<Record<string, RestInfo>> {
           }).join(", ")
         : undefined;
       const languages = c.languages ? Object.values(c.languages).join(", ") : undefined;
-      map[c.cca3] = { area: c.area, currencies, languages };
+      const continent = Array.isArray(c.continents) && c.continents.length ? c.continents[0] : c.region;
+      map[c.cca3] = { area: c.area, currencies, languages, continent };
     });
     countryData = map;
     return map;
@@ -749,6 +750,19 @@ function loadBorders(): void {
     buildSidebar();
     setActiveTab("countries");
     placeCountryLabels();
+
+    // Natural Earth leaves some ocean island states without a continent
+    // ("Seven seas (open ocean)" → "Other"). Reassign continents from the
+    // authoritative mledoze dataset so every country lands in one of the seven.
+    loadCountryData().then((data) => {
+      let changed = false;
+      countries.forEach((e) => {
+        if (e.isLandmass || !e.iso) return;
+        const d = data[e.iso];
+        if (d && d.continent && d.continent !== e.continent) { e.continent = d.continent; changed = true; }
+      });
+      if (changed) buildSidebar();
+    }).catch(() => { /* keep Natural Earth continents if unavailable */ });
     refreshCountryLabels(); // honour default (names off) once labels exist
     hideStatus();
     loadCapitals();

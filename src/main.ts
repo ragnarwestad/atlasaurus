@@ -187,18 +187,22 @@ function nearestSubunitName(iso: string | null, latlng: LatLng): string | null {
   return best ? best.name : null;
 }
 
-function addConnector(home: LatLng, tip: LatLng, name: string | null, seen: Record<string, boolean>): void {
+// Draw a connector ONLY when it has a unique name. This guarantees every line
+// carries a label (no unnamed lines) and avoids duplicates — e.g. Mafia/Pemba,
+// which both match the "Zanzibar" sub-unit, no longer get a label-less line.
+// Returns true if a line was drawn.
+function addConnector(home: LatLng, tip: LatLng, name: string | null, seen: Record<string, boolean>): boolean {
+  if (!name || seen[name]) return false;
+  seen[name] = true;
   L.polyline([home, tip], {
     color: "#8a3b00", weight: 1, opacity: 0.7, dashArray: "4 4", interactive: false,
   }).addTo(connectorLayer);
-  if (name && !seen[name]) {
-    seen[name] = true;
-    const html = '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>";
-    L.tooltip({
-      permanent: true, interactive: true, direction: "right", offset: [6, 0],
-      className: "map-label connector-label", opacity: 1,
-    }).setLatLng(tip).setContent(html).addTo(connectorLayer);
-  }
+  const html = '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>";
+  L.tooltip({
+    permanent: true, interactive: true, direction: "right", offset: [6, 0],
+    className: "map-label connector-label", opacity: 1,
+  }).setLatLng(tip).setContent(html).addTo(connectorLayer);
+  return true;
 }
 
 function refreshConnectors(): void {
@@ -220,10 +224,7 @@ function refreshConnectors(): void {
   for (let i = 1; i < parts.length && n < CONNECTOR_MAX_LINES; i++) {
     if (parts[i].area < CONNECTOR_MIN_AREA) break; // sorted largest-first
     const tip = centerOf(parts[i].rings);
-    const nm = nearestSubunitName(iso, tip);
-    if (!nm) continue;
-    addConnector(home, tip, nm, seen);
-    n++;
+    if (addConnector(home, tip, nearestSubunitName(iso, tip), seen)) n++;
   }
 
   // (b) Separate features under the SAME sovereign (Greenland & Faroe for
@@ -232,8 +233,7 @@ function refreshConnectors(): void {
   for (let j = 0; j < terrs.length && n < CONNECTOR_MAX_LINES; j++) {
     const t = terrs[j];
     if (t.adm0 === iso) continue; // skip the sovereign country itself
-    addConnector(home, [t.lat, t.lng], t.name, seen);
-    n++;
+    if (addConnector(home, [t.lat, t.lng], t.name, seen)) n++;
   }
 }
 

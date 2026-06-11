@@ -230,6 +230,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .help-card h2 { margin: 0 0 6px; color: #1b3a5c; }
 .help-card h3 { margin: 16px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #5a6b7a; }
 .help-card p { margin: 0 0 8px; }
+.help-card .help-note { margin-top: 10px; font-size: 12px; color: #8a8a8a; }
 .help-card ul { margin: 0; padding-left: 18px; }
 .help-card li { margin: 4px 0; }
 .help-close {

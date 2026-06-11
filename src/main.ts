@@ -1022,12 +1022,11 @@ function nextQuestion(): void {
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   if (quizType === "continent") {
-    renderContinentChoices();
     showContinentLabels();
-    quizChoicesEl.hidden = false;
+    quizChoicesEl.hidden = true;
     nbBox.hidden = true;
     locBox.hidden = true;
-    quizFeedbackEl.textContent = "Pick its continent — buttons or click a country on the map.";
+    quizFeedbackEl.textContent = "Click any country in its continent on the map.";
   } else if (quizType === "neighbour") {
     quizChoicesEl.hidden = true;
     locBox.hidden = true;
@@ -1083,24 +1082,6 @@ function showContinentLabels(): void {
     if (!pos) return;
     L.tooltip({ permanent: true, direction: "center", interactive: false, className: "map-label quiz-cont-label" })
       .setLatLng(pos).setContent(escapeHtml(c)).addTo(quizContLayer);
-  });
-}
-
-function renderContinentChoices(): void {
-  const present = Array.from(new Set(realCountries().map((c) => c.continent || "Other")))
-    .filter((c) => c !== "Other")
-    .sort((a, b) => {
-      const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
-    });
-  quizChoicesEl.innerHTML = "";
-  present.forEach((c) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = c;
-    b.dataset.continent = c;
-    b.addEventListener("click", () => answerContinent(c));
-    quizChoicesEl.appendChild(b);
   });
 }
 

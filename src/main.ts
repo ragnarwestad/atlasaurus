@@ -231,15 +231,16 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
       ')</div><div class="ci-terr-list">' + links + "</div></div>";
   }
 
+  const titleLink = '<a href="' + wikiUrl(entry ? entry.name : name) + '" target="_blank" rel="noopener">' +
+    escapeHtml(name) + ' <span class="ext">↗</span></a>';
   return (
     '<div class="ci-head">' + flag +
-      '<div><div class="ci-title">' + escapeHtml(name) + "</div>" +
+      '<div><div class="ci-title">' + titleLink + "</div>" +
         (longName ? '<div class="ci-sub">' + escapeHtml(longName) + "</div>" : "") +
       "</div>" +
       '<button class="ci-close" title="Close" aria-label="Close">×</button>' +
     "</div>" +
-    "<dl>" + dl + "</dl>" + terrBlock +
-    '<a class="ci-wiki" href="' + wikiUrl(entry ? entry.name : name) + '" target="_blank" rel="noopener">Wikipedia ↗</a>'
+    "<dl>" + dl + "</dl>" + terrBlock
   );
 }
 
@@ -295,14 +296,14 @@ function renderContinentInfo(name: string): void {
   if (gdp) rows.push(["GDP", "$" + fmtInt(gdp) + " M"]);
   if (topName) rows.push(["Most populous", escapeHtml(topName)]);
   const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
-  const wiki = name !== "Other"
-    ? '<a class="ci-wiki" href="' + wikiUrl(name) + '" target="_blank" rel="noopener">Wikipedia ↗</a>'
-    : "";
+  const titleLink = name !== "Other"
+    ? '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + ' <span class="ext">↗</span></a>'
+    : escapeHtml(name);
   countryInfoEl.innerHTML =
-    '<div class="ci-head"><div><div class="ci-title">' + escapeHtml(name) + "</div>" +
+    '<div class="ci-head"><div><div class="ci-title">' + titleLink + "</div>" +
     '<div class="ci-sub">Continent</div></div>' +
     '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' +
-    "<dl>" + dl + "</dl>" + wiki;
+    "<dl>" + dl + "</dl>";
   countryInfoEl.hidden = false;
   const close = countryInfoEl.querySelector(".ci-close");
   if (close) close.addEventListener("click", deselect);

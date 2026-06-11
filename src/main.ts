@@ -234,7 +234,10 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
   const longName = props.NAME_LONG && props.NAME_LONG !== name ? props.NAME_LONG : "";
   const flag = entry && entry.iso2 ? '<img src="https://flagcdn.com/40x30/' + entry.iso2 + '.png" alt="">' : "";
   const rows: [string, string][] = [];
-  if (entry && entry.capitalName) rows.push(["Capital", escapeHtml(entry.capitalName)]);
+  if (entry && entry.capitalName) {
+    rows.push(["Capital", '<a href="' + cityWikiUrl(entry.capitalName) + '" target="_blank" rel="noopener">' +
+      escapeHtml(entry.capitalName) + "</a>"]);
+  }
   if (props.POP_EST) rows.push(["Population", fmtInt(props.POP_EST) + (props.POP_YEAR ? " (" + props.POP_YEAR + ")" : "")]);
   if (extra && extra.area) rows.push(["Area", fmtInt(extra.area) + " km²"]);
   if (props.GDP_MD) rows.push(["GDP", "$" + fmtInt(props.GDP_MD) + " M" + (props.GDP_YEAR ? " (" + props.GDP_YEAR + ")" : "")]);
@@ -1264,10 +1267,14 @@ function addQuizDot(entry: CountryEntry, latlng: LatLng, kind: DotKind): void {
     ? '<img class="quiz-dot-flag" src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" alt=""> '
     : "";
   const col = DOT_COLORS[kind];
+  // The answer is already revealed, so link the name to Wikipedia (interactive
+  // tooltip) — handy for reading up on a country you just learned.
+  const nameLink = '<a href="' + wikiUrl(entry.name) + '" target="_blank" rel="noopener">' +
+    escapeHtml(entry.name) + "</a>";
   L.circleMarker(latlng, {
     radius: kind === "wrong" ? 5 : 6, color: col.stroke, weight: 2, fillColor: col.fill, fillOpacity: 1,
-  }).bindTooltip(flag + escapeHtml(entry.name), {
-    permanent: true, direction: "top", className: "map-label quiz-label quiz-label-" + kind,
+  }).bindTooltip(flag + nameLink, {
+    permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-" + kind,
   }).addTo(quizLayer);
 }
 

@@ -264,7 +264,7 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
       '<div><div class="ci-title">' + titleLink + "</div>" +
         (longName ? '<div class="ci-sub">' + escapeHtml(longName) + "</div>" : "") +
       "</div>" +
-      '<span class="ci-caret" title="Collapse / expand"></span>' +
+      '<button class="ci-toggle" title="Collapse / expand" aria-label="Collapse / expand"><span class="ci-caret"></span></button>' +
       '<button class="ci-close" title="Close" aria-label="Close">×</button>' +
     "</div>" +
     "<dl>" + dl + "</dl>" + terrBlock
@@ -276,6 +276,8 @@ function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | nu
   countryInfoEl.hidden = false;
   const close = countryInfoEl.querySelector(".ci-close");
   if (close) close.addEventListener("click", deselect);
+  const toggle = countryInfoEl.querySelector(".ci-toggle");
+  if (toggle) toggle.addEventListener("click", () => countryInfoEl.classList.toggle("collapsed"));
   const head = countryInfoEl.querySelector(".ci-head");
   if (head) makeDraggable(countryInfoEl, head as HTMLElement,
     () => countryInfoEl.classList.toggle("collapsed"));

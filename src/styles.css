@@ -262,12 +262,18 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #countryinfo .ci-title a:hover { text-decoration: underline; }
 #countryinfo .ci-title .ext { font-size: 11px; color: #3878c7; font-weight: 600; }
 #countryinfo .ci-sub { font-size: 11px; color: #888; }
-#countryinfo .ci-caret {
-  margin-left: auto; align-self: center; flex: 0 0 auto; width: 0; height: 0;
-  border-left: 5px solid transparent; border-right: 5px solid transparent;
-  border-top: 6px solid #9aa6b1; transition: transform .15s; cursor: pointer;
+#countryinfo .ci-toggle {
+  margin-left: auto; align-self: stretch; margin-top: -12px; margin-bottom: -8px;
+  display: flex; align-items: center; justify-content: center; width: 34px;
+  border: none; background: none; cursor: pointer; border-radius: 6px;
 }
-#countryinfo .ci-caret:hover { border-top-color: #5a6b7a; }
+#countryinfo .ci-toggle:hover { background: #eef2f6; }
+#countryinfo .ci-caret {
+  flex: 0 0 auto; width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 6px solid #9aa6b1; transition: transform .15s;
+}
+#countryinfo .ci-toggle:hover .ci-caret { border-top-color: #5a6b7a; }
 #countryinfo.collapsed .ci-caret { transform: rotate(-90deg); }
 #countryinfo.collapsed .ci-head { border-bottom: none; }
 #countryinfo.collapsed dl,

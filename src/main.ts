@@ -405,7 +405,7 @@ function refreshConnectors(): void {
 // Flags (scale with zoom)
 // ---------------------------------------------------------------------------
 function flagIcon(iso2: string, zoom: number): L.DivIcon {
-  const scale = Math.min(1 + (zoom - 2) * 0.35, 3); // 24px at z2 → up to ~72px
+  const scale = Math.min(0.78 + (zoom - 2) * 0.33, 3); // smaller when zoomed out (~19px at z2)
   const w = Math.round(24 * scale), h = Math.round(18 * scale);
   return L.divIcon({
     className: "flag-icon",

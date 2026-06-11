@@ -6,6 +6,32 @@ body { display: flex; font-family: system-ui, sans-serif; }
   display: flex; flex-direction: column; border-right: 1px solid #d8d8d8;
   background: #fff;
 }
+
+/* Top-level mode tabs (Explore / Quiz) */
+#mode-tabs { display: flex; border-bottom: 1px solid #d8d8d8; flex: 0 0 auto; }
+#mode-tabs .mode-tab {
+  flex: 1; padding: 11px 8px; font: 700 13px system-ui, sans-serif; cursor: pointer;
+  background: #f3f6f9; border: none; border-bottom: 2px solid transparent; color: #5a6b7a;
+}
+#mode-tabs .mode-tab:hover { color: #3878c7; }
+#mode-tabs .mode-tab.active { background: #fff; color: #1b3a5c; border-bottom-color: #3878c7; }
+#explore-panel, #quiz-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#explore-panel[hidden], #quiz-panel[hidden] { display: none; }
+
+/* Quiz panel */
+#quiz-prompt { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; color: #1b3a5c; min-height: 28px; }
+#quiz-prompt img { width: 34px; height: 26px; box-shadow: 0 0 2px rgba(0,0,0,.4); border-radius: 2px; flex: 0 0 auto; }
+#quiz-feedback { margin-top: 10px; font-size: 13px; line-height: 1.5; min-height: 38px; color: #5a6b7a; }
+#quiz-feedback.correct { color: #1b7a3d; font-weight: 600; }
+#quiz-feedback.wrong { color: #b3261e; font-weight: 600; }
+.quiz-actions { display: flex; gap: 8px; margin-top: 6px; }
+.quiz-actions button {
+  flex: 1; padding: 8px; font: 600 13px system-ui, sans-serif; cursor: pointer;
+  border-radius: 6px; border: 1px solid #cdd6df; background: #fff; color: #23323f;
+}
+.quiz-actions #quiz-next { background: #3878c7; color: #fff; border-color: #3878c7; }
+.quiz-actions button:disabled { opacity: .45; cursor: default; }
+#quiz-score { margin-top: 16px; font-size: 13px; color: #5a6b7a; }
 /* Two sections: "Map" (display toggles) and "Countries" (grouping + filter + list). */
 .sb-group { padding: 11px 14px; border-bottom: 1px solid #e6ebf0; }
 .sb-title {

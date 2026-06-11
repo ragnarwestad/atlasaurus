@@ -81,6 +81,8 @@ export const selectedStyle: PathOptions = { color: "#8a3b00", weight: 2.5, opaci
 export const relatedStyle: PathOptions  = { color: "#a85a1a", weight: 1.5, opacity: 1, fillColor: "#f3b06a", fillOpacity: 0.5 };
 export const continentStyle: PathOptions = { color: "#1f7a6b", weight: 1.2, opacity: 1, fillColor: "#79c9bb", fillOpacity: 0.55 }; // continent members
 export const hiddenStyle: PathOptions   = { opacity: 0, fillOpacity: 0 };
+export const quizCorrectStyle: PathOptions = { color: "#1b7a3d", weight: 2, opacity: 1, fillColor: "#54c47e", fillOpacity: 0.7 }; // quiz: right answer
+export const quizWrongStyle: PathOptions   = { color: "#9c1b12", weight: 2, opacity: 1, fillColor: "#e8675c", fillOpacity: 0.7 }; // quiz: wrong guess
 
 // --- Connector tuning ---
 export const CONNECTOR_MIN_AREA = 0.03; // deg^2 — ignore tiny specks

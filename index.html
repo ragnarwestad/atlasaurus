@@ -7,37 +7,57 @@
 </head>
 <body>
   <aside id="sidebar">
-    <section class="sb-group">
-      <h2 class="sb-title">Map</h2>
-      <label id="name-toggle">
-        <input type="checkbox" id="show-names" /> Show country names
-      </label>
-      <label id="cap-toggle">
-        <input type="checkbox" id="show-capitals" /> Show capitals
-      </label>
-      <label id="flag-toggle">
-        <input type="checkbox" id="show-flags" /> Show flags
-      </label>
-      <label id="iso-toggle">
-        <input type="checkbox" id="isolate" /> Isolate selected
-      </label>
-    </section>
-    <section class="sb-group sb-tabsec">
-      <div class="sb-tabs">
-        <button type="button" class="sb-tab active" data-tab="countries">Countries (<span id="count-num">0</span>)</button>
-        <button type="button" class="sb-tab" data-tab="continents">Continents (<span id="cont-num">0</span>)</button>
+    <div id="mode-tabs">
+      <button type="button" class="mode-tab active" data-mode="explore">Explore</button>
+      <button type="button" class="mode-tab" data-mode="quiz">Quiz</button>
+    </div>
+
+    <div id="explore-panel">
+      <section class="sb-group">
+        <h2 class="sb-title">Map</h2>
+        <label id="name-toggle">
+          <input type="checkbox" id="show-names" /> Show country names
+        </label>
+        <label id="cap-toggle">
+          <input type="checkbox" id="show-capitals" /> Show capitals
+        </label>
+        <label id="flag-toggle">
+          <input type="checkbox" id="show-flags" /> Show flags
+        </label>
+        <label id="iso-toggle">
+          <input type="checkbox" id="isolate" /> Isolate selected
+        </label>
+      </section>
+      <section class="sb-group sb-tabsec">
+        <div class="sb-tabs">
+          <button type="button" class="sb-tab active" data-tab="countries">Countries (<span id="count-num">0</span>)</button>
+          <button type="button" class="sb-tab" data-tab="continents">Continents (<span id="cont-num">0</span>)</button>
+        </div>
+        <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+        <label id="sort-row">Sort
+          <select id="sort">
+            <option value="name">Name (A–Z)</option>
+            <option value="population">Population</option>
+            <option value="area">Area</option>
+          </select>
+        </label>
+      </section>
+      <ul id="country-list"></ul>
+      <ul id="continent-list" hidden></ul>
+    </div>
+
+    <div id="quiz-panel" hidden>
+      <div class="sb-group">
+        <h2 class="sb-title">Find the country</h2>
+        <div id="quiz-prompt"></div>
+        <div id="quiz-feedback"></div>
+        <div class="quiz-actions">
+          <button id="quiz-skip" type="button">Skip</button>
+          <button id="quiz-next" type="button">Next →</button>
+        </div>
+        <div id="quiz-score"></div>
       </div>
-      <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
-      <label id="sort-row">Sort
-        <select id="sort">
-          <option value="name">Name (A–Z)</option>
-          <option value="population">Population</option>
-          <option value="area">Area</option>
-        </select>
-      </label>
-    </section>
-    <ul id="country-list"></ul>
-    <ul id="continent-list" hidden></ul>
+    </div>
   </aside>
   <div id="map"></div>
   <div id="status">Loading world data… (detailed borders, may take a few seconds)</div>

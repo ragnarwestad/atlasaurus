@@ -5,6 +5,7 @@ import "./styles.css";
 import {
   BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS,
   baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
+  quizCorrectStyle, quizWrongStyle,
   CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
 } from "./config";
 import { allPolygonParts, centerOf, type LatLng } from "./geo";
@@ -66,6 +67,15 @@ let showNames = false;
 let showCapitals = false;
 let showFlags = false;
 let isolate = false;
+
+// Quiz mode
+let mode: "explore" | "quiz" = "explore";
+let quizStarted = false;
+let quizTarget: CountryEntry | null = null;
+let quizGuess: CountryEntry | null = null;
+let quizAnswered = false;
+let quizCorrect = 0;
+let quizTotal = 0;
 // Set on a country click so the map's background-click deselect doesn't fire in
 // the same event dispatch (robust even if stopPropagation is ineffective).
 let suppressMapClick = false;
@@ -91,6 +101,7 @@ function isRevealed(e: CountryEntry): boolean {
   return e.layer === selectedLayer || sameRealm(e);
 }
 function countryVisible(e: CountryEntry): boolean {
+  if (mode === "quiz") return true; // everything visible/clickable in the quiz
   // A selected continent takes precedence: keep showing all its members (the
   // selected country, if any, is one of them).
   if (isolate && selectedContinent) return (e.continent || "Other") === selectedContinent;
@@ -110,11 +121,14 @@ function refreshCountryLabels(): void {
   countries.forEach((e) => {
     if (!e.labelTooltip) return;
     const el = e.labelTooltip.getElement();
-    if (el) el.style.display = countryVisible(e) && ((showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
+    if (!el) return;
+    if (mode === "quiz") { el.style.display = "none"; return; } // clean map for the quiz
+    el.style.display = countryVisible(e) && ((showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
   });
 }
 
 function refreshCapitals(): void {
+  if (mode === "quiz") { capitalMarkers.forEach((m) => { if (capitalLayer.hasLayer(m)) capitalLayer.removeLayer(m); }); return; }
   capitalMarkers.forEach((m) => {
     const e = m._entry;
     const cv = e ? countryVisible(e) : !(isolate && selectedLayer);
@@ -127,6 +141,7 @@ function refreshCapitals(): void {
 }
 
 function refreshFlags(): void {
+  if (mode === "quiz") { countries.forEach((e) => { if (e.flagMarker && flagLayer.hasLayer(e.flagMarker)) flagLayer.removeLayer(e.flagMarker); }); return; }
   countries.forEach((e) => {
     if (!e.flagMarker) return;
     const visible = countryVisible(e) && ((showFlags && inToggleScope(e)) || isRevealed(e));
@@ -253,6 +268,7 @@ function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | nu
 
 // Bottom panel shows the selected COUNTRY, or the selected CONTINENT, or nothing.
 function updateInfoPanel(): void {
+  if (mode === "quiz") { countryInfoEl.hidden = true; return; }
   if (selectedLayer) { renderCountryInfo(); return; }
   if (selectedContinent) { renderContinentInfo(selectedContinent); return; }
   countryInfoEl.hidden = true;
@@ -317,6 +333,14 @@ function renderContinentInfo(name: string): void {
 }
 
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
+  if (mode === "quiz") {
+    if (quizAnswered) {
+      if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
+      if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
+    }
+    if (e.layer === hoveredLayer) return hoverStyle;
+    return baseStyle;
+  }
   // Hidden in isolate mode: continent context wins (hide non-members); else the
   // single-country context (hide everything but it and its realm siblings).
   if (isolate && selectedContinent) {
@@ -805,14 +829,16 @@ function loadBorders(): void {
         const entry: CountryEntry = { name, layer: layerP, iso, iso2, continent, isLandmass };
         countries.push(entry);
         layerP.on({
-          // Hover only restyles the polygon and shows the off-map info panel —
-          // no on-map labels, no bringToFront — so it can never cancel a click.
-          mouseover: () => { hoveredLayer = layerP; refreshPolygons(); showHoverInfo(entry); },
-          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshPolygons(); hideHoverInfo(); },
+          // Hover only restyles the polygon (and, in Explore, shows the off-map
+          // info panel) — no on-map labels, no bringToFront — so it can never
+          // cancel a click.
+          mouseover: () => { hoveredLayer = layerP; refreshPolygons(); if (mode === "explore") showHoverInfo(entry); },
+          mouseout: () => { if (hoveredLayer === layerP) hoveredLayer = null; refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
           click: (e) => {
             L.DomEvent.stop(e);
             suppressMapClick = true;
             setTimeout(() => { suppressMapClick = false; }, 0);
+            if (mode === "quiz") { handleGuess(entry); return; }
             // The Antarctica landmass selects its continent, not a "country".
             if (isLandmass) selectContinent(continent); else selectLayer(layerP, true);
           },
@@ -851,8 +877,78 @@ function loadBorders(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Quiz mode
+// ---------------------------------------------------------------------------
+const quizPromptEl = document.getElementById("quiz-prompt")!;
+const quizFeedbackEl = document.getElementById("quiz-feedback")!;
+const quizScoreEl = document.getElementById("quiz-score")!;
+const quizNextBtn = document.getElementById("quiz-next") as HTMLButtonElement;
+const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
+
+function renderQuizPrompt(): void {
+  if (!quizTarget) { quizPromptEl.innerHTML = ""; return; }
+  const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
+  quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
+}
+function renderQuizScore(): void {
+  quizScoreEl.textContent = quizTotal ? "Score: " + quizCorrect + " / " + quizTotal : "";
+}
+function nextQuestion(): void {
+  const pool = realCountries();
+  if (!pool.length) return;
+  let t = quizTarget;
+  for (let i = 0; i < 20 && (!t || t === quizTarget); i++) t = pool[Math.floor(Math.random() * pool.length)];
+  quizTarget = t;
+  quizGuess = null;
+  quizAnswered = false;
+  renderQuizPrompt();
+  quizFeedbackEl.className = "";
+  quizFeedbackEl.textContent = "Click it on the map.";
+  quizNextBtn.disabled = true;
+  refreshPolygons();
+}
+function handleGuess(entry: CountryEntry): void {
+  if (mode !== "quiz" || !quizTarget || quizAnswered || entry.isLandmass) return;
+  quizGuess = entry;
+  quizAnswered = true;
+  quizTotal++;
+  const ok = entry === quizTarget;
+  if (ok) {
+    quizCorrect++;
+    quizFeedbackEl.className = "correct";
+    quizFeedbackEl.textContent = "✓ Correct!";
+  } else {
+    quizFeedbackEl.className = "wrong";
+    quizFeedbackEl.textContent = "✗ That's " + entry.name + ". " + quizTarget.name + " is shown in green.";
+  }
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  refreshPolygons();
+  try { map.fitBounds(quizTarget.layer.getBounds(), { maxZoom: 5, padding: [50, 50] }); } catch { /* ignore */ }
+}
+function setMode(m: "explore" | "quiz"): void {
+  mode = m;
+  document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+  (document.getElementById("explore-panel") as HTMLElement).hidden = m !== "explore";
+  (document.getElementById("quiz-panel") as HTMLElement).hidden = m !== "quiz";
+  hideHoverInfo();
+  if (m === "quiz") {
+    selectedLayer = null; selectedContinent = null; expandedContinent = null;
+    if (!quizStarted) { quizStarted = true; quizCorrect = 0; quizTotal = 0; nextQuestion(); }
+    renderQuizScore();
+  }
+  refreshAll();
+}
+
+// ---------------------------------------------------------------------------
 // Wire UI + go
 // ---------------------------------------------------------------------------
+document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
+  b.addEventListener("click", () => setMode(b.dataset.mode as "explore" | "quiz"));
+});
+quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
+quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
+
 const capToggle = document.getElementById("show-capitals") as HTMLInputElement;
 capToggle.addEventListener("change", () => { showCapitals = capToggle.checked; refreshCapitals(); });
 

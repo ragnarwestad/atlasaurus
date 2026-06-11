@@ -987,7 +987,14 @@ function loadBorders(): void {
           // Hover only restyles the polygon (and, in Explore, shows the off-map
           // info panel) — no on-map labels, no bringToFront — so it can never
           // cancel a click.
-          mouseover: () => { hoveredLayer = layerP; hoveredContinent = mode === "quiz" ? (entry.continent || "Other") : groupOf(entry); refreshPolygons(); if (mode === "explore") showHoverInfo(entry); },
+          mouseover: () => {
+            hoveredLayer = layerP;
+            hoveredContinent = mode === "quiz" ? (entry.continent || "Other") : groupOf(entry);
+            refreshPolygons();
+            // The selected country already shows its flag + name on the map and in
+            // the fact panel, so skip the redundant hover tooltip for it.
+            if (mode === "explore") { if (layerP === selectedLayer) hideHoverInfo(); else showHoverInfo(entry); }
+          },
           mouseout: () => { if (hoveredLayer === layerP) { hoveredLayer = null; hoveredContinent = null; } refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
           click: (e) => {
             L.DomEvent.stop(e);

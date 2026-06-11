@@ -90,8 +90,10 @@ function isRevealed(e: CountryEntry): boolean {
   return e.layer === selectedLayer || sameRealm(e);
 }
 function countryVisible(e: CountryEntry): boolean {
-  if (isolate && selectedLayer) return e.layer === selectedLayer || sameRealm(e);
+  // A selected continent takes precedence: keep showing all its members (the
+  // selected country, if any, is one of them).
   if (isolate && selectedContinent) return (e.continent || "Other") === selectedContinent;
+  if (isolate && selectedLayer) return e.layer === selectedLayer || sameRealm(e);
   return true;
 }
 
@@ -291,10 +293,15 @@ function renderContinentInfo(name: string): void {
 }
 
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
-  if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) return null;
-  if (isolate && selectedContinent && (e.continent || "Other") !== selectedContinent) return null;
-  if (e.layer === selectedLayer) return selectedStyle;
-  if (selectedContinent && (e.continent || "Other") === selectedContinent) return continentStyle;
+  // Hidden in isolate mode: continent context wins (hide non-members); else the
+  // single-country context (hide everything but it and its realm siblings).
+  if (isolate && selectedContinent) {
+    if ((e.continent || "Other") !== selectedContinent) return null;
+  } else if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) {
+    return null;
+  }
+  if (e.layer === selectedLayer) return selectedStyle;                                   // selected country (orange)
+  if (selectedContinent && (e.continent || "Other") === selectedContinent) return continentStyle; // continent member (green)
   if (sameRealm(e)) return relatedStyle;
   if (e.layer === hoveredLayer) return hoverStyle;
   return baseStyle;
@@ -416,9 +423,10 @@ function refreshAll(): void {
   markActiveContinent();
 }
 
-/** Single-choice selection; toggle=true (map click) deselects the same country. */
+/** Single-country selection; toggle=true (map click) deselects the same country.
+ *  A selected continent is kept, so picking a country inside it keeps the
+ *  continent highlighted (green) with the country shown selected (orange). */
 function selectLayer(layer: L.Polygon, toggle: boolean): void {
-  selectedContinent = null;
   selectedLayer = toggle && selectedLayer === layer ? null : layer;
   if (selectedLayer) selectedLayer.bringToFront();
   refreshAll();

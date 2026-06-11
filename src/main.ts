@@ -642,6 +642,11 @@ function buildSidebar(): void {
 
 function setActiveTab(tab: "countries" | "continents"): void {
   activeTab = tab;
+  // Each tab owns its selection type — clear the other tab's selection so a
+  // continent highlight doesn't linger on the Countries tab (and vice versa).
+  if (tab === "countries") { selectedContinent = null; expandedContinent = null; }
+  else { selectedLayer = null; }
+
   document.querySelectorAll<HTMLElement>(".sb-tab").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === tab);
   });
@@ -649,10 +654,9 @@ function setActiveTab(tab: "countries" | "continents"): void {
   (document.getElementById("country-list") as HTMLElement).hidden = !countries$;
   (document.getElementById("continent-list") as HTMLElement).hidden = countries$;
   (document.getElementById("search") as HTMLElement).style.display = countries$ ? "" : "none";
-  // The toggles' scope depends on the active tab, so re-evaluate the reveals.
-  refreshCountryLabels();
-  refreshCapitals();
-  refreshFlags();
+
+  buildContinentList(); // reflect cleared expand/selection state
+  refreshAll();         // restyle map, panels, reveals (toggle scope depends on tab)
 }
 
 // ---------------------------------------------------------------------------

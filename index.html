@@ -44,6 +44,35 @@
   <div id="hoverinfo" hidden></div>
   <div id="countryinfo" hidden></div>
 
+  <button id="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
+  <div id="help-modal" hidden>
+    <div class="help-card" role="dialog" aria-modal="true" aria-label="About this map">
+      <button class="help-close" type="button" aria-label="Close">×</button>
+      <h2>World Map</h2>
+      <p>An interactive map of every country — borders, capitals, flags and facts —
+         grouped into continents, with overseas territories drawn in.</p>
+
+      <h3>Using it</h3>
+      <ul>
+        <li><b>Countries</b> tab — search the list; click a country to zoom in and select it.</li>
+        <li><b>Continents</b> tab — click a continent to highlight its countries and see
+            totals; expand it to list them.</li>
+        <li><b>Sort</b> by name, population or area (the value is shown after the name).</li>
+        <li><b>Hover</b> a country for a flag · name · capital tooltip at the cursor.</li>
+        <li><b>Select</b> a country for a fact panel (population, area, GDP, currency,
+            languages…) plus dashed lines to its territories (e.g. Alaska, Greenland, Réunion).</li>
+        <li><b>Show names / capitals / flags</b> toggles, and <b>Isolate</b> to hide
+            everything except the selection.</li>
+        <li>Names link to Wikipedia. Click the ocean to clear the selection.</li>
+      </ul>
+
+      <h3>Data &amp; credits</h3>
+      <p>Borders &amp; facts: Natural Earth · area, currency, continents: mledoze/countries ·
+         flags: flagcdn · map engine: Leaflet · tiles: CARTO. Crimea is shown per the
+         UN-recognized border (Ukraine).</p>
+    </div>
+  </div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

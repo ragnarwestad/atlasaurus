@@ -117,6 +117,36 @@ body { display: flex; font-family: system-ui, sans-serif; }
 }
 .leaflet-interactive { cursor: pointer; }
 
+/* About / help button + modal */
+#help-btn {
+  position: fixed; z-index: 1100; top: 12px; right: 12px; width: 30px; height: 30px;
+  border-radius: 50%; border: 1px solid #cdd6df; background: rgba(255,255,255,.95);
+  color: #3878c7; font: 700 16px system-ui, sans-serif; cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+#help-btn:hover { background: #3878c7; color: #fff; border-color: #3878c7; }
+#help-modal {
+  position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+#help-modal[hidden] { display: none; }
+.help-card {
+  position: relative; background: #fff; max-width: 560px; width: 100%;
+  max-height: 82vh; overflow: auto; border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.35); padding: 22px 24px;
+  font: 14px/1.55 system-ui, sans-serif; color: #23323f;
+}
+.help-card h2 { margin: 0 0 6px; color: #1b3a5c; }
+.help-card h3 { margin: 16px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #5a6b7a; }
+.help-card p { margin: 0 0 8px; }
+.help-card ul { margin: 0; padding-left: 18px; }
+.help-card li { margin: 4px 0; }
+.help-close {
+  position: absolute; top: 8px; right: 12px; border: none; background: none;
+  font-size: 24px; line-height: 1; color: #9aa7b3; cursor: pointer;
+}
+.help-close:hover { color: #444; }
+
 /* Hover info panel — shows the hovered country's flag/name/capital off-map, so
    it never interferes with the polygon's hover/click (no flicker). */
 #hoverinfo {

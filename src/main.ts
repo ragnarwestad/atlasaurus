@@ -878,6 +878,17 @@ map.on("click", () => {        // background click clears selection
 });
 map.on("zoomend", updateFlagSizes);
 
+// About / help modal.
+const helpModal = document.getElementById("help-modal") as HTMLElement;
+const openHelp = () => { helpModal.hidden = false; };
+const closeHelp = () => { helpModal.hidden = true; };
+document.getElementById("help-btn")!.addEventListener("click", openHelp);
+helpModal.addEventListener("click", (e) => {
+  const t = e.target as HTMLElement;
+  if (t === helpModal || t.classList.contains("help-close")) closeHelp();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(); });
+
 // Track the cursor so the hover info panel can float next to it.
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => {
   lastMouseX = ev.clientX;

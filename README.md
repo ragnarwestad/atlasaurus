@@ -1,4 +1,4 @@
-# Geographica
+# Atlasaurus
 
 An interactive world map: every country with borders and its national capital,
 clickable Wikipedia links on country, capital and territory names, plus flags

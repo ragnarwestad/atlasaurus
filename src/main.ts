@@ -71,7 +71,7 @@ let isolate = false;
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
-let quizType: "name" | "flag" = "name";
+let quizType: "name" | "flag" | "capital" = "name";
 let quizStarted = false;
 let quizTarget: CountryEntry | null = null;
 let quizGuess: CountryEntry | null = null;
@@ -894,6 +894,11 @@ function renderQuizPrompt(): void {
     quizPromptEl.innerHTML = quizTarget.iso2
       ? '<img class="quiz-bigflag" src="https://flagcdn.com/96x72/' + quizTarget.iso2 + '.png" alt="Flag">'
       : "(no flag available)";
+  } else if (quizType === "capital") {
+    // Capital quiz: show the capital city; click its country.
+    quizPromptEl.innerHTML = quizTarget.capitalName
+      ? '<span class="quiz-cap-tag">capital</span> <span>' + escapeHtml(quizTarget.capitalName) + "</span>"
+      : "(no capital)";
   } else {
     // Name quiz: just the name (no flag — that would give it away).
     quizPromptEl.innerHTML = "<span>" + escapeHtml(quizTarget.name) + "</span>";
@@ -911,8 +916,10 @@ function layerCenter(entry: CountryEntry): LatLng | null {
 }
 
 function nextQuestion(): void {
-  // Flag quiz needs a flag, so restrict to countries with an ISO-2 code.
-  const pool = quizType === "flag" ? realCountries().filter((c) => c.iso2) : realCountries();
+  // Restrict the pool to countries that have what the prompt needs.
+  const pool = quizType === "flag" ? realCountries().filter((c) => c.iso2)
+    : quizType === "capital" ? realCountries().filter((c) => c.capitalName)
+    : realCountries();
   if (!pool.length) return;
   let t = quizTarget;
   for (let i = 0; i < 20 && (!t || t === quizTarget); i++) t = pool[Math.floor(Math.random() * pool.length)];
@@ -1004,7 +1011,7 @@ quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(
 quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
-    quizType = b.dataset.qtype as "name" | "flag";
+    quizType = b.dataset.qtype as "name" | "flag" | "capital";
     document.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
     if (mode === "quiz") nextQuestion();
   });

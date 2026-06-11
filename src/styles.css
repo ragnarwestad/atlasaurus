@@ -303,3 +303,18 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #countryinfo .ci-terr-list a { color: #8a3b00; text-decoration: none; }
 #countryinfo .ci-terr-list a:hover { text-decoration: underline; }
 #countryinfo dl { padding-bottom: 12px; }
+
+/* --- Mobile / narrow screens: stack the sidebar on top of the map --- */
+@media (max-width: 700px) {
+  body { flex-direction: column; }
+  #sidebar {
+    width: 100%; flex: 0 0 auto; height: auto; max-height: 48vh;
+    border-right: none; border-bottom: 1px solid #d8d8d8;
+  }
+  #map { height: auto; flex: 1 1 auto; min-height: 0; }
+  /* Fact panel becomes a full-width sheet pinned to the bottom. */
+  #countryinfo { left: 8px; right: 8px; width: auto; bottom: 8px; max-height: 50vh; }
+  /* The hover tooltip is desktop-only (no hover on touch) — hide it. */
+  #hoverinfo { display: none !important; }
+  .help-card { padding: 18px 16px; max-height: 88vh; }
+}

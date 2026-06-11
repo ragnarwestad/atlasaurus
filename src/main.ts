@@ -264,7 +264,7 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
       '<div><div class="ci-title">' + titleLink + "</div>" +
         (longName ? '<div class="ci-sub">' + escapeHtml(longName) + "</div>" : "") +
       "</div>" +
-      '<span class="ci-caret" title="Collapse / expand">▾</span>' +
+      '<span class="ci-caret" title="Collapse / expand"></span>' +
       '<button class="ci-close" title="Close" aria-label="Close">×</button>' +
     "</div>" +
     "<dl>" + dl + "</dl>" + terrBlock

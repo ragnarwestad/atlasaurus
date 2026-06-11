@@ -263,9 +263,11 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #countryinfo .ci-title .ext { font-size: 11px; color: #3878c7; font-weight: 600; }
 #countryinfo .ci-sub { font-size: 11px; color: #888; }
 #countryinfo .ci-caret {
-  margin-left: auto; color: #9aa6b1; font-size: 13px; line-height: 1; flex: 0 0 auto;
-  transition: transform .15s; align-self: center;
+  margin-left: auto; align-self: center; flex: 0 0 auto; width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 6px solid #9aa6b1; transition: transform .15s; cursor: pointer;
 }
+#countryinfo .ci-caret:hover { border-top-color: #5a6b7a; }
 #countryinfo.collapsed .ci-caret { transform: rotate(-90deg); }
 #countryinfo.collapsed .ci-head { border-bottom: none; }
 #countryinfo.collapsed dl,

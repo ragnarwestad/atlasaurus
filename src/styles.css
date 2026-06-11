@@ -233,6 +233,14 @@ body { display: flex; font-family: system-ui, sans-serif; }
 
 /* About / help button + modal */
 .sb-title-row { display: flex; align-items: center; justify-content: space-between; }
+.sb-fold { display: flex; align-items: center; gap: 7px; background: none; border: none; cursor: pointer; padding: 0; }
+.sb-fold .fold-caret {
+  width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 6px solid #9aa6b1; transition: transform .15s;
+}
+.sb-fold:hover .fold-caret { border-top-color: #5a6b7a; }
+#map-group.collapsed .sb-fold .fold-caret { transform: rotate(-90deg); }
+#map-group.collapsed .map-toggles { display: none; }
 .help-btn {
   width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%;
   border: 1px solid #cdd6df; background: #fff; color: #3878c7;

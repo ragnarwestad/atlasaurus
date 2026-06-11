@@ -1430,8 +1430,17 @@ document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
   btn.addEventListener("click", () => { setActiveTab(btn.dataset.tab as "countries" | "continents"); setListExpanded(true); });
 });
 document.getElementById("list-fold")!.addEventListener("click", () => setListExpanded(!listExpanded));
-// Save space on small screens: start with the list folded away.
+
+let mapExpanded = true;
+function setMapExpanded(on: boolean): void {
+  mapExpanded = on;
+  document.getElementById("map-group")!.classList.toggle("collapsed", !on);
+}
+document.querySelector(".sb-fold")!.addEventListener("click", () => setMapExpanded(!mapExpanded));
+
+// Save space on small screens: start with both sections folded away.
 setListExpanded(!isNarrow());
+setMapExpanded(!isNarrow());
 
 const searchInput = document.getElementById("search") as HTMLInputElement;
 const searchClear = document.getElementById("search-clear") as HTMLButtonElement;

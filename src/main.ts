@@ -71,6 +71,7 @@ let isolate = false;
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
+let quizType: "name" | "flag" = "name";
 let quizStarted = false;
 let quizTarget: CountryEntry | null = null;
 let quizGuess: CountryEntry | null = null;
@@ -888,8 +889,15 @@ const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
 
 function renderQuizPrompt(): void {
   if (!quizTarget) { quizPromptEl.innerHTML = ""; return; }
-  const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
-  quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
+  if (quizType === "flag") {
+    // Flag quiz: show only the flag (no name) — identify it and click it.
+    quizPromptEl.innerHTML = quizTarget.iso2
+      ? '<img class="quiz-bigflag" src="https://flagcdn.com/96x72/' + quizTarget.iso2 + '.png" alt="Flag">'
+      : "(no flag available)";
+  } else {
+    const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
+    quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
+  }
 }
 function renderQuizScore(): void {
   quizScoreEl.textContent = quizTotal ? "Score: " + quizCorrect + " / " + quizTotal : "";
@@ -903,7 +911,8 @@ function layerCenter(entry: CountryEntry): LatLng | null {
 }
 
 function nextQuestion(): void {
-  const pool = realCountries();
+  // Flag quiz needs a flag, so restrict to countries with an ISO-2 code.
+  const pool = quizType === "flag" ? realCountries().filter((c) => c.iso2) : realCountries();
   if (!pool.length) return;
   let t = quizTarget;
   for (let i = 0; i < 20 && (!t || t === quizTarget); i++) t = pool[Math.floor(Math.random() * pool.length)];
@@ -989,6 +998,13 @@ document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
 });
 quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
 quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
+document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
+  b.addEventListener("click", () => {
+    quizType = b.dataset.qtype as "name" | "flag";
+    document.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
+    if (mode === "quiz") nextQuestion();
+  });
+});
 
 const capToggle = document.getElementById("show-capitals") as HTMLInputElement;
 capToggle.addEventListener("change", () => { showCapitals = capToggle.checked; refreshCapitals(); });

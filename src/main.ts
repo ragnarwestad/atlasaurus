@@ -19,6 +19,7 @@ interface CountryEntry {
   iso: string | null;
   iso2: string | null;
   continent?: string;
+  isLandmass?: boolean; // Antarctica: a continent landmass, not a country
   labelTooltip?: L.Tooltip;
   labelPlaced?: boolean;
   capitalMarker?: L.CircleMarker;
@@ -257,7 +258,7 @@ function renderCountryInfo(): void {
 function renderContinentInfo(name: string): void {
   currentInfoCode = null;
   currentInfoContinent = name;
-  const members = countries.filter((e) => (e.continent || "Other") === name);
+  const members = countries.filter((e) => (e.continent || "Other") === name && !e.isLandmass);
   let pop = 0, gdp = 0, area = 0, topName = "", topPop = -1;
   members.forEach((e) => {
     const p = ((e.layer as any).feature && (e.layer as any).feature.properties) || {};
@@ -463,7 +464,7 @@ function focusCountry(entry: CountryEntry): void {
 // ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
-const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Other"];
+const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 let activeTab: "countries" | "continents" = "countries";
 let expandedContinent: string | null = null; // which continent's countries are shown in the Continents tab
 
@@ -489,11 +490,15 @@ function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   return li;
 }
 
+// Real countries exclude the Antarctica landmass (a continent, not a country).
+function realCountries(): CountryEntry[] { return countries.filter((c) => !c.isLandmass); }
+
 // Filter the flat country list by the search box; update the Countries tab count.
 function applyFilter(): void {
   const ul = document.getElementById("country-list")!;
   const search = document.getElementById("search") as HTMLInputElement;
   const q = search.value.trim().toLowerCase();
+  const total = realCountries().length;
   let shown = 0;
   ul.querySelectorAll<HTMLElement>("li.country").forEach((li) => {
     const matches = (li.dataset.name || "").indexOf(q) !== -1;
@@ -501,7 +506,7 @@ function applyFilter(): void {
     li.style.display = matches ? "" : "none";
   });
   const countNum = document.getElementById("count-num")!;
-  countNum.textContent = q ? shown + " of " + countries.length : String(countries.length);
+  countNum.textContent = q ? shown + " of " + total : String(total);
 }
 
 // Highlight the active continent header (the one shown on the map).
@@ -519,6 +524,7 @@ function buildContinentList(): void {
   const byCont: Record<string, CountryEntry[]> = {};
   countries.forEach((e) => {
     const g = e.continent || "Other";
+    if (e.isLandmass) { counts[g] = counts[g] || 0; return; } // list the continent, 0 countries
     counts[g] = (counts[g] || 0) + 1;
     (byCont[g] = byCont[g] || []).push(e);
   });
@@ -545,7 +551,7 @@ function buildContinentList(): void {
     cl.appendChild(head);
 
     if (expandedContinent === g) {
-      byCont[g].sort((a, b) => a.name.localeCompare(b.name)).forEach((entry) => {
+      (byCont[g] || []).sort((a, b) => a.name.localeCompare(b.name)).forEach((entry) => {
         const li = makeCountryLi(entry);
         li.classList.add("cont-member");
         cl.appendChild(li);
@@ -556,12 +562,12 @@ function buildContinentList(): void {
 }
 
 function buildSidebar(): void {
-  // Flat A–Z country list (Countries tab).
+  // Flat A–Z country list (Countries tab) — excludes the Antarctica landmass.
   const ul = document.getElementById("country-list")!;
   ul.innerHTML = "";
-  countries.slice().sort((a, b) => a.name.localeCompare(b.name))
+  realCountries().sort((a, b) => a.name.localeCompare(b.name))
     .forEach((entry) => ul.appendChild(makeCountryLi(entry)));
-  document.getElementById("count-num")!.textContent = String(countries.length);
+  document.getElementById("count-num")!.textContent = String(realCountries().length);
 
   buildContinentList();
   applyFilter();
@@ -705,7 +711,9 @@ function loadBorders(): void {
           } catch { /* skip */ }
         }
         const t = p.TYPE || "";
-        return t !== "Dependency" && t !== "Lease" && adm0 !== "ATA"; // ATA = Antarctica
+        // Antarctica (ATA) is kept as a continent landmass (handled specially in
+        // onEachFeature), not dropped like dependencies/leases.
+        return t !== "Dependency" && t !== "Lease";
       },
       style: () => baseStyle,
       onEachFeature: (feature: any, lyr: L.Layer) => {
@@ -717,7 +725,9 @@ function loadBorders(): void {
         const iso2 = /^[A-Za-z]{2}$/.test(a2) ? a2.toLowerCase() : null;
         let continent = pr.CONTINENT || pr.continent || "Other";
         if (/seven seas/i.test(continent)) continent = "Other"; // open-ocean islands
-        const entry: CountryEntry = { name, layer: layerP, iso, iso2, continent };
+        const isLandmass = iso === "ATA";                       // Antarctica: continent, not a country
+        if (isLandmass) continent = "Antarctica";
+        const entry: CountryEntry = { name, layer: layerP, iso, iso2, continent, isLandmass };
         countries.push(entry);
         layerP.on({
           // Hover only restyles the polygon and shows the off-map info panel —
@@ -728,7 +738,8 @@ function loadBorders(): void {
             L.DomEvent.stop(e);
             suppressMapClick = true;
             setTimeout(() => { suppressMapClick = false; }, 0);
-            selectLayer(layerP, true);
+            // The Antarctica landmass selects its continent, not a "country".
+            if (isLandmass) selectContinent(continent); else selectLayer(layerP, true);
           },
         });
       },

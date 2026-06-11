@@ -871,7 +871,7 @@ function loadBorders(): void {
             setTimeout(() => { suppressMapClick = false; }, 0);
             if (mode === "quiz") {
               if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
-              else if (quizType === "neighbour") { if (!entry.isLandmass && entry !== quizTarget) toggleNbPick(entry); }
+              else if (quizType === "neighbour") { if (nbMode === "map" && !entry.isLandmass && entry !== quizTarget) toggleNbPick(entry); }
               else handleGuess(entry);
               return;
             }
@@ -998,7 +998,7 @@ function nextQuestion(): void {
     renderNbChips();
     nbCheck.disabled = false;
     nbBox.hidden = false;
-    quizFeedbackEl.textContent = "Add every country that borders it (search or click the map), then Check.";
+    applyNbMode();
   } else {
     quizChoicesEl.hidden = true;
     quizContLayer.clearLayers();
@@ -1089,6 +1089,18 @@ const nbResults = document.getElementById("nb-results")!;
 const nbChips = document.getElementById("nb-chips")!;
 const nbCheck = document.getElementById("nb-check") as HTMLButtonElement;
 let nbSelected = new Set<CountryEntry>();
+// Two mutually-exclusive ways to answer the Neighbour round: click the
+// neighbours on the map, or search and pick them by name.
+let nbMode: "map" | "search" = "map";
+function applyNbMode(): void {
+  nbBox.classList.toggle("map-mode", nbMode === "map");
+  if (nbMode === "map") { nbInput.value = ""; renderNbResults(""); }
+  if (mode === "quiz" && quizType === "neighbour" && !quizAnswered) {
+    quizFeedbackEl.textContent = nbMode === "map"
+      ? "Click every country that borders it on the map, then Check."
+      : "Search and add every country that borders it, then Check.";
+  }
+}
 
 function renderNbResults(query: string): void {
   const q = query.trim().toLowerCase();
@@ -1248,6 +1260,14 @@ quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(
 quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
 nbInput.addEventListener("input", () => renderNbResults(nbInput.value));
 nbCheck.addEventListener("click", nbCheckAnswers);
+document.querySelectorAll<HTMLInputElement>('#nb-mode input[name="nbmode"]').forEach((r) => {
+  r.addEventListener("change", () => {
+    if (!r.checked) return;
+    nbMode = r.value === "search" ? "search" : "map";
+    applyNbMode();
+    if (nbMode === "search") nbInput.focus();
+  });
+});
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
     quizType = b.dataset.qtype as "name" | "flag" | "capital" | "continent" | "neighbour";

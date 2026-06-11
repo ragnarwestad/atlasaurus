@@ -924,29 +924,41 @@ function handleGuess(entry: CountryEntry): void {
   quizTotal++;
   const ok = entry === quizTarget;
   quizLayer.clearLayers();
+  const tCenter = layerCenter(quizTarget);
   if (ok) {
     quizCorrect++;
     quizFeedbackEl.className = "correct";
     quizFeedbackEl.textContent = "✓ Correct!";
+    if (tCenter) addQuizDot(tCenter, quizTarget.name, true); // labelled green dot
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
       '. <a href="#" class="quiz-zoom">' + escapeHtml(quizTarget.name) + "</a> is the right one.";
     const z = quizFeedbackEl.querySelector(".quiz-zoom");
     if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
-    // Draw a line from the guess to the correct country so its location is clear
-    // even when it's a tiny island. (No auto-zoom — use the link for that.)
-    const a = layerCenter(entry), b = layerCenter(quizTarget);
-    if (a && b) {
-      L.polyline([a, b], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
-      L.circleMarker(b, { radius: 6, color: "#1b7a3d", weight: 2, fillColor: "#54c47e", fillOpacity: 1 })
-        .bindTooltip(escapeHtml(quizTarget.name), { permanent: false, direction: "top" }).addTo(quizLayer);
-      L.circleMarker(a, { radius: 5, color: "#9c1b12", weight: 2, fillColor: "#e8675c", fillOpacity: 1 }).addTo(quizLayer);
+    // Draw a line from the guess to the correct country (both labelled) so the
+    // location is clear even for a tiny island. (No auto-zoom — use the link.)
+    const gCenter = layerCenter(entry);
+    if (gCenter && tCenter) {
+      L.polyline([gCenter, tCenter], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
+      addQuizDot(tCenter, quizTarget.name, true);  // green: the right answer
+      addQuizDot(gCenter, entry.name, false);      // red: your guess
     }
   }
   renderQuizScore();
   quizNextBtn.disabled = false;
   refreshPolygons();
+}
+
+function addQuizDot(latlng: LatLng, name: string, correct: boolean): void {
+  L.circleMarker(latlng, {
+    radius: correct ? 6 : 5,
+    color: correct ? "#1b7a3d" : "#9c1b12", weight: 2,
+    fillColor: correct ? "#54c47e" : "#e8675c", fillOpacity: 1,
+  }).bindTooltip(escapeHtml(name), {
+    permanent: true, direction: "top",
+    className: "map-label quiz-label " + (correct ? "quiz-label-correct" : "quiz-label-wrong"),
+  }).addTo(quizLayer);
 }
 
 function zoomToTarget(maxZoom: number): void {

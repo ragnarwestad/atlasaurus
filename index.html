@@ -38,14 +38,16 @@
           <button type="button" class="sb-tab active" data-tab="countries">Countries (<span id="count-num">0</span>)</button>
           <button type="button" class="sb-tab" data-tab="continents">Continents (<span id="cont-num">0</span>)</button>
         </div>
-        <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
-        <label id="sort-row">Sort
-          <select id="sort">
-            <option value="name">Name (A–Z)</option>
-            <option value="population">Population</option>
-            <option value="area">Area</option>
-          </select>
-        </label>
+        <div class="filter-sort">
+          <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+          <label id="sort-row">Sort
+            <select id="sort">
+              <option value="name">Name (A–Z)</option>
+              <option value="population">Population</option>
+              <option value="area">Area</option>
+            </select>
+          </label>
+        </div>
       </section>
       <ul id="country-list"></ul>
       <ul id="continent-list" hidden></ul>

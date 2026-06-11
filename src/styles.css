@@ -103,6 +103,9 @@ body { display: flex; font-family: system-ui, sans-serif; }
   margin: 0; font: 700 11px system-ui, sans-serif; letter-spacing: .06em;
   text-transform: uppercase; color: #5a6b7a;
 }
+.filter-sort { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 9px; }
+.filter-sort #search { flex: 2 1 140px; width: auto; margin-top: 0; }
+.filter-sort #sort-row { flex: 1 1 120px; margin-top: 0; }
 #search {
   width: 100%; box-sizing: border-box; margin-top: 9px; padding: 7px 9px;
   font-size: 13px; border: 1px solid #ccc; border-radius: 6px;

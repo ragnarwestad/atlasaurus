@@ -36,6 +36,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .quiz-label { font: 600 12px system-ui, sans-serif; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }
 .quiz-label-correct { color: #1b7a3d; }
 .quiz-label-wrong { color: #9c1b12; }
+.quiz-label .quiz-dot-flag { width: 20px; height: 15px; vertical-align: middle; box-shadow: 0 0 2px rgba(0,0,0,.5); border-radius: 2px; }
 .quiz-actions { display: flex; gap: 8px; margin-top: 6px; }
 .quiz-actions button {
   flex: 1; padding: 8px; font: 600 13px system-ui, sans-serif; cursor: pointer;

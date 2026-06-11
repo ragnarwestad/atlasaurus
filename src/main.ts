@@ -895,8 +895,8 @@ function renderQuizPrompt(): void {
       ? '<img class="quiz-bigflag" src="https://flagcdn.com/96x72/' + quizTarget.iso2 + '.png" alt="Flag">'
       : "(no flag available)";
   } else {
-    const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
-    quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
+    // Name quiz: just the name (no flag — that would give it away).
+    quizPromptEl.innerHTML = "<span>" + escapeHtml(quizTarget.name) + "</span>";
   }
 }
 function renderQuizScore(): void {
@@ -938,7 +938,7 @@ function handleGuess(entry: CountryEntry): void {
     quizCorrect++;
     quizFeedbackEl.className = "correct";
     quizFeedbackEl.textContent = "✓ Correct!";
-    if (tCenter) addQuizDot(tCenter, quizTarget.name, true); // labelled green dot
+    if (tCenter) addQuizDot(quizTarget, tCenter, true); // labelled green dot
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
@@ -950,8 +950,8 @@ function handleGuess(entry: CountryEntry): void {
     const gCenter = layerCenter(entry);
     if (gCenter && tCenter) {
       L.polyline([gCenter, tCenter], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
-      addQuizDot(tCenter, quizTarget.name, true);  // green: the right answer
-      addQuizDot(gCenter, entry.name, false);      // red: your guess
+      addQuizDot(quizTarget, tCenter, true);  // green: the right answer
+      addQuizDot(entry, gCenter, false);      // red: your guess
     }
   }
   renderQuizScore();
@@ -959,12 +959,16 @@ function handleGuess(entry: CountryEntry): void {
   refreshPolygons();
 }
 
-function addQuizDot(latlng: LatLng, name: string, correct: boolean): void {
+function addQuizDot(entry: CountryEntry, latlng: LatLng, correct: boolean): void {
+  // In the flag quiz, also show each involved country's flag on the map.
+  const flag = quizType === "flag" && entry.iso2
+    ? '<img class="quiz-dot-flag" src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" alt=""> '
+    : "";
   L.circleMarker(latlng, {
     radius: correct ? 6 : 5,
     color: correct ? "#1b7a3d" : "#9c1b12", weight: 2,
     fillColor: correct ? "#54c47e" : "#e8675c", fillOpacity: 1,
-  }).bindTooltip(escapeHtml(name), {
+  }).bindTooltip(flag + escapeHtml(entry.name), {
     permanent: true, direction: "top",
     className: "map-label quiz-label " + (correct ? "quiz-label-correct" : "quiz-label-wrong"),
   }).addTo(quizLayer);

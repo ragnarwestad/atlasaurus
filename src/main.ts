@@ -52,6 +52,7 @@ const capitalLayer = L.layerGroup().addTo(map);    // capital dots + name labels
 const connectorLayer = L.layerGroup().addTo(map);  // satellite/sovereignty lines
 const flagLayer = L.layerGroup().addTo(map);       // flag images
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
+const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 
 // ---------------------------------------------------------------------------
 // State
@@ -848,7 +849,11 @@ function loadBorders(): void {
             L.DomEvent.stop(e);
             suppressMapClick = true;
             setTimeout(() => { suppressMapClick = false; }, 0);
-            if (mode === "quiz") { if (quizType !== "continent") handleGuess(entry); return; }
+            if (mode === "quiz") {
+              if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
+              else handleGuess(entry);
+              return;
+            }
             // The Antarctica landmass selects its continent, not a "country".
             if (isLandmass) selectContinent(continent); else selectLayer(layerP, true);
           },
@@ -946,14 +951,32 @@ function nextQuestion(): void {
   quizFeedbackEl.className = "";
   if (quizType === "continent") {
     renderContinentChoices();
+    showContinentLabels();
     quizChoicesEl.hidden = false;
-    quizFeedbackEl.textContent = "Which continent is it in?";
+    quizFeedbackEl.textContent = "Pick its continent — buttons or click a country on the map.";
   } else {
     quizChoicesEl.hidden = true;
+    quizContLayer.clearLayers();
     quizFeedbackEl.textContent = "Click it on the map.";
   }
   quizNextBtn.disabled = true;
   refreshPolygons();
+}
+
+// Approximate on-map position for each continent's name label.
+const CONTINENT_LABEL_POS: Record<string, [number, number]> = {
+  "Africa": [3, 20], "Asia": [47, 89], "Europe": [54, 22],
+  "North America": [46, -100], "South America": [-15, -60], "Oceania": [-25, 134],
+};
+function showContinentLabels(): void {
+  quizContLayer.clearLayers();
+  const present = Array.from(new Set(realCountries().map((c) => c.continent || "Other"))).filter((c) => c !== "Other");
+  present.forEach((c) => {
+    const pos = CONTINENT_LABEL_POS[c];
+    if (!pos) return;
+    L.tooltip({ permanent: true, direction: "center", interactive: false, className: "map-label quiz-cont-label" })
+      .setLatLng(pos).setContent(escapeHtml(c)).addTo(quizContLayer);
+  });
 }
 
 function renderContinentChoices(): void {
@@ -1062,6 +1085,7 @@ function setMode(m: "explore" | "quiz"): void {
   hideHoverInfo();
   if (m === "explore") {
     quizLayer.clearLayers();
+    quizContLayer.clearLayers();
   } else {
     selectedLayer = null; selectedContinent = null; expandedContinent = null;
     if (!quizStarted) { quizStarted = true; quizCorrect = 0; quizTotal = 0; nextQuestion(); }

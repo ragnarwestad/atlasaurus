@@ -253,7 +253,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #countryinfo[hidden] { display: none; }
 #countryinfo .ci-head {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px;
-  border-bottom: 1px solid #eee; position: sticky; top: 0;
+  border-bottom: 1px solid #eee; position: sticky; top: 0; cursor: move;
   background: rgba(255,255,255,.97);
 }
 #countryinfo .ci-head img { width: 40px; height: 30px; box-shadow: 0 0 2px rgba(0,0,0,.4); border-radius: 2px; flex: 0 0 auto; }

@@ -275,6 +275,34 @@ function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | nu
   countryInfoEl.hidden = false;
   const close = countryInfoEl.querySelector(".ci-close");
   if (close) close.addEventListener("click", deselect);
+  const head = countryInfoEl.querySelector(".ci-head");
+  if (head) makeDraggable(countryInfoEl, head as HTMLElement);
+}
+
+// Drag a panel by a handle element. Links/buttons inside the handle still work
+// (we ignore mousedowns that land on them). Switches to top/left positioning so
+// the panel stays where the user drops it, clamped to the viewport.
+function makeDraggable(panel: HTMLElement, handle: HTMLElement): void {
+  handle.addEventListener("mousedown", (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest("a, button")) return;
+    e.preventDefault();
+    const rect = panel.getBoundingClientRect();
+    const offX = e.clientX - rect.left;
+    const offY = e.clientY - rect.top;
+    panel.style.bottom = "auto";
+    const onMove = (m: MouseEvent) => {
+      const nx = Math.max(0, Math.min(window.innerWidth - rect.width, m.clientX - offX));
+      const ny = Math.max(0, Math.min(window.innerHeight - 36, m.clientY - offY));
+      panel.style.left = nx + "px";
+      panel.style.top = ny + "px";
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
 }
 
 // Bottom panel shows the selected COUNTRY, or the selected CONTINENT, or nothing.

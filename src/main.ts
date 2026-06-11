@@ -433,8 +433,8 @@ function applyFilter(): void {
     h.style.display = (visibleByGroup[h.dataset.group || ""] || 0) > 0 ? "" : "none";
   });
   countEl.textContent = q
-    ? shown + " of " + countries.length + " countries"
-    : countries.length + " countries";
+    ? "Countries (" + shown + " of " + countries.length + ")"
+    : "Countries (" + countries.length + ")";
 }
 
 function buildSidebar(): void {

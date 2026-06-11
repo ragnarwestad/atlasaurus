@@ -348,6 +348,10 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
         if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
       }
+    } else if (quizType === "continent") {
+      // Tint each continent so the clickable regions are obvious.
+      const st = CONTINENT_QUIZ_STYLES[e.continent || "Other"];
+      if (st) return e.layer === hoveredLayer ? { ...st, weight: 2, fillOpacity: 0.72 } : st;
     }
     if (e.layer === hoveredLayer) return hoverStyle;
     return baseStyle;
@@ -963,6 +967,15 @@ function nextQuestion(): void {
   refreshPolygons();
 }
 
+// Distinct tint per continent while the continent quiz question is open.
+const CONTINENT_QUIZ_STYLES: Record<string, L.PathOptions> = {
+  "Africa":        { color: "#b8860b", weight: 1, opacity: 1, fillColor: "#f2c14e", fillOpacity: 0.55 },
+  "Asia":          { color: "#b1472f", weight: 1, opacity: 1, fillColor: "#e8896c", fillOpacity: 0.55 },
+  "Europe":        { color: "#2f5fa0", weight: 1, opacity: 1, fillColor: "#7fb2e8", fillOpacity: 0.55 },
+  "North America": { color: "#2e7d4b", weight: 1, opacity: 1, fillColor: "#8fd0a0", fillOpacity: 0.55 },
+  "South America": { color: "#7a4ba0", weight: 1, opacity: 1, fillColor: "#c79be0", fillOpacity: 0.55 },
+  "Oceania":       { color: "#1f8a80", weight: 1, opacity: 1, fillColor: "#6fcbc3", fillOpacity: 0.55 },
+};
 // Approximate on-map position for each continent's name label.
 const CONTINENT_LABEL_POS: Record<string, [number, number]> = {
   "Africa": [3, 20], "Asia": [47, 89], "Europe": [54, 22],

@@ -492,6 +492,20 @@ let activeTab: "countries" | "continents" = "countries";
 let expandedContinent: string | null = null; // which continent's countries are shown in the Continents tab
 let sortBy: "name" | "population" | "area" = "name";
 
+// Compact value with 2 decimals + magnitude suffix, e.g. 1.41B, 5.43M, 323.80K.
+function formatCompact(n: number): string {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  return n.toFixed(2);
+}
+// The value shown in parentheses for the current sort (empty when sorting by name).
+function metricLabel(value: number): string {
+  if (sortBy === "population") return " (" + formatCompact(value) + ")";
+  if (sortBy === "area") return " (" + formatCompact(value) + " km²)";
+  return "";
+}
+
 function popOf(e: CountryEntry): number {
   const p = ((e.layer as any).feature && (e.layer as any).feature.properties) || {};
   return p.POP_EST || 0;
@@ -516,6 +530,12 @@ function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   label.title = "Zoom to " + entry.name + " on the map";
   label.style.flex = "1";
   label.addEventListener("click", () => focusCountry(entry));
+  if (sortBy !== "name") {
+    const m = document.createElement("span");
+    m.className = "metric";
+    m.textContent = metricLabel(sortBy === "population" ? popOf(entry) : areaOf(entry));
+    label.appendChild(m);
+  }
 
   const wiki = document.createElement("a");
   wiki.textContent = "Wiki ↗";
@@ -586,7 +606,10 @@ function buildContinentList(): void {
       (selectedContinent === g ? " active" : "");
     head.dataset.group = g;
     head.title = "Show all of " + g + " on the map";
-    head.innerHTML = '<span class="cont-name"><span class="caret">▾</span> ' + escapeHtml(g) +
+    const total = sortBy === "name" ? 0
+      : (byCont[g] || []).reduce((s, e) => s + (sortBy === "population" ? popOf(e) : areaOf(e)), 0);
+    const metric = sortBy === "name" ? "" : '<span class="metric">' + metricLabel(total) + "</span>";
+    head.innerHTML = '<span class="cont-name"><span class="caret">▾</span> ' + escapeHtml(g) + metric +
       '</span><span class="cnt">' + counts[g] + "</span>";
     head.addEventListener("click", () => {
       if (expandedContinent === g) { expandedContinent = null; deselect(); }

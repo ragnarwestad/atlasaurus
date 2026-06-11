@@ -71,6 +71,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
   gap: 8px; align-items: baseline;
 }
 #country-list li.country:hover { background: #eaf2fb; }
+/* Value shown after the name when sorting by population/area */
+.metric { color: #9aa7b3; font-weight: 400; font-size: 12px; margin-left: 4px; }
 #country-list a, #continent-list a {
   color: #3878c7; text-decoration: none; font-size: 11px; flex: 0 0 auto;
 }

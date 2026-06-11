@@ -436,7 +436,8 @@ function loadBorders(): void {
     const layer = L.geoJSON(geo, {
       // Keep sovereign states (+ disputed/indeterminate). Drop dependencies and
       // leases (e.g. Ashmore and Cartier Islands, French Polynesia, Puerto Rico),
-      // but record EVERY feature under its sovereign for sovereignty links.
+      // and Antarctica (a treaty-governed continent, not a country), but record
+      // EVERY feature under its sovereign for sovereignty links.
       filter: (feature: any) => {
         const p = feature.properties || {};
         const sov = p.SOV_A3 || p.sov_a3, adm0 = p.ADM0_A3 || p.adm0_a3;
@@ -451,7 +452,7 @@ function loadBorders(): void {
           } catch { /* skip */ }
         }
         const t = p.TYPE || "";
-        return t !== "Dependency" && t !== "Lease";
+        return t !== "Dependency" && t !== "Lease" && adm0 !== "ATA"; // ATA = Antarctica
       },
       style: () => baseStyle,
       onEachFeature: (feature: any, lyr: L.Layer) => {

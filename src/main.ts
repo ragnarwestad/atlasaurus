@@ -264,6 +264,7 @@ function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo |
       '<div><div class="ci-title">' + titleLink + "</div>" +
         (longName ? '<div class="ci-sub">' + escapeHtml(longName) + "</div>" : "") +
       "</div>" +
+      '<span class="ci-caret" title="Collapse / expand">▾</span>' +
       '<button class="ci-close" title="Close" aria-label="Close">×</button>' +
     "</div>" +
     "<dl>" + dl + "</dl>" + terrBlock
@@ -276,21 +277,24 @@ function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | nu
   const close = countryInfoEl.querySelector(".ci-close");
   if (close) close.addEventListener("click", deselect);
   const head = countryInfoEl.querySelector(".ci-head");
-  if (head) makeDraggable(countryInfoEl, head as HTMLElement);
+  if (head) makeDraggable(countryInfoEl, head as HTMLElement,
+    () => countryInfoEl.classList.toggle("collapsed"));
 }
 
-// Drag a panel by a handle element. Links/buttons inside the handle still work
-// (we ignore mousedowns that land on them). Switches to top/left positioning so
-// the panel stays where the user drops it, clamped to the viewport.
-function makeDraggable(panel: HTMLElement, handle: HTMLElement): void {
+// Drag a panel by a handle element, with an optional click handler (fired only
+// on a clean click — no drag — that didn't land on a link/button). Links and
+// buttons inside the handle still work; dragging switches to top/left so the
+// panel stays where it's dropped, clamped to the viewport.
+function makeDraggable(panel: HTMLElement, handle: HTMLElement, onClick?: () => void): void {
   handle.addEventListener("mousedown", (e: MouseEvent) => {
     if ((e.target as HTMLElement).closest("a, button")) return;
     e.preventDefault();
     const rect = panel.getBoundingClientRect();
     const offX = e.clientX - rect.left;
     const offY = e.clientY - rect.top;
-    panel.style.bottom = "auto";
+    let moved = false;
     const onMove = (m: MouseEvent) => {
+      if (!moved) { moved = true; panel.style.bottom = "auto"; }
       const nx = Math.max(0, Math.min(window.innerWidth - rect.width, m.clientX - offX));
       const ny = Math.max(0, Math.min(window.innerHeight - 36, m.clientY - offY));
       panel.style.left = nx + "px";
@@ -299,6 +303,7 @@ function makeDraggable(panel: HTMLElement, handle: HTMLElement): void {
     const onUp = () => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      if (!moved && onClick) onClick();
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);

@@ -31,15 +31,22 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .sb-tab.active { background: #3878c7; border-color: #3878c7; color: #fff; }
 .sb-tab span { font-weight: 600; }
 
-/* Continent list */
+/* Continent list (headers + expandable member countries) */
 #continent-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-#continent-list li {
-  padding: 10px 14px; cursor: pointer; font-size: 13px; color: #222;
-  border-bottom: 1px solid #f2f2f2; display: flex; justify-content: space-between; align-items: baseline;
+#continent-list li.cont-head {
+  padding: 9px 14px; cursor: pointer; font: 600 13px system-ui, sans-serif; color: #1b3a5c;
+  border-bottom: 1px solid #f2f2f2; display: flex; justify-content: space-between; align-items: center;
 }
-#continent-list li:hover { background: #eaf2fb; }
-#continent-list li.active { background: #d6efe9; color: #176b5d; font-weight: 600; }
-#continent-list li .cnt { color: #9aa7b3; font-weight: 600; }
+#continent-list li.cont-head:hover { background: #eaf2fb; }
+#continent-list li.cont-head.active { background: #d6efe9; color: #176b5d; }
+#continent-list li.cont-head .cnt { color: #9aa7b3; }
+#continent-list li.cont-head .caret { display: inline-block; transition: transform .15s; font-size: 9px; }
+#continent-list li.cont-head:not(.expanded) .caret { transform: rotate(-90deg); }
+#continent-list li.cont-member {
+  padding: 7px 14px 7px 30px; cursor: pointer; font-size: 13px; color: #222;
+  border-bottom: 1px solid #f6f6f6; display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+}
+#continent-list li.cont-member:hover { background: #eaf2fb; }
 
 /* Flag markers — pointer-transparent so hovered flags never steal the cursor
    from the polygon (which would break click-to-select). */
@@ -54,10 +61,10 @@ body { display: flex; font-family: system-ui, sans-serif; }
   gap: 8px; align-items: baseline;
 }
 #country-list li.country:hover { background: #eaf2fb; }
-#country-list a {
+#country-list a, #continent-list a {
   color: #3878c7; text-decoration: none; font-size: 11px; flex: 0 0 auto;
 }
-#country-list a:hover { text-decoration: underline; }
+#country-list a:hover, #continent-list a:hover { text-decoration: underline; }
 
 #map { flex: 1; height: 100vh; background: #aadaff; }
 #status {

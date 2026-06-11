@@ -457,6 +457,7 @@ function focusCountry(entry: CountryEntry): void {
 // ---------------------------------------------------------------------------
 const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Other"];
 let activeTab: "countries" | "continents" = "countries";
+let expandedContinent: string | null = null; // which continent's countries are shown in the Continents tab
 
 function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   const li = document.createElement("li");
@@ -495,43 +496,67 @@ function applyFilter(): void {
   countNum.textContent = q ? shown + " of " + countries.length : String(countries.length);
 }
 
-// Highlight the active continent's row in the Continents tab.
+// Highlight the active continent header (the one shown on the map).
 function markActiveContinent(): void {
-  document.querySelectorAll<HTMLElement>("#continent-list li").forEach((li) => {
-    li.classList.toggle("active", li.dataset.group === selectedContinent);
+  document.querySelectorAll<HTMLElement>("#continent-list li.cont-head").forEach((h) => {
+    h.classList.toggle("active", h.dataset.group === selectedContinent);
   });
 }
 
-function buildSidebar(): void {
-  // Flat A–Z country list.
-  const ul = document.getElementById("country-list")!;
-  ul.innerHTML = "";
-  countries.slice().sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((entry) => ul.appendChild(makeCountryLi(entry)));
-
-  // Continent list (sorted by a sensible order), with member counts.
+// Continents tab: each continent is a header; the expanded one lists its
+// member countries beneath. Clicking a header expands it AND highlights the
+// continent on the map; clicking a member selects that single country.
+function buildContinentList(): void {
   const counts: Record<string, number> = {};
-  countries.forEach((e) => { const g = e.continent || "Other"; counts[g] = (counts[g] || 0) + 1; });
+  const byCont: Record<string, CountryEntry[]> = {};
+  countries.forEach((e) => {
+    const g = e.continent || "Other";
+    counts[g] = (counts[g] || 0) + 1;
+    (byCont[g] = byCont[g] || []).push(e);
+  });
   const order = Object.keys(counts).sort((a, b) => {
     const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
   });
+
   const cl = document.getElementById("continent-list")!;
   cl.innerHTML = "";
   order.forEach((g) => {
-    const li = document.createElement("li");
-    li.dataset.group = g;
-    li.title = "Show all of " + g + " on the map";
-    li.innerHTML = "<span>" + escapeHtml(g) + '</span><span class="cnt">' + counts[g] + "</span>";
-    li.addEventListener("click", () => selectContinent(g));
-    cl.appendChild(li);
+    const head = document.createElement("li");
+    head.className = "cont-head" + (expandedContinent === g ? " expanded" : "") +
+      (selectedContinent === g ? " active" : "");
+    head.dataset.group = g;
+    head.title = "Show all of " + g + " on the map";
+    head.innerHTML = '<span class="cont-name"><span class="caret">▾</span> ' + escapeHtml(g) +
+      '</span><span class="cnt">' + counts[g] + "</span>";
+    head.addEventListener("click", () => {
+      if (expandedContinent === g) { expandedContinent = null; deselect(); }
+      else { expandedContinent = g; selectContinent(g); }
+      buildContinentList();
+    });
+    cl.appendChild(head);
+
+    if (expandedContinent === g) {
+      byCont[g].sort((a, b) => a.name.localeCompare(b.name)).forEach((entry) => {
+        const li = makeCountryLi(entry);
+        li.classList.add("cont-member");
+        cl.appendChild(li);
+      });
+    }
   });
-
-  document.getElementById("count-num")!.textContent = String(countries.length);
   document.getElementById("cont-num")!.textContent = String(order.length);
+}
 
+function buildSidebar(): void {
+  // Flat A–Z country list (Countries tab).
+  const ul = document.getElementById("country-list")!;
+  ul.innerHTML = "";
+  countries.slice().sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((entry) => ul.appendChild(makeCountryLi(entry)));
+  document.getElementById("count-num")!.textContent = String(countries.length);
+
+  buildContinentList();
   applyFilter();
-  markActiveContinent();
 }
 
 function setActiveTab(tab: "countries" | "continents"): void {

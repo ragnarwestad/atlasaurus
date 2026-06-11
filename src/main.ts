@@ -4,7 +4,7 @@ import "./styles.css";
 
 import {
   BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS,
-  baseStyle, hoverStyle, selectedStyle, relatedStyle, hiddenStyle,
+  baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
   CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
 } from "./config";
 import { allPolygonParts, centerOf, type LatLng } from "./geo";
@@ -59,6 +59,7 @@ const subunitsByIso: Record<string, Subunit[]> = {};
 const territoriesBySov: Record<string, Territory[]> = {};
 
 let selectedLayer: L.Polygon | null = null;
+let selectedContinent: string | null = null;
 let hoveredLayer: L.Polygon | null = null;
 let showNames = false;
 let showCapitals = false;
@@ -89,7 +90,9 @@ function isRevealed(e: CountryEntry): boolean {
   return e.layer === selectedLayer || sameRealm(e);
 }
 function countryVisible(e: CountryEntry): boolean {
-  return !(isolate && selectedLayer) || e.layer === selectedLayer || sameRealm(e);
+  if (isolate && selectedLayer) return e.layer === selectedLayer || sameRealm(e);
+  if (isolate && selectedContinent) return (e.continent || "Other") === selectedContinent;
+  return true;
 }
 
 function refreshCountryLabels(): void {
@@ -152,6 +155,7 @@ function hideHoverInfo(): void {
 interface RestInfo { area?: number; currencies?: string; languages?: string; }
 const countryInfoEl = document.getElementById("countryinfo")!;
 let currentInfoCode: string | null = null;
+let currentInfoContinent: string | null = null;
 
 // Area / currency / languages come from the mledoze/countries dataset — a static
 // file on jsDelivr (the data REST Countries is built from), keyed by ISO-3.
@@ -223,8 +227,17 @@ function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | nu
   if (close) close.addEventListener("click", deselect);
 }
 
-function updateCountryInfo(): void {
-  if (!selectedLayer) { countryInfoEl.hidden = true; currentInfoCode = null; return; }
+// Bottom panel shows the selected COUNTRY, or the selected CONTINENT, or nothing.
+function updateInfoPanel(): void {
+  if (selectedLayer) { renderCountryInfo(); return; }
+  if (selectedContinent) { renderContinentInfo(selectedContinent); return; }
+  countryInfoEl.hidden = true;
+  currentInfoCode = null;
+  currentInfoContinent = null;
+}
+
+function renderCountryInfo(): void {
+  currentInfoContinent = null;
   const props = ((selectedLayer as any).feature && (selectedLayer as any).feature.properties) || {};
   const entry = entryForLayer(selectedLayer);
   const code: string | null = props.ADM0_A3 || props.adm0_a3 || null;
@@ -239,9 +252,49 @@ function updateCountryInfo(): void {
   }
 }
 
+function renderContinentInfo(name: string): void {
+  currentInfoCode = null;
+  currentInfoContinent = name;
+  const members = countries.filter((e) => (e.continent || "Other") === name);
+  let pop = 0, gdp = 0, area = 0, topName = "", topPop = -1;
+  members.forEach((e) => {
+    const p = ((e.layer as any).feature && (e.layer as any).feature.properties) || {};
+    if (p.POP_EST) pop += p.POP_EST;
+    if (p.GDP_MD) gdp += p.GDP_MD;
+    if (p.POP_EST > topPop) { topPop = p.POP_EST; topName = e.name; }
+    if (countryData && e.iso && countryData[e.iso] && countryData[e.iso].area) area += countryData[e.iso].area as number;
+  });
+  const rows: [string, string][] = [["Countries", String(members.length)]];
+  if (pop) rows.push(["Population", fmtInt(pop)]);
+  if (countryData && area) rows.push(["Area", fmtInt(area) + " km²"]);
+  if (gdp) rows.push(["GDP", "$" + fmtInt(gdp) + " M"]);
+  if (topName) rows.push(["Most populous", escapeHtml(topName)]);
+  const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
+  const wiki = name !== "Other"
+    ? '<a class="ci-wiki" href="' + wikiUrl(name) + '" target="_blank" rel="noopener">Wikipedia ↗</a>'
+    : "";
+  countryInfoEl.innerHTML =
+    '<div class="ci-head"><div><div class="ci-title">' + escapeHtml(name) + "</div>" +
+    '<div class="ci-sub">Continent</div></div>' +
+    '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' +
+    "<dl>" + dl + "</dl>" + wiki;
+  countryInfoEl.hidden = false;
+  const close = countryInfoEl.querySelector(".ci-close");
+  if (close) close.addEventListener("click", deselect);
+
+  // Area needs the country dataset; lazy-load then re-render if still showing.
+  if (!countryData) {
+    loadCountryData().then(() => {
+      if (currentInfoContinent === name && selectedContinent === name) renderContinentInfo(name);
+    }).catch(() => { /* area optional */ });
+  }
+}
+
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
   if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) return null;
+  if (isolate && selectedContinent && (e.continent || "Other") !== selectedContinent) return null;
   if (e.layer === selectedLayer) return selectedStyle;
+  if (selectedContinent && (e.continent || "Other") === selectedContinent) return continentStyle;
   if (sameRealm(e)) return relatedStyle;
   if (e.layer === hoveredLayer) return hoverStyle;
   return baseStyle;
@@ -359,17 +412,46 @@ function refreshAll(): void {
   refreshCountryLabels();
   refreshCapitals();
   refreshFlags();
-  updateCountryInfo();
+  updateInfoPanel();
+  markActiveContinent();
 }
 
 /** Single-choice selection; toggle=true (map click) deselects the same country. */
 function selectLayer(layer: L.Polygon, toggle: boolean): void {
+  selectedContinent = null;
   selectedLayer = toggle && selectedLayer === layer ? null : layer;
   if (selectedLayer) selectedLayer.bringToFront();
   refreshAll();
 }
 function deselect(): void {
-  if (selectedLayer) { selectedLayer = null; refreshAll(); }
+  if (selectedLayer || selectedContinent) { selectedLayer = null; selectedContinent = null; refreshAll(); }
+}
+
+// Select a whole continent: highlight all member countries and show aggregate
+// info. Clicking the active continent again clears it. (Mutually exclusive with
+// single-country selection.)
+function selectContinent(name: string): void {
+  selectedLayer = null;
+  selectedContinent = selectedContinent === name ? null : name;
+  if (selectedContinent) {
+    let b: L.LatLngBounds | null = null;
+    countries.forEach((e) => {
+      if ((e.continent || "Other") !== selectedContinent) return;
+      try {
+        const lb = e.layer.getBounds();
+        b = b ? b.extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
+      } catch { /* skip */ }
+    });
+    if (b) { try { map.fitBounds(b, { padding: [30, 30], maxZoom: 6 }); } catch { /* ignore */ } }
+  }
+  refreshAll();
+}
+
+// Highlight the active continent's header in the sidebar.
+function markActiveContinent(): void {
+  document.querySelectorAll<HTMLElement>("#country-list li.grp").forEach((h) => {
+    h.classList.toggle("active", h.dataset.group === selectedContinent);
+  });
 }
 function focusCountry(entry: CountryEntry): void {
   try { map.fitBounds(entry.layer.getBounds(), { maxZoom: 6, padding: [40, 40] }); } catch {}
@@ -455,13 +537,35 @@ function buildSidebar(): void {
       const header = document.createElement("li");
       header.className = "grp" + (collapsedGroups[g] ? " collapsed" : "");
       header.dataset.group = g;
-      header.innerHTML = '<span><span class="caret">▾</span> ' + escapeHtml(g) + "</span>" +
-        '<span class="cnt">' + groups[g].length + "</span>";
-      header.addEventListener("click", () => {
+
+      // Caret toggles collapse; the rest of the header selects the continent.
+      const caret = document.createElement("span");
+      caret.className = "caret";
+      caret.textContent = "▾";
+      caret.title = "Expand / collapse";
+      caret.addEventListener("click", (ev) => {
+        ev.stopPropagation();
         collapsedGroups[g] = !collapsedGroups[g];
         header.classList.toggle("collapsed", collapsedGroups[g]);
         applyFilter();
       });
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "grp-name";
+      nameSpan.textContent = g;
+      const left = document.createElement("span");
+      left.className = "grp-left";
+      left.appendChild(caret);
+      left.appendChild(nameSpan);
+
+      const cnt = document.createElement("span");
+      cnt.className = "cnt";
+      cnt.textContent = String(groups[g].length);
+
+      header.appendChild(left);
+      header.appendChild(cnt);
+      header.title = "Show all of " + g + " on the map";
+      header.addEventListener("click", () => selectContinent(g));
+
       ul.appendChild(header);
       groups[g].sort((a, b) => a.name.localeCompare(b.name))
         .forEach((entry) => ul.appendChild(makeCountryLi(entry, g)));
@@ -472,6 +576,7 @@ function buildSidebar(): void {
   }
 
   applyFilter();
+  markActiveContinent();
 }
 
 // ---------------------------------------------------------------------------

@@ -79,6 +79,7 @@ export const baseStyle: PathOptions     = { color: "#3878c7", weight: 1,   opaci
 export const hoverStyle: PathOptions    = { color: "#e0922b", weight: 1.5, opacity: 1, fillColor: "#ffd9a3", fillOpacity: 0.55 };
 export const selectedStyle: PathOptions = { color: "#8a3b00", weight: 2.5, opacity: 1, fillColor: "#e8740c", fillOpacity: 0.65 };
 export const relatedStyle: PathOptions  = { color: "#a85a1a", weight: 1.5, opacity: 1, fillColor: "#f3b06a", fillOpacity: 0.5 };
+export const continentStyle: PathOptions = { color: "#1f7a6b", weight: 1.2, opacity: 1, fillColor: "#79c9bb", fillOpacity: 0.55 }; // continent members
 export const hiddenStyle: PathOptions   = { opacity: 0, fillOpacity: 0 };
 
 // --- Connector tuning ---

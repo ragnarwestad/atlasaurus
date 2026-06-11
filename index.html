@@ -57,6 +57,14 @@
           <button type="button" class="qt-btn" data-qtype="neighbour">Neighbour</button>
         </div>
         <div id="quiz-prompt"></div>
+        <div id="loc-box" hidden>
+          <div id="loc-mode">
+            <label><input type="radio" name="locmode" value="map" checked /> Click on map</label>
+            <label><input type="radio" name="locmode" value="search" /> Select country</label>
+          </div>
+          <input id="loc-input" type="search" placeholder="Type the country…" autocomplete="off" />
+          <ul id="loc-results"></ul>
+        </div>
         <div id="quiz-choices" hidden></div>
         <div id="nb-box" hidden>
           <div id="nb-mode">
@@ -110,8 +118,8 @@
       <p>Switch to the <b>Quiz</b> tab (top of the sidebar) for several rounds with a
          running score:</p>
       <ul>
-        <li><b>By name / By flag / By capital</b> — you're given the prompt; click the
-            right country on the map.</li>
+        <li><b>By name / By flag / By capital</b> — you're given the prompt; answer either
+            by <b>Click on map</b> or <b>Select country</b> (search by name).</li>
         <li><b>Continent</b> — a country is named; pick its continent (buttons or click
             any country on the map). The correct continent turns green, a wrong pick red.</li>
         <li><b>Neighbour</b> — find <i>all</i> countries that border the target. Choose how

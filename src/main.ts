@@ -872,7 +872,7 @@ function loadBorders(): void {
             if (mode === "quiz") {
               if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
               else if (quizType === "neighbour") { if (nbMode === "map" && !entry.isLandmass && entry !== quizTarget) toggleNbPick(entry); }
-              else handleGuess(entry);
+              else { if (locMode === "map") handleGuess(entry); }
               return;
             }
             // The Antarctica landmass selects its continent, not a "country".
@@ -988,9 +988,11 @@ function nextQuestion(): void {
     showContinentLabels();
     quizChoicesEl.hidden = false;
     nbBox.hidden = true;
+    locBox.hidden = true;
     quizFeedbackEl.textContent = "Pick its continent — buttons or click a country on the map.";
   } else if (quizType === "neighbour") {
     quizChoicesEl.hidden = true;
+    locBox.hidden = true;
     quizContLayer.clearLayers();
     nbSelected = new Set();
     nbInput.value = ""; nbInput.disabled = false;
@@ -1003,7 +1005,10 @@ function nextQuestion(): void {
     quizChoicesEl.hidden = true;
     quizContLayer.clearLayers();
     nbBox.hidden = true;
-    quizFeedbackEl.textContent = "Click it on the map.";
+    locInput.value = ""; locInput.disabled = false;
+    locResults.innerHTML = "";
+    locBox.hidden = false;
+    applyLocMode();
   }
   quizNextBtn.disabled = true;
   refreshPolygons();
@@ -1100,6 +1105,41 @@ function applyNbMode(): void {
       ? "Click every country that borders it on the map, then Check."
       : "Search and add every country that borders it, then Check.";
   }
+}
+
+// --- Locate quizzes (name / flag / capital): answer by clicking the map or by
+//     searching for the country by name. The two are mutually exclusive. ---
+const locBox = document.getElementById("loc-box") as HTMLElement;
+const locInput = document.getElementById("loc-input") as HTMLInputElement;
+const locResults = document.getElementById("loc-results")!;
+let locMode: "map" | "search" = "map";
+
+function applyLocMode(): void {
+  locBox.classList.toggle("map-mode", locMode === "map");
+  if (locMode === "map") { locInput.value = ""; renderLocResults(""); }
+  if (mode === "quiz" && isLocateQuiz() && !quizAnswered) {
+    quizFeedbackEl.textContent = locMode === "map"
+      ? "Click it on the map."
+      : "Find and select the country.";
+  }
+}
+function isLocateQuiz(): boolean {
+  return quizType === "name" || quizType === "flag" || quizType === "capital";
+}
+function renderLocResults(query: string): void {
+  const q = query.trim().toLowerCase();
+  locResults.innerHTML = "";
+  if (!q) return;
+  realCountries()
+    .filter((c) => c.name.toLowerCase().indexOf(q) !== -1)
+    .slice(0, 8)
+    .forEach((c) => {
+      const li = document.createElement("li");
+      const flag = c.iso2 ? '<img src="https://flagcdn.com/20x15/' + c.iso2 + '.png" alt="">' : "";
+      li.innerHTML = flag + "<span>" + escapeHtml(c.name) + "</span>";
+      li.addEventListener("click", () => { if (!quizAnswered) { locInput.value = ""; locResults.innerHTML = ""; handleGuess(c); } });
+      locResults.appendChild(li);
+    });
 }
 
 function renderNbResults(query: string): void {
@@ -1207,6 +1247,8 @@ function handleGuess(entry: CountryEntry): void {
   }
   renderQuizScore();
   quizNextBtn.disabled = false;
+  locInput.disabled = true;
+  locResults.innerHTML = "";
   refreshPolygons();
 }
 
@@ -1266,6 +1308,15 @@ document.querySelectorAll<HTMLInputElement>('#nb-mode input[name="nbmode"]').for
     nbMode = r.value === "search" ? "search" : "map";
     applyNbMode();
     if (nbMode === "search") nbInput.focus();
+  });
+});
+locInput.addEventListener("input", () => renderLocResults(locInput.value));
+document.querySelectorAll<HTMLInputElement>('#loc-mode input[name="locmode"]').forEach((r) => {
+  r.addEventListener("change", () => {
+    if (!r.checked) return;
+    locMode = r.value === "search" ? "search" : "map";
+    applyLocMode();
+    if (locMode === "search" && !quizAnswered) locInput.focus();
   });
 });
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {

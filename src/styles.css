@@ -166,7 +166,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #continent-list li.cont-head:hover { background: #eaf2fb; }
 #continent-list li.cont-head.active { background: #d6efe9; color: #176b5d; }
 #continent-list li.cont-head .cnt { color: #9aa7b3; }
-#continent-list li.cont-head .caret { display: inline-block; transition: transform .15s; font-size: 9px; }
+#continent-list li.cont-head .caret { display: inline-block; transition: transform .15s; font-size: 9px; margin-right: 6px; }
+.cont-swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,.15) inset; }
 #continent-list li.cont-head:not(.expanded) .caret { transform: rotate(-90deg); }
 #continent-list li.cont-member {
   padding: 7px 14px 7px 30px; cursor: pointer; font-size: 13px; color: #222;

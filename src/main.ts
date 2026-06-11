@@ -89,6 +89,14 @@ function groupOf(e: CountryEntry): string {
   const v = p[SCHEME_PROP[groupScheme]];
   return (v != null && String(v).trim()) ? String(v).trim() : "Other";
 }
+// Distinct hue per region for the Regions-tab map tint (spread around the wheel).
+let regionHue: Record<string, number> = {};
+function rebuildRegionColors(): void {
+  const groups = Array.from(new Set(realCountries().map(groupOf))).filter((g) => g !== "Other").sort();
+  regionHue = {};
+  const n = groups.length || 1;
+  groups.forEach((g, i) => { regionHue[g] = Math.round((360 * i) / n); });
+}
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
@@ -464,6 +472,19 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
     return null;
   }
   if (e.layer === selectedLayer) return selectedStyle;                                   // selected country (orange)
+  // Regions tab: tint every country by its region (distinct hue), like the
+  // continent quiz. The selected region and the hovered region get a deeper fill.
+  if (activeTab === "continents") {
+    const hue = regionHue[groupOf(e)];
+    if (hue != null) {
+      const sel = selectedContinent === groupOf(e);
+      const hot = !sel && hoveredContinent === groupOf(e);
+      return {
+        color: "hsl(" + hue + ", 55%, 38%)", weight: sel ? 1.8 : hot ? 1.3 : 1, opacity: 1,
+        fillColor: "hsl(" + hue + ", 60%, 62%)", fillOpacity: sel ? 0.72 : hot ? 0.6 : 0.45,
+      };
+    }
+  }
   if (selectedContinent && groupOf(e) === selectedContinent) return continentStyle; // region member (green)
   if (sameRealm(e)) return relatedStyle;
   if (e.layer === hoveredLayer) return hoverStyle;
@@ -733,6 +754,7 @@ function markActiveContinent(): void {
 // member countries beneath. Clicking a header expands it AND highlights the
 // continent on the map; clicking a member selects that single country.
 function buildContinentList(): void {
+  rebuildRegionColors();
   const counts: Record<string, number> = {};
   const byCont: Record<string, CountryEntry[]> = {};
   countries.forEach((e) => {
@@ -764,7 +786,9 @@ function buildContinentList(): void {
     const total = sortBy === "name" ? 0
       : (byCont[g] || []).reduce((s, e) => s + (sortBy === "population" ? popOf(e) : areaOf(e)), 0);
     const metric = sortBy === "name" ? "" : '<span class="metric">' + metricLabel(total) + "</span>";
-    head.innerHTML = '<span class="cont-name"><span class="caret">▾</span> ' + escapeHtml(g) + metric +
+    const hue = regionHue[g];
+    const sw = hue != null ? '<span class="cont-swatch" style="background:hsl(' + hue + ',60%,62%)"></span>' : "";
+    head.innerHTML = '<span class="cont-name"><span class="caret">▾</span>' + sw + escapeHtml(g) + metric +
       '</span><span class="cnt">' + counts[g] + "</span>";
     head.addEventListener("click", () => {
       if (expandedContinent === g) { expandedContinent = null; deselect(); }
@@ -961,7 +985,7 @@ function loadBorders(): void {
           // Hover only restyles the polygon (and, in Explore, shows the off-map
           // info panel) — no on-map labels, no bringToFront — so it can never
           // cancel a click.
-          mouseover: () => { hoveredLayer = layerP; hoveredContinent = entry.continent || "Other"; refreshPolygons(); if (mode === "explore") showHoverInfo(entry); },
+          mouseover: () => { hoveredLayer = layerP; hoveredContinent = mode === "quiz" ? (entry.continent || "Other") : groupOf(entry); refreshPolygons(); if (mode === "explore") showHoverInfo(entry); },
           mouseout: () => { if (hoveredLayer === layerP) { hoveredLayer = null; hoveredContinent = null; } refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
           click: (e) => {
             L.DomEvent.stop(e);

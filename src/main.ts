@@ -78,6 +78,8 @@ let quizGuess: CountryEntry | null = null;
 let quizAnswered = false;
 let quizCorrect = 0;
 let quizTotal = 0;
+let quizContCorrect: string | null = null; // continent quiz: correct continent (green)
+let quizContWrong: string | null = null;   // continent quiz: wrongly guessed continent (red)
 // Set on a country click so the map's background-click deselect doesn't fire in
 // the same event dispatch (robust even if stopPropagation is ineffective).
 let suppressMapClick = false;
@@ -337,8 +339,14 @@ function renderContinentInfo(name: string): void {
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
   if (mode === "quiz") {
     if (quizAnswered) {
-      if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
-      if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
+      if (quizType === "continent") {
+        const cont = e.continent || "Other";
+        if (quizContCorrect && cont === quizContCorrect) return quizCorrectStyle; // correct continent (green)
+        if (quizContWrong && cont === quizContWrong) return quizWrongStyle;       // guessed continent (red)
+      } else {
+        if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
+        if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
+      }
     }
     if (e.layer === hoveredLayer) return hoverStyle;
     return baseStyle;
@@ -931,6 +939,8 @@ function nextQuestion(): void {
   quizTarget = t;
   quizGuess = null;
   quizAnswered = false;
+  quizContCorrect = null;
+  quizContWrong = null;
   quizLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
@@ -983,7 +993,11 @@ function answerContinent(name: string): void {
     : "✗ " + quizTarget.name + " is in " + correct + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
-  // Reveal where it is on the map.
+  // Colour the correct continent green (and the guessed one red) on the map,
+  // and mark where the country itself is.
+  quizContCorrect = correct;
+  quizContWrong = ok ? null : name;
+  refreshPolygons();
   quizLayer.clearLayers();
   const c = layerCenter(quizTarget);
   if (c) addQuizDot(quizTarget, c, true);

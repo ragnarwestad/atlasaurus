@@ -9,7 +9,7 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
 3. Commit one logical change with a short, descriptive message.
 
 - `src/` is the single source of truth.
-- **Never commit** `dist/`, `node_modules/`, or a prebuilt `world-map.html` — all are build artifacts / git-ignored.
+- **Never commit** `dist/`, `node_modules/`, or a prebuilt `atlasaurus.html` — all are build artifacts / git-ignored.
 - Package manager is **pnpm** (lockfile: `pnpm-lock.yaml`). Don't use npm/yarn.
 
 ## pnpm notes

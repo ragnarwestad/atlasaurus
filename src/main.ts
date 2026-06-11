@@ -146,6 +146,98 @@ function hideHoverInfo(): void {
   hoverInfoEl.hidden = true;
 }
 
+// --- Selected-country fact panel (population/GDP/region from Natural Earth,
+//     area/currency/languages from REST Countries, fetched + cached on select) ---
+interface RestInfo { area?: number; currencies?: string; languages?: string; }
+const countryInfoEl = document.getElementById("countryinfo")!;
+let currentInfoCode: string | null = null;
+
+// Area / currency / languages come from the mledoze/countries dataset — a static
+// file on jsDelivr (the data REST Countries is built from), keyed by ISO-3.
+// Fetched once on the first selection, then cached for the session.
+const COUNTRY_DATA_URLS = [
+  "https://cdn.jsdelivr.net/gh/mledoze/countries@master/countries.json",
+  "https://raw.githubusercontent.com/mledoze/countries/master/countries.json",
+];
+let countryData: Record<string, RestInfo> | null = null;
+let countryDataPromise: Promise<Record<string, RestInfo>> | null = null;
+
+function loadCountryData(): Promise<Record<string, RestInfo>> {
+  if (countryDataPromise) return countryDataPromise;
+  countryDataPromise = fetchJson(COUNTRY_DATA_URLS).then((arr: any[]) => {
+    const map: Record<string, RestInfo> = {};
+    (arr || []).forEach((c) => {
+      if (!c || !c.cca3) return;
+      const currencies = c.currencies
+        ? Object.keys(c.currencies).map((cc) => {
+            const i = c.currencies[cc];
+            return i.name + " (" + cc + (i.symbol ? ", " + i.symbol : "") + ")";
+          }).join(", ")
+        : undefined;
+      const languages = c.languages ? Object.values(c.languages).join(", ") : undefined;
+      map[c.cca3] = { area: c.area, currencies, languages };
+    });
+    countryData = map;
+    return map;
+  });
+  return countryDataPromise;
+}
+
+function fmtInt(n: number): string { return Math.round(n).toLocaleString("en-US"); }
+function entryForLayer(layer: L.Layer | null): CountryEntry | null {
+  return layer ? (countries.find((e) => e.layer === layer) || null) : null;
+}
+
+function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo | null): string {
+  const name = props.FORMAL_EN || props.NAME_LONG || props.ADMIN || (entry && entry.name) || "Unknown";
+  const longName = props.NAME_LONG && props.NAME_LONG !== name ? props.NAME_LONG : "";
+  const flag = entry && entry.iso2 ? '<img src="https://flagcdn.com/40x30/' + entry.iso2 + '.png" alt="">' : "";
+  const rows: [string, string][] = [];
+  if (entry && entry.capitalName) rows.push(["Capital", escapeHtml(entry.capitalName)]);
+  if (props.POP_EST) rows.push(["Population", fmtInt(props.POP_EST) + (props.POP_YEAR ? " (" + props.POP_YEAR + ")" : "")]);
+  if (extra && extra.area) rows.push(["Area", fmtInt(extra.area) + " km²"]);
+  if (props.GDP_MD) rows.push(["GDP", "$" + fmtInt(props.GDP_MD) + " M" + (props.GDP_YEAR ? " (" + props.GDP_YEAR + ")" : "")]);
+  if (extra && extra.currencies) rows.push(["Currency", escapeHtml(extra.currencies)]);
+  if (extra && extra.languages) rows.push(["Languages", escapeHtml(extra.languages)]);
+  const region = [props.CONTINENT, props.SUBREGION].filter(Boolean).join(" · ");
+  if (region) rows.push(["Region", escapeHtml(region)]);
+  if (props.INCOME_GRP) rows.push(["Income group", escapeHtml(String(props.INCOME_GRP).replace(/^\d+\.\s*/, ""))]);
+  const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
+  return (
+    '<div class="ci-head">' + flag +
+      '<div><div class="ci-title">' + escapeHtml(name) + "</div>" +
+        (longName ? '<div class="ci-sub">' + escapeHtml(longName) + "</div>" : "") +
+      "</div>" +
+      '<button class="ci-close" title="Close" aria-label="Close">×</button>' +
+    "</div>" +
+    "<dl>" + dl + "</dl>" +
+    '<a class="ci-wiki" href="' + wikiUrl(entry ? entry.name : name) + '" target="_blank" rel="noopener">Wikipedia ↗</a>'
+  );
+}
+
+function renderInfo(props: any, entry: CountryEntry | null, extra: RestInfo | null): void {
+  countryInfoEl.innerHTML = buildInfoHTML(props, entry, extra);
+  countryInfoEl.hidden = false;
+  const close = countryInfoEl.querySelector(".ci-close");
+  if (close) close.addEventListener("click", deselect);
+}
+
+function updateCountryInfo(): void {
+  if (!selectedLayer) { countryInfoEl.hidden = true; currentInfoCode = null; return; }
+  const props = ((selectedLayer as any).feature && (selectedLayer as any).feature.properties) || {};
+  const entry = entryForLayer(selectedLayer);
+  const code: string | null = props.ADM0_A3 || props.adm0_a3 || null;
+  currentInfoCode = code;
+  renderInfo(props, entry, (countryData && code) ? countryData[code] || null : null);
+
+  // Lazy-load area/currency/languages the first time, then re-render.
+  if (!countryData) {
+    loadCountryData().then((map) => {
+      if (currentInfoCode === code && selectedLayer) renderInfo(props, entry, code ? map[code] || null : null);
+    }).catch(() => { /* extra fields optional */ });
+  }
+}
+
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
   if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) return null;
   if (e.layer === selectedLayer) return selectedStyle;
@@ -266,6 +358,7 @@ function refreshAll(): void {
   refreshCountryLabels();
   refreshCapitals();
   refreshFlags();
+  updateCountryInfo();
 }
 
 /** Single-choice selection; toggle=true (map click) deselects the same country. */

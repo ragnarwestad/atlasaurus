@@ -90,3 +90,31 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #hoverinfo img { width: 32px; height: 24px; box-shadow: 0 0 2px rgba(0,0,0,.45); border-radius: 2px; flex: 0 0 auto; }
 #hoverinfo .hi-name { font-weight: 600; }
 #hoverinfo .hi-cap { color: #8a1d16; font-size: 12px; }
+
+/* Selected-country fact panel (bottom-left) */
+#countryinfo {
+  position: fixed; z-index: 1000; left: 286px; bottom: 16px; width: 360px;
+  max-height: 56vh; overflow: auto;
+  background: rgba(255,255,255,.97); border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  font: 13px system-ui, sans-serif; color: #1b2b3a;
+}
+#countryinfo[hidden] { display: none; }
+#countryinfo .ci-head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px 8px;
+  border-bottom: 1px solid #eee; position: sticky; top: 0;
+  background: rgba(255,255,255,.97);
+}
+#countryinfo .ci-head img { width: 40px; height: 30px; box-shadow: 0 0 2px rgba(0,0,0,.4); border-radius: 2px; flex: 0 0 auto; }
+#countryinfo .ci-title { font-size: 15px; font-weight: 700; color: #1b3a5c; line-height: 1.2; }
+#countryinfo .ci-sub { font-size: 11px; color: #888; }
+#countryinfo .ci-close {
+  margin-left: auto; border: none; background: none; font-size: 20px; cursor: pointer;
+  color: #aaa; line-height: 1; padding: 0 2px; align-self: flex-start;
+}
+#countryinfo .ci-close:hover { color: #444; }
+#countryinfo dl { margin: 0; padding: 10px 14px 6px; display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; }
+#countryinfo dt { color: #8a8a8a; }
+#countryinfo dd { margin: 0; }
+#countryinfo .ci-wiki { display: inline-block; margin: 4px 14px 14px; color: #3878c7; text-decoration: none; }
+#countryinfo .ci-wiki:hover { text-decoration: underline; }

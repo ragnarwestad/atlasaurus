@@ -209,13 +209,13 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .leaflet-interactive { cursor: pointer; }
 
 /* About / help button + modal */
-#help-btn {
-  position: fixed; z-index: 1100; top: 12px; right: 12px; width: 30px; height: 30px;
-  border-radius: 50%; border: 1px solid #cdd6df; background: rgba(255,255,255,.95);
-  color: #3878c7; font: 700 16px system-ui, sans-serif; cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+.sb-title-row { display: flex; align-items: center; justify-content: space-between; }
+.help-btn {
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%;
+  border: 1px solid #cdd6df; background: #fff; color: #3878c7;
+  font: 700 13px system-ui, sans-serif; line-height: 1; cursor: pointer; padding: 0;
 }
-#help-btn:hover { background: #3878c7; color: #fff; border-color: #3878c7; }
+.help-btn:hover { background: #3878c7; color: #fff; border-color: #3878c7; }
 #help-modal {
   position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.45);
   display: flex; align-items: center; justify-content: center; padding: 20px;

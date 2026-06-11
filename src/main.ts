@@ -1414,7 +1414,7 @@ map.on("zoomend", updateFlagSizes);
 const helpModal = document.getElementById("help-modal") as HTMLElement;
 const openHelp = () => { helpModal.hidden = false; };
 const closeHelp = () => { helpModal.hidden = true; };
-document.getElementById("help-btn")!.addEventListener("click", openHelp);
+document.querySelectorAll<HTMLElement>(".help-btn").forEach((b) => b.addEventListener("click", openHelp));
 helpModal.addEventListener("click", (e) => {
   const t = e.target as HTMLElement;
   if (t === helpModal || t.classList.contains("help-close")) closeHelp();

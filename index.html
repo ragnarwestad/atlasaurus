@@ -14,7 +14,10 @@
 
     <div id="explore-panel">
       <section class="sb-group">
-        <h2 class="sb-title">Map</h2>
+        <div class="sb-title-row">
+          <h2 class="sb-title">Map</h2>
+          <button class="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
+        </div>
         <label id="name-toggle">
           <input type="checkbox" id="show-names" /> Show country names
         </label>
@@ -48,7 +51,10 @@
 
     <div id="quiz-panel" hidden>
       <div class="sb-group">
-        <h2 class="sb-title">Find the</h2>
+        <div class="sb-title-row">
+          <h2 class="sb-title">Find the</h2>
+          <button class="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
+        </div>
         <div class="sb-tabs" id="quiz-cat">
           <button type="button" class="qc-tab active" data-cat="country">Country</button>
           <button type="button" class="qc-tab" data-cat="continent">Continent</button>
@@ -93,7 +99,6 @@
   <div id="hoverinfo" hidden></div>
   <div id="countryinfo" hidden></div>
 
-  <button id="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
   <div id="help-modal" hidden>
     <div class="help-card" role="dialog" aria-modal="true" aria-label="About this map">
       <button class="help-close" type="button" aria-label="Close">×</button>

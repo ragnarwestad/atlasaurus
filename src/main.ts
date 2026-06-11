@@ -736,7 +736,8 @@ function loadBorders(): void {
     }).addTo(map);
 
     (map as any).borderLayer = layer;
-    buildSidebar(); // start expanded — countries visible under each continent
+    if (groupByContinent) collapseAllContinents(); // start with a clean continent overview
+    buildSidebar();
     placeCountryLabels();
     refreshCountryLabels(); // honour default (names off) once labels exist
     hideStatus();

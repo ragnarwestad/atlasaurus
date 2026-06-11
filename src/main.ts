@@ -18,6 +18,7 @@ interface CountryEntry {
   layer: L.Polygon & { feature?: any };
   iso: string | null;
   iso2: string | null;
+  continent?: string;
   labelTooltip?: L.Tooltip;
   labelPlaced?: boolean;
   capitalMarker?: L.CircleMarker;
@@ -378,44 +379,91 @@ function focusCountry(entry: CountryEntry): void {
 // ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
-function buildSidebar(): void {
-  countries.sort((a, b) => a.name.localeCompare(b.name));
+const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Other"];
+const collapsedGroups: Record<string, boolean> = {};
+let groupByContinent = true;
+
+function makeCountryLi(entry: CountryEntry, group: string): HTMLLIElement {
+  const li = document.createElement("li");
+  li.className = "country";
+  li.dataset.name = entry.name.toLowerCase();
+  if (group) li.dataset.group = group;
+
+  const label = document.createElement("span");
+  label.textContent = entry.name;
+  label.title = "Zoom to " + entry.name + " on the map";
+  label.style.flex = "1";
+  label.addEventListener("click", () => focusCountry(entry));
+
+  const wiki = document.createElement("a");
+  wiki.textContent = "Wiki ↗";
+  wiki.href = wikiUrl(entry.name);
+  wiki.target = "_blank";
+  wiki.rel = "noopener";
+
+  li.appendChild(label);
+  li.appendChild(wiki);
+  return li;
+}
+
+// Apply the search box + collapsed-group state to the rendered list.
+function applyFilter(): void {
   const ul = document.getElementById("country-list")!;
   const countEl = document.getElementById("count")!;
-  ul.innerHTML = "";
-  countries.forEach((entry) => {
-    const li = document.createElement("li");
-    li.dataset.name = entry.name.toLowerCase();
-
-    const label = document.createElement("span");
-    label.textContent = entry.name;
-    label.title = "Zoom to " + entry.name + " on the map";
-    label.style.flex = "1";
-    label.addEventListener("click", () => focusCountry(entry));
-
-    const wiki = document.createElement("a");
-    wiki.textContent = "Wiki ↗";
-    wiki.href = wikiUrl(entry.name);
-    wiki.target = "_blank";
-    wiki.rel = "noopener";
-
-    li.appendChild(label);
-    li.appendChild(wiki);
-    ul.appendChild(li);
-  });
-  countEl.textContent = countries.length + " countries";
-
   const search = document.getElementById("search") as HTMLInputElement;
-  search.addEventListener("input", () => {
-    const q = search.value.trim().toLowerCase();
-    let shown = 0;
-    Array.prototype.forEach.call(ul.children, (li: HTMLElement) => {
-      const match = (li.dataset.name || "").indexOf(q) !== -1;
-      li.style.display = match ? "" : "none";
-      if (match) shown++;
-    });
-    countEl.textContent = shown + " of " + countries.length + " countries";
+  const q = search.value.trim().toLowerCase();
+  let shown = 0;
+  const visibleByGroup: Record<string, number> = {};
+
+  ul.querySelectorAll<HTMLElement>("li.country").forEach((li) => {
+    const g = li.dataset.group || "";
+    const matches = (li.dataset.name || "").indexOf(q) !== -1;
+    if (matches) { shown++; if (g) visibleByGroup[g] = (visibleByGroup[g] || 0) + 1; }
+    li.style.display = matches && !(g && collapsedGroups[g]) ? "" : "none";
   });
+  ul.querySelectorAll<HTMLElement>("li.grp").forEach((h) => {
+    h.style.display = (visibleByGroup[h.dataset.group || ""] || 0) > 0 ? "" : "none";
+  });
+  countEl.textContent = q
+    ? shown + " of " + countries.length + " countries"
+    : countries.length + " countries";
+}
+
+function buildSidebar(): void {
+  const ul = document.getElementById("country-list")!;
+  ul.innerHTML = "";
+
+  if (groupByContinent) {
+    const groups: Record<string, CountryEntry[]> = {};
+    countries.forEach((e) => {
+      const g = e.continent || "Other";
+      (groups[g] = groups[g] || []).push(e);
+    });
+    const order = Object.keys(groups).sort((a, b) => {
+      const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+    order.forEach((g) => {
+      const header = document.createElement("li");
+      header.className = "grp" + (collapsedGroups[g] ? " collapsed" : "");
+      header.dataset.group = g;
+      header.innerHTML = '<span><span class="caret">▾</span> ' + escapeHtml(g) + "</span>" +
+        '<span class="cnt">' + groups[g].length + "</span>";
+      header.addEventListener("click", () => {
+        collapsedGroups[g] = !collapsedGroups[g];
+        header.classList.toggle("collapsed", collapsedGroups[g]);
+        applyFilter();
+      });
+      ul.appendChild(header);
+      groups[g].sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((entry) => ul.appendChild(makeCountryLi(entry, g)));
+    });
+  } else {
+    countries.slice().sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((entry) => ul.appendChild(makeCountryLi(entry, "")));
+  }
+
+  applyFilter();
 }
 
 // ---------------------------------------------------------------------------
@@ -555,7 +603,9 @@ function loadBorders(): void {
         const iso = pr.ADM0_A3 || pr.adm0_a3 || pr.ISO_A3 || pr.iso_a3 || feature.id || null;
         const a2 = pr.ISO_A2_EH || pr.ISO_A2 || pr.WB_A2 || "";
         const iso2 = /^[A-Za-z]{2}$/.test(a2) ? a2.toLowerCase() : null;
-        const entry: CountryEntry = { name, layer: layerP, iso, iso2 };
+        let continent = pr.CONTINENT || pr.continent || "Other";
+        if (/seven seas/i.test(continent)) continent = "Other"; // open-ocean islands
+        const entry: CountryEntry = { name, layer: layerP, iso, iso2, continent };
         countries.push(entry);
         layerP.on({
           // Hover only restyles the polygon and shows the off-map info panel —
@@ -598,6 +648,12 @@ nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; re
 
 const isoToggle = document.getElementById("isolate") as HTMLInputElement;
 isoToggle.addEventListener("change", () => { isolate = isoToggle.checked; refreshAll(); });
+
+const groupToggle = document.getElementById("group-continents") as HTMLInputElement;
+groupToggle.addEventListener("change", () => { groupByContinent = groupToggle.checked; buildSidebar(); });
+
+const searchInput = document.getElementById("search") as HTMLInputElement;
+searchInput.addEventListener("input", applyFilter);
 
 map.on("click", () => {        // background click clears selection
   if (suppressMapClick) return; // ignore the click that came from a country

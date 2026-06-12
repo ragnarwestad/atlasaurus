@@ -38,7 +38,9 @@ export function refreshCountryLabels(): void {
 // Flags (scale with zoom)
 // ---------------------------------------------------------------------------
 export function flagIcon(iso2: string, zoom: number): L.DivIcon {
-  const scale = Math.min(0.78 + (zoom - 2) * 0.33, 3); // smaller when zoomed out (~19px at z2)
+  // Grow with zoom: tiny when zoomed out (~12px at z2, so the world view isn't a
+  // wall of flags), up to ~3.2× when zoomed in.
+  const scale = Math.min(0.5 + (zoom - 2) * 0.38, 3.2);
   const w = Math.round(24 * scale), h = Math.round(18 * scale);
   return L.divIcon({
     className: "flag-icon",

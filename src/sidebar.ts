@@ -15,23 +15,6 @@ export function focusCountry(entry: CountryEntry): void {
   selectLayer(entry.layer, false); // sidebar click always selects (no toggle)
 }
 
-let listExpanded = true; // the Countries/Continents list section is foldable
-
-// Single source of truth for what the list section shows, given the active tab
-// and whether the section is expanded. Collapsing hides the filter row + lists.
-export function updateListVisibility(): void {
-  const countries$ = app.activeTab === "countries";
-  (document.getElementById("country-list") as HTMLElement).hidden = !listExpanded || !countries$;
-  (document.getElementById("continent-list") as HTMLElement).hidden = !listExpanded || countries$;
-  (document.querySelector(".filter-sort") as HTMLElement).style.display = listExpanded ? "" : "none";
-  (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
-  // The "Group by" scheme picker belongs only to the Regions tab.
-  (document.getElementById("scheme-row") as HTMLElement).hidden = countries$ || !listExpanded;
-  const sec = document.querySelector(".sb-tabsec") as HTMLElement;
-  if (sec) sec.classList.toggle("collapsed", !listExpanded);
-}
-export function setListExpanded(on: boolean): void { listExpanded = on; updateListVisibility(); }
-export function toggleListExpanded(): void { setListExpanded(!listExpanded); }
 
 // Compact value with 2 decimals + magnitude suffix, e.g. 1.41B, 5.43M, 323.80K.
 function formatCompact(n: number): string {
@@ -244,18 +227,30 @@ export function initFeatureLists(): void {
   buildFeatureLists();
 }
 
+// Region mode (map tint + region labels + scoped toggles) follows whether the
+// Regions section is open. Expanding it = "continents", collapsing = "countries".
 export function setActiveTab(tab: "countries" | "continents"): void {
   app.activeTab = tab;
-  // Each tab owns its selection type — clear the other tab's selection so a
-  // continent highlight doesn't linger on the Countries tab (and vice versa).
+  // Each mode owns its selection type — clear the other's so a continent highlight
+  // doesn't linger in country mode (and vice versa).
   if (tab === "countries") { app.selectedContinent = null; app.expandedContinent = null; }
   else { app.selectedLayer = null; }
-
-  document.querySelectorAll<HTMLElement>(".sb-tab").forEach((b) => {
-    b.classList.toggle("active", b.dataset.tab === tab);
-  });
-  updateListVisibility();
-
   buildContinentList();   // reflect cleared expand/selection state
-  hooks.refreshAll();     // restyle map, panels, reveals (toggle scope depends on tab)
+  hooks.refreshAll();     // restyle map, panels, reveals (toggle scope depends on mode)
+}
+
+// Wire the Countries (cosmetic) and Regions (drives region mode) fold headers,
+// then the physical-feature lists.
+export function initSidebarSections(): void {
+  const countriesSec = document.getElementById("feat-sec-countries");
+  document.getElementById("feat-head-countries")?.addEventListener("click", () => countriesSec?.classList.toggle("collapsed"));
+
+  const regionsSec = document.getElementById("feat-sec-regions");
+  document.getElementById("feat-head-regions")?.addEventListener("click", () => {
+    const opening = regionsSec?.classList.contains("collapsed"); // collapsed now → about to open
+    regionsSec?.classList.toggle("collapsed");
+    setActiveTab(opening ? "continents" : "countries");
+  });
+
+  initFeatureLists();
 }

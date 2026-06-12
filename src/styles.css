@@ -16,6 +16,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #mode-tabs .mode-tab:hover { color: #3878c7; }
 #mode-tabs .mode-tab.active { background: #fff; color: #1b3a5c; border-bottom-color: #3878c7; }
 #explore-panel, #quiz-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#explore-panel { overflow-y: auto; }
 #explore-panel[hidden], #quiz-panel[hidden] { display: none; }
 
 /* Quiz panel */
@@ -210,7 +211,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .city-label a:hover { text-decoration: underline; }
 #map.peak-labels-on .peak-label { display: block; }
 
-#country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+#country-list, #continent-list { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow-y: auto; }
 #country-list li {
   padding: 7px 14px; cursor: pointer; font-size: 13px; color: #222;
   border-bottom: 1px solid #f2f2f2; display: flex; justify-content: space-between;
@@ -234,6 +235,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .feat-sec.collapsed .sb-fold .fold-caret { transform: rotate(-90deg); }
 .feat-sec.collapsed .feat-body { display: none; }
 .feat-search-wrap { display: flex; padding: 0 14px 10px; }
+.feat-body .filter-sort { padding: 0 14px 10px; margin-top: 0; }
 .feat-search { width: 100%; }
 .feat-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
 .feat-list li.feat-item {

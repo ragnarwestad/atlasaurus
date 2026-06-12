@@ -13,8 +13,8 @@ import { refreshCapitals, scheduleCityUpdate, refreshCities } from "./places";
 import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
-  setListExpanded, toggleListExpanded, applyFilter, buildSidebar, buildContinentList,
-  setActiveTab, markActiveContinent, initFeatureLists, buildFeatureLists,
+  applyFilter, buildSidebar, buildContinentList,
+  markActiveContinent, initSidebarSections, buildFeatureLists,
 } from "./sidebar";
 import {
   setMode, nextQuestion, setQuizCat, applyNbMode, applyLocMode, renderNbResults,
@@ -105,11 +105,6 @@ const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { app.showNames = nameToggle.checked; refreshCountryLabels(); });
 
 
-document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
-  btn.addEventListener("click", () => { setActiveTab(btn.dataset.tab as "countries" | "continents"); setListExpanded(true); });
-});
-document.getElementById("list-fold")!.addEventListener("click", toggleListExpanded);
-
 let mapExpanded = true;
 function setMapExpanded(on: boolean): void {
   mapExpanded = on;
@@ -117,8 +112,8 @@ function setMapExpanded(on: boolean): void {
 }
 document.querySelector(".sb-fold")!.addEventListener("click", () => setMapExpanded(!mapExpanded));
 
-// Save space on small screens: start with both sections folded away.
-setListExpanded(!isNarrow());
+// Save space on small screens: start with the map options + country list folded.
+if (isNarrow()) document.getElementById("feat-sec-countries")?.classList.add("collapsed");
 setMapExpanded(!isNarrow());
 
 const searchInput = document.getElementById("search") as HTMLInputElement;
@@ -189,6 +184,6 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(
 // Track the cursor so the hover info panel can float next to it.
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(ev.clientX, ev.clientY));
 
-initFeatureLists();   // wire the Lakes/Mountains/Rivers list sections
+initSidebarSections(); // wire the Countries/Regions + Lakes/Mountains/Rivers fold sections
 loadPhysicalData();   // populate those lists (peaks now; rivers/lakes when fetched)
 loadBorders();

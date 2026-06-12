@@ -49,37 +49,52 @@
           </label>
         </div>
       </section>
-      <section class="sb-group sb-tabsec">
-        <div class="sb-tabs">
-          <button type="button" id="list-fold" class="list-fold" title="Show / hide the list" aria-label="Show / hide the list"><span class="fold-caret"></span></button>
-          <button type="button" class="sb-tab active" data-tab="countries">Countries (<span id="count-num">0</span>)</button>
-          <button type="button" class="sb-tab" data-tab="continents">Regions (<span id="cont-num">0</span>)</button>
-        </div>
-        <div class="filter-sort">
-          <span class="search-wrap">
-            <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
-            <button id="search-clear" type="button" title="Clear filter" aria-label="Clear filter" hidden>×</button>
-          </span>
-          <label id="scheme-row" hidden>Group by
-            <select id="scheme">
-              <option value="continent">Continents</option>
-              <option value="unRegion">UN regions</option>
-              <option value="subregion">UN subregions</option>
-              <option value="wbRegion">World Bank regions</option>
-            </select>
-          </label>
-          <label id="sort-row">Sort
-            <select id="sort">
-              <option value="name">Name (A–Z)</option>
-              <option value="population">Population</option>
-              <option value="area">Area</option>
-            </select>
-          </label>
-        </div>
-      </section>
-      <ul id="country-list"></ul>
-      <ul id="continent-list" hidden></ul>
       <div id="feature-lists">
+        <section class="feat-sec" id="feat-sec-countries">
+          <div class="sb-title-row feat-head-row">
+            <button type="button" class="sb-fold" id="feat-head-countries">
+              <span class="fold-caret"></span>
+              <h2 class="sb-title">Countries (<span id="count-num">0</span>)</h2>
+            </button>
+          </div>
+          <div class="feat-body">
+            <div class="filter-sort">
+              <span class="search-wrap">
+                <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+                <button id="search-clear" type="button" title="Clear filter" aria-label="Clear filter" hidden>×</button>
+              </span>
+              <label id="sort-row">Sort
+                <select id="sort">
+                  <option value="name">Name (A–Z)</option>
+                  <option value="population">Population</option>
+                  <option value="area">Area</option>
+                </select>
+              </label>
+            </div>
+            <ul id="country-list"></ul>
+          </div>
+        </section>
+        <section class="feat-sec collapsed" id="feat-sec-regions">
+          <div class="sb-title-row feat-head-row">
+            <button type="button" class="sb-fold" id="feat-head-regions">
+              <span class="fold-caret"></span>
+              <h2 class="sb-title">Regions (<span id="cont-num">0</span>)</h2>
+            </button>
+          </div>
+          <div class="feat-body">
+            <div class="filter-sort">
+              <label id="scheme-row">Group by
+                <select id="scheme">
+                  <option value="continent">Continents</option>
+                  <option value="unRegion">UN regions</option>
+                  <option value="subregion">UN subregions</option>
+                  <option value="wbRegion">World Bank regions</option>
+                </select>
+              </label>
+            </div>
+            <ul id="continent-list"></ul>
+          </div>
+        </section>
         <section class="feat-sec collapsed" id="feat-sec-lakes">
           <div class="sb-title-row feat-head-row">
             <button type="button" class="sb-fold" id="feat-head-lakes">

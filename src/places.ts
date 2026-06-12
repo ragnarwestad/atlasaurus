@@ -177,27 +177,24 @@ function drawOutlineGeom(geom: any): void {
 }
 export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
 
-// First Polygon/MultiPolygon in a Nominatim payload (reverse = one object,
-// search = an array of results).
-function polyFrom(data: any): any {
-  const items = Array.isArray(data) ? data : [data];
-  const hit = items.find((x) => x && x.geojson && (x.geojson.type === "Polygon" || x.geojson.type === "MultiPolygon"));
-  return hit ? hit.geojson : null;
+// Polygon/MultiPolygon out of a single Nominatim object (else null).
+function geomOf(obj: any): any {
+  const g = obj && obj.geojson;
+  return g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
 }
-// Reverse-geocode the city's coordinates: returns the admin area that *contains*
-// the point, independent of how that area is named (Danish cities' boundaries are
-// the municipality, e.g. "Københavns Kommune", which a name search never matches).
-// zoom≈10 targets the city/municipality level.
-function reverseBoundary(lat: number, lng: number, zoom: number): Promise<any> {
+// Reverse-geocode the city's coordinates. Returns the full first object so we can
+// use both its geometry AND its address (the address still names the municipality
+// even when the geometry is just the city point, as for Copenhagen).
+function reverseFull(lat: number, lng: number, zoom: number): Promise<any> {
   return fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&polygon_geojson=1&zoom=" + zoom + "&lat=" + lat + "&lon=" + lng, { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : null))
-    .then(polyFrom)
     .catch(() => null);
 }
-function searchBoundary(qs: string): Promise<any> {
-  return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&dedupe=0&limit=10&" + qs, { headers: { Accept: "application/json" } })
+// Free-form search, scanning all results for the first areal boundary.
+function searchBoundary(q: string): Promise<any> {
+  return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&dedupe=0&limit=10&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : []))
-    .then(polyFrom)
+    .then((arr) => (Array.isArray(arr) ? arr : []).map(geomOf).find(Boolean) || null)
     .catch(() => null);
 }
 async function showCityOutline(lat: number, lng: number, name: string, adm0: string): Promise<void> {
@@ -205,14 +202,22 @@ async function showCityOutline(lat: number, lng: number, name: string, adm0: str
   const key = (name + "|" + adm0).toLowerCase();
   const reqId = ++outlineReqId;
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
-  // Reverse-geocode at the coordinates first (name-independent, fixes Denmark); if
-  // that yields no polygon, fall back to a free-form name search.
-  let geom = await reverseBoundary(lat, lng, 10);
-  console.log("[outline]", name, adm0, "@", lat, lng, "| reverse:", geom ? geom.type : "none"); // TEMP diagnostic
-  if (!geom) {
-    geom = await searchBoundary("q=" + encodeURIComponent(name + (adm0 ? ", " + adm0 : "")));
-    console.log("[outline]", name, "| search:", geom ? geom.type : "none"); // TEMP diagnostic
+
+  const r = await reverseFull(lat, lng, 10);
+  let geom = geomOf(r); // works directly for most (e.g. Sorø → its kommune)
+  // Big cities reverse to the place *node* (a point); its address still names the
+  // municipality (e.g. "Københavns Kommune"), which we can search for directly.
+  if (!geom && r && r.address) {
+    const a = r.address;
+    const country = adm0 || a.country || "";
+    const cands = [a.municipality, a.city, a.town, a.county].filter((x: any, i: number, arr: any[]) => x && arr.indexOf(x) === i);
+    for (const nm of cands) {
+      geom = await searchBoundary(nm + (country ? ", " + country : ""));
+      if (geom) break;
+    }
   }
+  if (!geom) geom = await searchBoundary(name + (adm0 ? ", " + adm0 : ""));
+
   outlineCache.set(key, geom || null);
   if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection
 }

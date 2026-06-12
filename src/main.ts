@@ -14,7 +14,7 @@ import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
   applyFilter, buildSidebar, buildContinentList,
-  markActiveContinent, initSidebarSections, buildFeatureLists,
+  setActiveTab, markActiveContinent, initSidebarSections, buildFeatureLists,
 } from "./sidebar";
 import {
   setMode, nextQuestion, setQuizCat, applyNbMode, applyLocMode, renderNbResults,
@@ -103,6 +103,9 @@ cityToggle.addEventListener("change", () => { app.showCities = cityToggle.checke
 
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { app.showNames = nameToggle.checked; refreshCountryLabels(); });
+
+const regionToggle = document.getElementById("show-regions") as HTMLInputElement;
+regionToggle.addEventListener("change", () => setActiveTab(regionToggle.checked ? "continents" : "countries"));
 
 
 let mapExpanded = true;

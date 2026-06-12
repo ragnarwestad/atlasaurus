@@ -246,11 +246,7 @@ export function initSidebarSections(): void {
   document.getElementById("feat-head-countries")?.addEventListener("click", () => countriesSec?.classList.toggle("collapsed"));
 
   const regionsSec = document.getElementById("feat-sec-regions");
-  document.getElementById("feat-head-regions")?.addEventListener("click", () => {
-    const opening = regionsSec?.classList.contains("collapsed"); // collapsed now → about to open
-    regionsSec?.classList.toggle("collapsed");
-    setActiveTab(opening ? "continents" : "countries");
-  });
+  document.getElementById("feat-head-regions")?.addEventListener("click", () => regionsSec?.classList.toggle("collapsed"));
 
   initFeatureLists();
 }

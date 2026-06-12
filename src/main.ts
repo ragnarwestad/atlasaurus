@@ -9,7 +9,7 @@ import { app, hooks, loadCountryData, type GroupScheme, type QuizType } from "./
 import { trackMouse, hideHoverInfo, countryInfoEl, updateInfoPanel, isNarrow } from "./panel";
 import { refreshCountryLabels, refreshFlags, updateFlagSizes } from "./labels";
 import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes, schedulePhysicalUpdate, loadPhysicalData } from "./physical";
-import { refreshCapitals, scheduleCityUpdate, refreshCities } from "./places";
+import { refreshCapitals, scheduleCityUpdate, refreshCities, loadCityData } from "./places";
 import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
@@ -187,6 +187,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(
 // Track the cursor so the hover info panel can float next to it.
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(ev.clientX, ev.clientY));
 
-initSidebarSections(); // wire the Countries/Regions + Lakes/Mountains/Rivers fold sections
+initSidebarSections(); // wire the Countries/Regions + Cities/Lakes/Mountains/Rivers fold sections
 loadPhysicalData();   // populate those lists (peaks now; rivers/lakes when fetched)
+loadCityData();       // populate the Cities list (independent of the Cities map layer)
 loadBorders();

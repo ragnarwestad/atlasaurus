@@ -9,6 +9,7 @@ import {
 import { groupOf, rebuildRegionColors } from "./regions";
 import { selectLayer, selectContinent, deselect } from "./countries";
 import { peakList, riverList, lakeList, type PhysFeature } from "./physical";
+import { cityList } from "./places";
 
 export function focusCountry(entry: CountryEntry): void {
   try { map.fitBounds(entry.layer.getBounds(), { maxZoom: 6, padding: [40, 40] }); } catch {}
@@ -160,11 +161,15 @@ export function buildSidebar(): void {
 // ---------------------------------------------------------------------------
 // Physical-feature lists: Lakes / Mountains / Rivers (collapsible, searchable)
 // ---------------------------------------------------------------------------
-const FEATURE_SECTIONS: { id: string; list: () => PhysFeature[] }[] = [
+// `dynamic` sections (Cities) have too many entries to pre-render, so they show a
+// capped, population-ranked slice and re-render matches as you type.
+const FEATURE_SECTIONS: { id: string; list: () => PhysFeature[]; dynamic?: boolean }[] = [
+  { id: "cities", list: () => cityList, dynamic: true },
   { id: "lakes", list: () => lakeList },
   { id: "mountains", list: () => peakList },
   { id: "rivers", list: () => riverList },
 ];
+const DYNAMIC_CAP = 200; // max rows rendered for a dynamic list
 
 function makeFeatureLi(f: PhysFeature): HTMLLIElement {
   const li = document.createElement("li");
@@ -188,8 +193,27 @@ function makeFeatureLi(f: PhysFeature): HTMLLIElement {
   return li;
 }
 
+// Dynamic (large) list: filter the full data, render up to DYNAMIC_CAP rows in the
+// data's existing order (population-ranked), and report the match count.
+function renderDynamicList(id: string, full: PhysFeature[]): void {
+  const ul = document.getElementById("feat-list-" + id);
+  const search = document.getElementById("feat-search-" + id) as HTMLInputElement | null;
+  const countEl = document.getElementById("feat-count-" + id);
+  if (!ul) return;
+  const q = (search?.value || "").trim().toLowerCase();
+  const matches = q ? full.filter((f) => f.name.toLowerCase().indexOf(q) !== -1) : full;
+  ul.innerHTML = "";
+  matches.slice(0, DYNAMIC_CAP).forEach((f) => ul.appendChild(makeFeatureLi(f)));
+  if (countEl) {
+    countEl.textContent = !q ? String(full.length)
+      : (matches.length > DYNAMIC_CAP ? DYNAMIC_CAP + "+" : String(matches.length)) + " of " + full.length;
+  }
+}
+
 // Apply a section's search box to its list + update its header count.
 function applyFeatureFilter(id: string): void {
+  const sec = FEATURE_SECTIONS.find((s) => s.id === id);
+  if (sec?.dynamic) { renderDynamicList(id, sec.list()); return; }
   const ul = document.getElementById("feat-list-" + id);
   const search = document.getElementById("feat-search-" + id) as HTMLInputElement | null;
   const countEl = document.getElementById("feat-count-" + id);
@@ -205,10 +229,11 @@ function applyFeatureFilter(id: string): void {
   if (countEl) countEl.textContent = q ? shown + " of " + items.length : String(items.length);
 }
 
-// (Re)render all three lists from the current data (called once on startup and
-// again when the lazily-fetched river/lake data arrives).
+// (Re)render every list from the current data (called once on startup and again
+// when lazily-fetched data — cities/rivers/lakes — arrives).
 export function buildFeatureLists(): void {
   FEATURE_SECTIONS.forEach((sec) => {
+    if (sec.dynamic) { renderDynamicList(sec.id, sec.list()); return; }
     const ul = document.getElementById("feat-list-" + sec.id);
     if (!ul) return;
     ul.innerHTML = "";

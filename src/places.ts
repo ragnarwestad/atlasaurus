@@ -5,11 +5,16 @@ import { CAPITAL_URLS, CITY_URLS } from "./config";
 import { cityWikiUrl, escapeHtml } from "./wiki";
 import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
 import {
-  app, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom,
+  app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom,
   type CountryEntry, type CapitalMarker,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
+import type { PhysFeature } from "./physical";
+
+// Sidebar Cities list (search-driven; sorted by population so the default view is
+// the biggest cities). Populated when the city data loads.
+export const cityList: PhysFeature[] = [];
 
 const CAPITAL_MAX = 70; // ceiling on capitals shown per view (grows with zoom)
 export function refreshCapitals(): void {
@@ -130,8 +135,30 @@ function loadCities(): void {
       } as CityRec;
     }).filter(Boolean)) as CityRec[];
     cityDataLoaded = true; citiesLoading = false;
+    // Build the sidebar Cities list (biggest first) and refresh the lists.
+    cityList.length = 0;
+    cityData.slice().sort((a, c) => c.pop - a.pop).forEach((d) => {
+      cityList.push({
+        name: d.name,
+        wiki: cityWikiUrl(d.name),
+        focus: () => { map.setView([d.lat, d.lng], Math.max(map.getZoom(), 7)); cityOpen(d); },
+      });
+    });
+    hooks.rebuildFeatureLists();
     updateCities();
   }).catch(() => { citiesLoading = false; });
+}
+// Load the city dataset up front so the sidebar Cities list is populated even
+// before the Cities map layer is switched on.
+export function loadCityData(): void { loadCities(); }
+// The feature detail box for a city (shared by the map markers and the list).
+function cityOpen(d: CityRec): void {
+  const sub = d.cap ? (d.adm0 ? "Capital of " + d.adm0 : "Capital") : (d.adm0 ? "City in " + d.adm0 : "City");
+  const rows: [string, string][] = [];
+  if (d.adm1 && d.adm1 !== d.adm0) rows.push(["Region", escapeHtml(d.adm1)]);
+  if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
+  if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
+  renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
 }
 function updateCities(): void {
   if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
@@ -150,14 +177,7 @@ function updateCities(): void {
     const style = d.cap
       ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
       : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
-    const open = () => {
-      const sub = d.cap ? (d.adm0 ? "Capital of " + d.adm0 : "Capital") : (d.adm0 ? "City in " + d.adm0 : "City");
-      const rows: [string, string][] = [];
-      if (d.adm1 && d.adm1 !== d.adm0) rows.push(["Region", escapeHtml(d.adm1)]);
-      if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
-      if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
-      renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
-    };
+    const open = () => cityOpen(d);
     L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
       L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open();
     });

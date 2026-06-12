@@ -1,9 +1,13 @@
 # City outline — problem statement & handoff
 
-> Status: **working for the cases we've tested manually, but not yet verified at
-> scale.** The remaining work is a run→fix→repeat loop against the live API that
-> couldn't be closed in the Cowork sandbox (no outbound HTTP from code). Pick it up
-> in Claude Code, which runs in a real shell and can hit the network.
+> Status: **live-verified green** (2026-06-12): `pnpm test:live` passes 25/25 from a
+> real shell — every asserted city resolves to a containing, city-sized boundary
+> (observed spans 22–49 km; sources `reverse` / `addr:municipality`). The algorithm
+> itself needed **no** changes: every red in earlier runs (including the partial
+> browser-driven run that resolved 17 of 32 before being blocked) was Nominatim
+> **429 throttling**, not a resolution bug — see "Constraints" below for the
+> root cause and the harness fixes. Remaining open: Tokyo policy, and widening
+> the verified subset toward the ~7k cities.
 
 ## The problem we're solving
 
@@ -83,8 +87,11 @@ addr:town | addr:county | name-search | none`.
   ⚠️ These only check our *branching logic* against assumed response shapes — they
   would **not** have caught the real bugs, which were all about Nominatim's actual
   behaviour. They're a regression guard + documentation, nothing more.
-- **Open:** no at-scale verification. We don't know how many of the ~7k cities
-  resolve correctly, or which patterns still fail.
+- **Live-verified (2026-06-12, `pnpm test:live`):** all 25 cities in the integration
+  test pass — containing, city-sized polygons with sane spans (22–49 km where logged).
+  No algorithm changes were needed; the earlier reds were all 429 throttling.
+- **Open:** the verified subset is still only ~25 notable cities out of ~7k; Tokyo
+  remains logged-only (`hard`) pending a policy decision.
 
 ## The work to finish (the loop for Claude Code)
 
@@ -123,10 +130,19 @@ Run this loop until green:
 - **Nominatim usage policy:** max ~1 request/second; the integration test paces
   itself and sends a `User-Agent`. Don't hammer it across all 7k cities (hours +
   likely a block) — test a representative subset.
-- **Rate-limit caching bug to watch:** `outlineCache` in `places.ts` stores `null` on
-  failure, so a transient error permanently caches "no outline" for that city until
-  reload. Consider not caching `null` (or caching it with a TTL / only on definitive
-  "no boundary exists").
+- **429 throttling — what we learned (2026-06-12):**
+  - vitest's `happy-dom` environment simulates browser CORS and sent an **OPTIONS
+    preflight before every request** (triggered by the custom `User-Agent`), silently
+    doubling the request rate to ~2/s — that's what got the IP blocked mid-run. The
+    integration test now forces `@vitest-environment node` (no preflight).
+  - The limiter is **window-based**, not just per-second: a full ~30-request run
+    passes cleanly, but starting another one a minute later gets 429'd. Leave a few
+    minutes between live runs. Blocks observed so far lift after ~5–10 minutes.
+  - The test's fetch wrapper now **backs off 30 s and retries (×3)** on 429, so a
+    transient throttle no longer masquerades as "no boundary found".
+- **Rate-limit caching bug — fixed:** `outlineCache` in `places.ts` used to store
+  `null` on failure, permanently caching "no outline" after a transient error.
+  It now caches successful geometries only.
 
 ## Files
 - `src/cityBoundary.ts` — resolution logic (edit here).

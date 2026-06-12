@@ -160,7 +160,7 @@ function cityOpen(d: CityRec): void {
   if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
   if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
   renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows); // clears the previous outline via hooks.clearCityOutline
-  showCityOutline(d.lat, d.lng);
+  showCityOutline(d.lat, d.lng, d.pop);
 }
 
 // --- City outline: the Natural Earth urban-area polygon that contains the city's
@@ -168,7 +168,7 @@ function cityOpen(d: CityRec): void {
 type UrbanFeat = { bbox: [number, number, number, number]; geom: any };
 let urbanFeats: UrbanFeat[] = [];
 let urbanLoaded = false, urbanLoading = false;
-let pendingOutline: { lat: number; lng: number } | null = null;
+let pendingOutline: { lat: number; lng: number; pop: number } | null = null;
 const cityOutlineStyle = { color: "#8a3b00", weight: 2, opacity: 0.95, fillColor: "#e8740c", fillOpacity: 0.18 };
 
 function geomBbox(geom: any): [number, number, number, number] | null {
@@ -182,39 +182,33 @@ function geomBbox(geom: any): [number, number, number, number] | null {
   if (geom && geom.coordinates) walk(geom.coordinates);
   return isFinite(minX) ? [minX, minY, maxX, maxY] : null;
 }
-function pointInRing(x: number, y: number, ring: number[][]): boolean {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
-    if (((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) inside = !inside;
-  }
-  return inside;
+// Shortest distance (km) from a point to an axis-aligned lon/lat bbox (0 if
+// inside), with a cos-latitude correction so it's roughly metric at any latitude.
+function bboxDistKm(lat: number, lng: number, b: [number, number, number, number]): number {
+  const dLng = Math.max(b[0] - lng, 0, lng - b[2]);
+  const dLat = Math.max(b[1] - lat, 0, lat - b[3]);
+  const kx = dLng * 111 * Math.cos(lat * Math.PI / 180);
+  const ky = dLat * 111;
+  return Math.sqrt(kx * kx + ky * ky);
 }
-function pointInPolygon(x: number, y: number, rings: number[][][]): boolean {
-  if (!rings.length || !pointInRing(x, y, rings[0])) return false;
-  for (let k = 1; k < rings.length; k++) if (pointInRing(x, y, rings[k])) return false; // inside a hole
-  return true;
-}
-function geomContains(x: number, y: number, geom: any): boolean {
-  if (geom && geom.type === "Polygon") return pointInPolygon(x, y, geom.coordinates);
-  if (geom && geom.type === "MultiPolygon") return geom.coordinates.some((poly: number[][][]) => pointInPolygon(x, y, poly));
-  return false;
-}
-function drawCityOutline(lat: number, lng: number): void {
+// NE urban areas are fragmented (a metro = many separate polygons), so drawing
+// only the polygon under the city point misses most of it (e.g. Manhattan). Draw
+// every urban polygon within a population-scaled radius to capture the whole
+// built-up cluster.
+function drawCityOutline(lat: number, lng: number, pop: number): void {
   cityOutlineLayer.clearLayers();
-  for (const f of urbanFeats) {
-    const b = f.bbox;
-    if (lng < b[0] || lng > b[2] || lat < b[1] || lat > b[3]) continue;
-    if (geomContains(lng, lat, f.geom)) {
-      L.geoJSON({ type: "Feature", geometry: f.geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
-      return;
-    }
+  const rKm = Math.min(45, Math.max(6, Math.sqrt(Math.max(pop, 0)) / 45));
+  const feats = urbanFeats
+    .filter((f) => bboxDistKm(lat, lng, f.bbox) <= rKm)
+    .map((f) => ({ type: "Feature", geometry: f.geom }));
+  if (feats.length) {
+    L.geoJSON({ type: "FeatureCollection", features: feats } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
   }
 }
 export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); pendingOutline = null; }
-function showCityOutline(lat: number, lng: number): void {
-  if (urbanLoaded) { drawCityOutline(lat, lng); return; }
-  pendingOutline = { lat, lng };
+function showCityOutline(lat: number, lng: number, pop: number): void {
+  if (urbanLoaded) { drawCityOutline(lat, lng, pop); return; }
+  pendingOutline = { lat, lng, pop };
   if (urbanLoading) return;
   urbanLoading = true;
   fetchJson(URBAN_URLS).then((geo) => {
@@ -223,7 +217,7 @@ function showCityOutline(lat: number, lng: number): void {
       return bb ? { bbox: bb, geom: f.geometry } : null;
     }).filter(Boolean)) as UrbanFeat[];
     urbanLoaded = true; urbanLoading = false;
-    if (pendingOutline) { drawCityOutline(pendingOutline.lat, pendingOutline.lng); pendingOutline = null; }
+    if (pendingOutline) { drawCityOutline(pendingOutline.lat, pendingOutline.lng, pendingOutline.pop); pendingOutline = null; }
   }).catch(() => { urbanLoading = false; });
 }
 function updateCities(): void {

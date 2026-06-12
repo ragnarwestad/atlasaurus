@@ -101,7 +101,7 @@ function rebuildRegionColors(): void {
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
-let quizType: "name" | "flag" | "capital" | "continent" | "neighbour" = "name";
+let quizType: "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" = "name";
 let quizStarted = false;
 let quizNeighbourSet = new Set<CountryEntry>();
 let quizTarget: CountryEntry | null = null;
@@ -461,6 +461,8 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
       }
     } else if (quizType === "neighbour" && nbSelected.has(e)) {
       return relatedStyle; // your current picks (before checking)
+    } else if (quizType === "spot" && e === quizTarget) {
+      return selectedStyle; // the country to name (orange highlight + pin)
     }
     if (e.layer === hoveredLayer) return hoverStyle;
     return baseStyle;
@@ -1069,6 +1071,10 @@ function renderQuizPrompt(): void {
     // Show the country (flag + name); pick its continent / click a neighbour.
     const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
     quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
+  } else if (quizType === "spot") {
+    // Spot quiz: the country is highlighted/pinned on the map — naming it is the
+    // task, so the prompt must NOT reveal the name.
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">pinned</span> <span>Which country?</span>';
   } else {
     // Name quiz: just the name (no flag — that would give it away).
     quizPromptEl.innerHTML = "<span>" + escapeHtml(quizTarget.name) + "</span>";
@@ -1131,6 +1137,22 @@ function nextQuestion(): void {
     nbCheck.disabled = false;
     nbBox.hidden = false;
     applyNbMode();
+  } else if (quizType === "spot") {
+    // Spot: highlight + drop a pin on a random country; the user names it by
+    // search. Reset to the world view so the pin is always on screen.
+    quizChoicesEl.hidden = true;
+    quizContLayer.clearLayers();
+    nbBox.hidden = true;
+    locInput.value = ""; locInput.disabled = false;
+    locResults.innerHTML = "";
+    locBox.hidden = false;
+    locModeEl.hidden = true;     // always answered by typing the name
+    locMode = "search";
+    applyLocMode();
+    const c = quizTarget ? layerCenter(quizTarget) : null;
+    map.setView([20, 0], 2);
+    if (c) L.circleMarker(c, { radius: 9, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 }).addTo(quizLayer);
+    quizFeedbackEl.textContent = "Which country is highlighted? Type its name.";
   } else {
     quizChoicesEl.hidden = true;
     quizContLayer.clearLayers();
@@ -1482,7 +1504,7 @@ document.querySelectorAll<HTMLInputElement>('#loc-mode input[name="locmode"]').f
 });
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
-    quizType = b.dataset.qtype as "name" | "flag" | "capital" | "continent" | "neighbour";
+    quizType = b.dataset.qtype as "name" | "flag" | "capital" | "spot" | "continent" | "neighbour";
     document.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
     if (mode === "quiz") nextQuestion();
   });
@@ -1497,7 +1519,7 @@ function setQuizCat(cat: "country" | "continent"): void {
     quizType = "continent";
   } else {
     const active = document.querySelector<HTMLElement>(".qt-btn.active");
-    quizType = (active && (active.dataset.qtype as "name" | "flag" | "capital" | "neighbour")) || "name";
+    quizType = (active && (active.dataset.qtype as "name" | "flag" | "capital" | "spot" | "neighbour")) || "name";
   }
   if (mode === "quiz") nextQuestion();
 }

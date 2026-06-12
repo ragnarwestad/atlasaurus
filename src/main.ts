@@ -175,16 +175,33 @@ function refreshCountryLabels(): void {
   });
 }
 
+const CAPITAL_MAX = 70; // ceiling on capitals shown per view (grows with zoom)
 function refreshCapitals(): void {
   if (mode === "quiz") { capitalMarkers.forEach((m) => { if (capitalLayer.hasLayer(m)) capitalLayer.removeLayer(m); }); return; }
-  capitalMarkers.forEach((m) => {
+  const z = map.getZoom();
+  const cap = Math.max(8, Math.min(CAPITAL_MAX, Math.round((z - 1) * 12)));
+  const b = map.getBounds().pad(0.15);
+  // Capitals allowed by the toggle + tab scope (the selected region on the Regions tab).
+  const eligible = capitalMarkers.filter((m) => {
     const e = m._entry;
     const cv = e ? countryVisible(e) : !(isolate && selectedLayer);
     const byToggle = e ? (showCapitals && inToggleScope(e)) : (showCapitals && activeTab === "countries");
-    const visible = cv && (byToggle || (e ? isRevealed(e) : false));
+    return cv && byToggle;
+  });
+  // Of those, show only the in-view ones, ranked by country population and capped
+  // by zoom — so big countries' capitals appear first, more as you zoom in.
+  const shown = new Set<CapitalMarker>(
+    eligible
+      .filter((m) => b.contains(m.getLatLng()))
+      .sort((a, c) => (c._entry ? popOf(c._entry) : 0) - (a._entry ? popOf(a._entry) : 0))
+      .slice(0, cap),
+  );
+  // The selected country's capital is always shown, regardless of zoom/cap.
+  capitalMarkers.forEach((m) => { const e = m._entry; if (e && isRevealed(e) && countryVisible(e)) shown.add(m); });
+  capitalMarkers.forEach((m) => {
     const has = capitalLayer.hasLayer(m);
-    if (visible && !has) capitalLayer.addLayer(m);
-    else if (!visible && has) capitalLayer.removeLayer(m);
+    if (shown.has(m) && !has) capitalLayer.addLayer(m);
+    else if (!shown.has(m) && has) capitalLayer.removeLayer(m);
   });
 }
 
@@ -1924,7 +1941,8 @@ map.on("click", () => {        // background click clears selection
 });
 map.on("zoomend", updateFlagSizes);
 map.on("zoomend", updatePeakSizes);
-map.on("moveend", scheduleCityUpdate); // re-render in-view cities after pan/zoom
+map.on("moveend", scheduleCityUpdate);  // re-render in-view cities after pan/zoom
+map.on("moveend", refreshCapitals);     // re-evaluate which capitals fit the view
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;

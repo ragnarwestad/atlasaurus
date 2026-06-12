@@ -21,7 +21,10 @@
 				// deliberate choice (tsconfig has noImplicitAny: false).
 				"noExplicitAny": "off",
 				// The `(x[k] = x[k] || []).push(…)` grouping idiom is used on purpose.
-				"noAssignInExpressions": "off"
+				"noAssignInExpressions": "off",
+				// Concise arrows in forEach (`.forEach((f) => ul.appendChild(…))`) are
+				// the house style; the returned value is intentionally ignored.
+				"useIterableCallbackReturn": "off"
 			},
 			"style": {
 				// String concatenation (not template literals) is the house style.

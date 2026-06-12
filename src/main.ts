@@ -827,10 +827,13 @@ function updateCities(): void {
     const style = d.cap
       ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
       : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
-    L.circleMarker([d.lat, d.lng], style).addTo(cityLayer);
-    L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: true, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
+    L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
+      L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+      renderFeatureInfo(d.name, cityWikiUrl(d.name), d.cap ? "Capital" : "City", d.pop ? [["Population", fmtInt(d.pop)]] : []);
+    });
+    L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: false, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
       .setLatLng([d.lat, d.lng])
-      .setContent('<a href="' + cityWikiUrl(d.name) + '" target="_blank" rel="noopener">' + escapeHtml(d.name) + "</a>")
+      .setContent(escapeHtml(d.name))
       .addTo(cityLabelLayer);
   });
 }

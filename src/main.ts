@@ -712,6 +712,21 @@ function refreshPeaks(): void {
   updatePeakLabels();
 }
 
+// Great-circle length (km) of a LineString / MultiLineString geometry.
+function lineLengthKm(geom: any): number {
+  const hav = (a: number[], b: number[]) => {
+    const R = 6371, toR = Math.PI / 180;
+    const dLat = (b[1] - a[1]) * toR, dLng = (b[0] - a[0]) * toR;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * toR) * Math.cos(b[1] * toR) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+  if (!geom) return 0;
+  const lines: number[][][] = geom.type === "LineString" ? [geom.coordinates] : geom.type === "MultiLineString" ? geom.coordinates : [];
+  let len = 0;
+  for (const line of lines) for (let i = 1; i < line.length; i++) len += hav(line[i - 1], line[i]);
+  return len;
+}
+
 // --- Rivers (Explore "Rivers" layer) — major named river centerlines from
 //     Natural Earth, loaded lazily the first time the toggle is switched on. ---
 let riverGeo: L.GeoJSON | null = null;
@@ -728,7 +743,8 @@ function loadRivers(): void {
         if (!name) return;
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
-        const open = () => renderFeatureInfo(name, wikiUrl(name), "River", []);
+        const km = lineLengthKm(f.geometry);
+        const open = () => renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []);
         layer.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
@@ -801,7 +817,7 @@ function refreshLakes(): void {
 //     labels only for the top few. (Thousands of permanent labels = big lag.) ---
 const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
 const CITY_MAX = 70;       // ceiling on cities rendered per view (each gets a dot AND a label)
-interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; pop: number; }
+interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; pop: number; adm0: string; adm1: string; elev: number; }
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
 let citiesLoading = false;
@@ -823,7 +839,13 @@ function loadCities(): void {
       const name = p.name || p.nameascii;
       if (!c || !name) return null;
       const cap = String(p.featurecla || "").toLowerCase().indexOf("admin-0 capital") !== -1;
-      return { lat: c[1], lng: c[0], name, mz: placeMinZoom(p), cap } as CityRec;
+      return {
+        lat: c[1], lng: c[0], name, mz: placeMinZoom(p), cap,
+        pop: +(p.pop_max || p.pop_min || 0),
+        adm0: p.adm0name || p.adm0_name || "",
+        adm1: p.adm1name || p.adm1_name || "",
+        elev: +(p.elevation || p.ELEVATION || 0),
+      } as CityRec;
     }).filter(Boolean)) as CityRec[];
     cityDataLoaded = true; citiesLoading = false;
     updateCities();
@@ -846,7 +868,14 @@ function updateCities(): void {
     const style = d.cap
       ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
       : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
-    const open = () => renderFeatureInfo(d.name, cityWikiUrl(d.name), d.cap ? "Capital" : "City", d.pop ? [["Population", fmtInt(d.pop)]] : []);
+    const open = () => {
+      const rows: [string, string][] = [];
+      if (d.adm0) rows.push(["Country", escapeHtml(d.adm0)]);
+      if (d.adm1 && d.adm1 !== d.adm0) rows.push(["Region", escapeHtml(d.adm1)]);
+      if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
+      if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
+      renderFeatureInfo(d.name, cityWikiUrl(d.name), d.cap ? "Capital" : "City", rows);
+    };
     L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
       L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open();
     });

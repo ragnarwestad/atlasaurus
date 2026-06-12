@@ -16,7 +16,9 @@ import { resolveCityBoundary, geomContains, geomExtentKm, MAX_CITY_KM } from "./
 
 const LIVE = !!process.env.RUN_LIVE;
 
-interface Case { name: string; lat: number; lng: number; adm0: string; hard?: boolean }
+// minKm: assert a *lower* span bound too — catches resolving to a sub-city unit
+// (e.g. Manhattan, 25 km, instead of City of New York, 68 km).
+interface Case { name: string; lat: number; lng: number; adm0: string; hard?: boolean; minKm?: number }
 const CITIES: Case[] = [
   { name: "Copenhagen", lat: 55.6761, lng: 12.5683, adm0: "Denmark" },
   { name: "Aarhus", lat: 56.1629, lng: 10.2039, adm0: "Denmark" },
@@ -26,7 +28,7 @@ const CITIES: Case[] = [
   { name: "Stockholm", lat: 59.3293, lng: 18.0686, adm0: "Sweden" },
   { name: "Helsinki", lat: 60.1699, lng: 24.9384, adm0: "Finland" },
   { name: "Reykjavík", lat: 64.1466, lng: -21.9426, adm0: "Iceland" },
-  { name: "New York", lat: 40.7128, lng: -74.0060, adm0: "United States" },
+  { name: "New York", lat: 40.7128, lng: -74.0060, adm0: "United States", minKm: 40 },
   { name: "Los Angeles", lat: 34.0522, lng: -118.2437, adm0: "United States" },
   { name: "London", lat: 51.5074, lng: -0.1278, adm0: "United Kingdom" },
   { name: "Paris", lat: 48.8566, lng: 2.3522, adm0: "France" },
@@ -79,5 +81,6 @@ describe.skipIf(!LIVE)("Nominatim live city boundaries", () => {
     expect(res.geom, `${c.name}: no boundary returned`).not.toBeNull();
     expect(geomContains(c.lng, c.lat, res.geom!), `${c.name}: boundary does not contain the point`).toBe(true);
     expect(geomExtentKm(res.geom!), `${c.name}: boundary too large (${span} km)`).toBeLessThanOrEqual(MAX_CITY_KM);
+    if (c.minKm) expect(geomExtentKm(res.geom!), `${c.name}: boundary too small (${span} km) — sub-city unit?`).toBeGreaterThanOrEqual(c.minKm);
   }, 240_000); // headroom for 429 backoff (up to 3 × 30 s per request)
 });

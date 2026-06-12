@@ -9,6 +9,10 @@
 //   - ambiguous names: "New York"/"Tokyo" surface the state/prefecture first, so
 //                      we reject oversized matches and require the polygon to
 //                      contain the city point.
+//   - sub-city units:  at big-city centres /reverse?zoom=10 can return a borough/
+//                      ward polygon (Manhattan for New York, Chiyoda for Tokyo)
+//                      that passes the size filter — so the reverse polygon is
+//                      only accepted when its name loosely matches the city's.
 
 export const MAX_CITY_KM = 120; // reject admin areas bigger than a real city (states, prefectures)
 
@@ -54,9 +58,30 @@ export function geomContains(lng: number, lat: number, geom: GeoJSONGeom): boole
 }
 
 function reverseFull(lat: number, lng: number, zoom: number): Promise<any> {
-  return fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&polygon_geojson=1&zoom=" + zoom + "&lat=" + lat + "&lon=" + lng, { headers: { Accept: "application/json" } })
+  return fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&polygon_geojson=1&namedetails=1&zoom=" + zoom + "&lat=" + lat + "&lon=" + lng, { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
+}
+
+// Normalised, diacritic-free lowercase for name comparison.
+function norm(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+// Loose name match between the city being resolved and a Nominatim result: true
+// when either name contains the other ("Sorø Kommune" ~ "Sorø", "City of New
+// York" ~ "New York"; "Manhattan"/"千代田区" do NOT match "New York"/"Tokyo").
+// A result exposing no usable name at all passes (we can't judge it).
+export function nameMatches(city: string, r: any): boolean {
+  const c = norm(city);
+  if (!c) return true;
+  const nd = (r && r.namedetails) || {};
+  const names = [r && r.name, nd.name, nd["name:en"], r && r.display_name && String(r.display_name).split(",")[0]]
+    .filter((n) => n && String(n).trim());
+  if (!names.length) return true;
+  return names.some((n) => {
+    const x = norm(String(n));
+    return x.includes(c) || c.includes(x);
+  });
 }
 // Search and return the first city-sized boundary that actually contains the point
 // (skips the state/prefecture that ambiguous names surface).
@@ -76,15 +101,18 @@ function searchPick(q: string, lat: number, lng: number): Promise<GeoJSONGeom | 
 export async function resolveCityBoundary(lat: number, lng: number, name: string, adm0: string): Promise<CityBoundary> {
   const r = await reverseFull(lat, lng, 10);
   const direct = geomOf(r);
-  // Accept the reverse polygon only if it's city-sized.
-  if (direct && geomExtentKm(direct) <= MAX_CITY_KM) return { geom: direct, source: "reverse" };
+  // Accept the reverse polygon only if it's city-sized AND named like the city —
+  // at big-city centres zoom 10 can return a borough/ward whose polygon would
+  // otherwise pass the size filter (Manhattan for New York, Chiyoda for Tokyo).
+  if (direct && geomExtentKm(direct) <= MAX_CITY_KM && nameMatches(name, r)) return { geom: direct, source: "reverse" };
+  const rejectedName = (direct && r && r.name) || ""; // the sub-city unit we refused
 
   if (r && r.address) {
     const a = r.address;
     const country = adm0 || a.country || "";
     const cands: [CityBoundary["source"], string][] = ([
       ["addr:municipality", a.municipality], ["addr:city", a.city], ["addr:town", a.town], ["addr:county", a.county],
-    ] as [CityBoundary["source"], any][]).filter(([, v], i, arr) => v && arr.findIndex(([, w]) => w === v) === i);
+    ] as [CityBoundary["source"], any][]).filter(([, v], i, arr) => v && v !== rejectedName && arr.findIndex(([, w]) => w === v) === i);
     for (const [source, nm] of cands) {
       const g = await searchPick(nm + (country ? ", " + country : ""), lat, lng);
       if (g) return { geom: g, source };

@@ -51,7 +51,7 @@ describe("geomContains", () => {
 describe("resolveCityBoundary", () => {
   it("uses the reverse polygon directly for a normal town (Sorø)", async () => {
     const poly = rect(11.567, 55.433, 0.08); // small kommune around the point
-    handler = (url) => (isReverse(url) ? { geojson: poly, address: { municipality: "Sorø Kommune" } } : []);
+    handler = (url) => (isReverse(url) ? { geojson: poly, name: "Sorø Kommune", address: { municipality: "Sorø Kommune" } } : []);
     const res = await resolveCityBoundary(55.433, 11.567, "Sorø", "Denmark");
     expect(res.source).toBe("reverse");
     expect(res.geom).toEqual(poly);
@@ -89,6 +89,38 @@ describe("resolveCityBoundary", () => {
       return [{ geojson: prefecture }];
     };
     const res = await resolveCityBoundary(35.69, 139.7, "Tokyo", "Japan");
+    expect(res.geom).toBeNull();
+    expect(res.source).toBe("none");
+  });
+
+  // Real shape observed live (2026-06-12): at NYC's centre, reverse?zoom=10 returns
+  // the Manhattan polygon (25 km — passes the size filter) with address.city still
+  // naming the real city. The name mismatch must push us to the address search.
+  it("rejects a city-sized borough from reverse and searches the address city (New York → Manhattan)", async () => {
+    const manhattan = rect(-73.97, 40.78, 0.11); // ~25 km, contains the point
+    const city = rect(-74, 40.7, 0.3);           // ~68 km City of New York
+    handler = (url) => {
+      if (isReverse(url)) return { geojson: manhattan, name: "Manhattan", address: { city: "New York", county: "New York County", state: "New York" } };
+      return qOf(url).startsWith("New York,") ? [{ geojson: city, name: "New York" }] : [];
+    };
+    const res = await resolveCityBoundary(40.72, -73.99, "New York", "United States of America");
+    expect(res.source).toBe("addr:city");
+    expect(res.geom).toEqual(city);
+  });
+
+  // Real shape observed live (2026-06-12): at Tokyo's centre, reverse?zoom=10
+  // returns the tiny Chiyoda ward polygon, and address.city is that same ward —
+  // so the candidate must be skipped (searching it would just re-pick the ward),
+  // leaving the name search, where the metropolis is rejected as oversized.
+  it("skips the rejected ward in the address candidates (Tokyo → Chiyoda)", async () => {
+    const chiyoda = rect(139.75, 35.69, 0.025); // ~6 km ward around the point
+    const metropolis = rect(139.7, 35.7, 3);    // huge; rejected by MAX_CITY_KM
+    handler = (url) => {
+      if (isReverse(url)) return { geojson: chiyoda, name: "千代田区", address: { city: "千代田区" } };
+      if (qOf(url).startsWith("千代田区")) return [{ geojson: chiyoda, name: "千代田区" }]; // would wrongly re-pick the ward
+      return [{ geojson: metropolis, name: "東京都" }];
+    };
+    const res = await resolveCityBoundary(35.687, 139.749, "Tokyo", "Japan");
     expect(res.geom).toBeNull();
     expect(res.source).toBe("none");
   });

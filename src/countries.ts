@@ -21,8 +21,7 @@ import { refreshCountryLabels, placeCountryLabels } from "./labels";
 import { loadCapitals } from "./places";
 import { groupOf, CONTINENT_QUIZ_STYLES } from "./regions";
 import { buildSidebar, setActiveTab } from "./sidebar";
-// TODO(refactor): quiz handlers move to ./quiz in the next step.
-import { answerContinent, toggleNbPick, handlePeakCountryGuess, handleGuess } from "./main";
+import { answerContinent, toggleNbPick, handlePeakCountryGuess, handleGuess } from "./quiz";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)

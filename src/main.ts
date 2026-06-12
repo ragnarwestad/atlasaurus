@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
 import {
-  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS, RIVER_URLS,
+  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS, RIVER_URLS, LAKE_URLS,
   baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
   quizCorrectStyle, quizWrongStyle,
   CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
@@ -54,6 +54,7 @@ const connectorLayer = L.layerGroup().addTo(map);  // satellite/sovereignty line
 const flagLayer = L.layerGroup().addTo(map);       // flag images
 const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
 const riverLayer = L.layerGroup().addTo(map);      // major river centerlines
+const lakeLayer = L.layerGroup().addTo(map);       // major lakes
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
@@ -76,6 +77,7 @@ let showCapitals = false;
 let showFlags = false;
 let showPeaks = false;
 let showRivers = false;
+let showLakes = false;
 let isolate = false;
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
@@ -684,6 +686,35 @@ function refreshRivers(): void {
   else if (!on && riverLayer.hasLayer(riverGeo)) riverLayer.removeLayer(riverGeo);
   updatePeakLabels();
 }
+
+// --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---
+let lakeGeo: L.GeoJSON | null = null;
+let lakesLoading = false;
+function loadLakes(): void {
+  if (lakeGeo || lakesLoading) return;
+  lakesLoading = true;
+  fetchJson(LAKE_URLS).then((geo) => {
+    lakeGeo = L.geoJSON(geo, {
+      style: () => ({ color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
+      onEachFeature: (f: any, layer: L.Layer) => {
+        const name = (f.properties || {}).name || (f.properties || {}).name_en;
+        if (name) (layer as L.Path).bindTooltip(
+          '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
+          { permanent: true, direction: "center", interactive: true, className: "map-label lake-label" });
+      },
+    });
+    lakesLoading = false;
+    refreshLakes();
+  }).catch(() => { lakesLoading = false; });
+}
+function refreshLakes(): void {
+  const on = showLakes && mode === "explore";
+  if (on && !lakeGeo) { loadLakes(); return; }
+  if (!lakeGeo) return;
+  if (on && !lakeLayer.hasLayer(lakeGeo)) lakeLayer.addLayer(lakeGeo);
+  else if (!on && lakeLayer.hasLayer(lakeGeo)) lakeLayer.removeLayer(lakeGeo);
+  updatePeakLabels();
+}
 // Peak/river names get crowded when zoomed out, so hide the labels below a zoom
 // threshold — the icons and lines still show every feature.
 function updatePeakLabels(): void {
@@ -692,6 +723,7 @@ function updatePeakLabels(): void {
   const on = map.getZoom() >= 4;
   mapEl.classList.toggle("peak-labels-on", on);
   mapEl.classList.toggle("river-labels-on", on);
+  mapEl.classList.toggle("lake-labels-on", on);
 }
 function updatePeakSizes(): void {
   const z = map.getZoom();
@@ -718,6 +750,7 @@ function refreshAll(): void {
   refreshFlags();
   refreshPeaks();
   refreshRivers();
+  refreshLakes();
   updateInfoPanel();
   markActiveContinent();
   updateRegionLabels();
@@ -1755,6 +1788,9 @@ mtnToggle.addEventListener("change", () => { showPeaks = mtnToggle.checked; refr
 
 const rivToggle = document.getElementById("show-rivers") as HTMLInputElement;
 rivToggle.addEventListener("change", () => { showRivers = rivToggle.checked; refreshRivers(); });
+
+const lakeToggle = document.getElementById("show-lakes") as HTMLInputElement;
+lakeToggle.addEventListener("change", () => { showLakes = lakeToggle.checked; refreshLakes(); });
 
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; refreshCountryLabels(); });

@@ -30,6 +30,12 @@ export const RIVER_URLS = [
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_rivers_lake_centerlines.geojson",
 ];
 
+// Major lakes (50m). Loaded lazily the first time "Lakes" is toggled on.
+export const LAKE_URLS = [
+  "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_lakes.geojson",
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_lakes.geojson",
+];
+
 // --- English Wikipedia title overrides for dataset country names ---
 export const WIKI_OVERRIDES: Record<string, string> = {
   "United States of America": "United States",

@@ -74,6 +74,14 @@ function lngSpan(geom: any): number {
   if (geom && geom.coordinates) walk(geom.coordinates);
   return max - min;
 }
+// Some NE features carry empty coordinates → an empty path whose permanent
+// "center" tooltip throws "latlngs not passed" on open. Count the leaf points so
+// we can drop those before they reach the map.
+function pathPointCount(layer: any): number {
+  const lls = layer && layer.getLatLngs ? layer.getLatLngs() : null;
+  const count = (a: any): number => (Array.isArray(a) ? a.reduce((n, x) => n + count(x), 0) : 1);
+  return lls ? count(lls) : 0;
+}
 function loadRivers(): void {
   if (riverGeo || riversLoading) return;
   riversLoading = true;
@@ -95,6 +103,7 @@ function loadRivers(): void {
       style: () => ({ renderer: featureCanvas, color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = riverName(f);
+        if (pathPointCount(layer) < 2) return; // skip empty/degenerate geometry (would throw on tooltip-center)
         riverEntries.push({ layer: layer as L.Path, mz: mzByName[name] ?? (map.getMaxZoom() || 8) });
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
@@ -169,6 +178,7 @@ function loadLakes(): void {
       style: () => ({ renderer: featureCanvas, color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = lakeName(f);
+        if (pathPointCount(layer) < 3) return; // skip empty/degenerate polygon (would throw on tooltip-center)
         pending.push({ layer: layer as L.Path, name });
         if (best[name] !== f) return; // only the largest polygon per name gets a label + drives the threshold
         // Rough area from the polygon: shoelace deg² → km² with a latitude correction.

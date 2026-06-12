@@ -82,7 +82,8 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
 - **Sub-units:** Natural Earth `ne_10m_admin_0_map_subunits` (satellite labels).
 - **Rivers:** Natural Earth `ne_50m_rivers_lake_centerlines` (loaded lazily when the
   Rivers toggle is first switched on).
-- **Lakes:** Natural Earth `ne_50m_lakes` (loaded lazily with the Lakes toggle).
+- **Lakes:** Natural Earth `ne_10m_lakes`, filtered to named lakes (loaded lazily
+  with the Lakes toggle).
 - **Mountain peaks:** a small curated list in `src/peaks.ts` (name, ISO country
   codes, elevation, coordinates; figures from Wikipedia / Britannica).
 - **Flags:** [flagcdn.com](https://flagcdn.com) by ISO 3166-1 alpha-2 code.

@@ -30,10 +30,12 @@ export const RIVER_URLS = [
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_rivers_lake_centerlines.geojson",
 ];
 
-// Major lakes (50m). Loaded lazily the first time "Lakes" is toggled on.
+// Lakes — 10m for proper coverage (the 50m set is curated and drops some large
+// lakes, e.g. Norway's Mjøsa). We filter to *named* lakes at load so the map
+// isn't swamped by the thousands of tiny unnamed ones. Loaded lazily.
 export const LAKE_URLS = [
-  "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_lakes.geojson",
-  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_lakes.geojson",
+  "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_10m_lakes.geojson",
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes.geojson",
 ];
 
 // --- English Wikipedia title overrides for dataset country names ---

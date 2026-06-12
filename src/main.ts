@@ -695,6 +695,7 @@ function loadLakes(): void {
   lakesLoading = true;
   fetchJson(LAKE_URLS).then((geo) => {
     lakeGeo = L.geoJSON(geo, {
+      filter: (f: any) => !!((f.properties || {}).name || (f.properties || {}).name_en), // named lakes only
       style: () => ({ color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = (f.properties || {}).name || (f.properties || {}).name_en;

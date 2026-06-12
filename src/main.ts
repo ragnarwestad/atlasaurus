@@ -1,45 +1,16 @@
-import L from "leaflet";
+// App entry point: imports the modules, defines the refreshAll coordinator,
+// wires the DOM event listeners and kicks off the data loading.
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
-import {
-  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS, RIVER_URLS, LAKE_URLS, CITY_URLS,
-  baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
-  quizCorrectStyle, quizWrongStyle,
-  CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
-} from "./config";
-import { allPolygonParts, centerOf, type LatLng } from "./geo";
-import { wikiUrl, cityWikiUrl, escapeHtml } from "./wiki";
-import { PEAKS, type Peak } from "./peaks";
-import {
-  map, capitalLayer, connectorLayer, flagLayer, peakLayer, riverLayer, lakeLayer,
-  cityLayer, cityLabelLayer, cityCanvas, quizLayer, quizContLayer, regionLabelLayer,
-} from "./map";
-import {
-  app, hooks, countries, byIso, capitalMarkers, subunitsByIso, territoriesBySov,
-  CONTINENT_ORDER, fmtInt, fetchJson, realCountries, entryForLayer, popOf, areaOf,
-  layerCenter, loadCountryData,
-  type CountryEntry, type CapitalMarker, type Territory, type Subunit,
-  type RestInfo, type GroupScheme, type QuizType,
-} from "./state";
-import {
-  trackMouse, showHoverInfo, hideHoverInfo, countryInfoEl, renderFeatureInfo,
-  attachLabelClick, updateInfoPanel, isNarrow,
-} from "./panel";
-import {
-  refreshCountryLabels, refreshFlags, updateFlagSizes, placeCountryLabels, updatePeakLabels,
-} from "./labels";
-import {
-  peakIcon, refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes, peakCountryNames,
-} from "./physical";
-import { refreshCapitals, loadCapitals, scheduleCityUpdate, refreshCities } from "./places";
-import {
-  groupOf, SCHEME_LABEL, rebuildRegionColors, updateRegionLabels,
-  CONTINENT_QUIZ_STYLES, CONTINENT_LABEL_POS,
-} from "./regions";
-import {
-  refreshPolygons, refreshConnectors, selectLayer, selectContinent, deselect, loadBorders,
-} from "./countries";
+import { map } from "./map";
+import { app, hooks, loadCountryData, type GroupScheme, type QuizType } from "./state";
+import { trackMouse, hideHoverInfo, countryInfoEl, updateInfoPanel, isNarrow } from "./panel";
+import { refreshCountryLabels, refreshFlags, updateFlagSizes } from "./labels";
+import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes } from "./physical";
+import { refreshCapitals, scheduleCityUpdate, refreshCities } from "./places";
+import { updateRegionLabels } from "./regions";
+import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
   setListExpanded, toggleListExpanded, applyFilter, buildSidebar, buildContinentList,
   setActiveTab, markActiveContinent,
@@ -49,9 +20,8 @@ import {
   renderLocResults, nbCheckAnswers, nbInput, nbCheck, locInput, quizNextBtn, quizSkipBtn,
 } from "./quiz";
 
-
 // ---------------------------------------------------------------------------
-// Refresh pipeline + selection
+// Refresh pipeline
 // ---------------------------------------------------------------------------
 function refreshAll(): void {
   refreshPolygons();

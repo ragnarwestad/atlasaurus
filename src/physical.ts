@@ -94,6 +94,17 @@ export function refreshRivers(): void {
 // --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---
 let lakeGeo: L.GeoJSON | null = null;
 let lakesLoading = false;
+// Each named lake (all its polygons) appears from this zoom, by computed area, so
+// big lakes show early and the small ones don't all flood in at once.
+const lakeEntries: { layer: L.Path; mz: number }[] = [];
+function lakeMinZoom(km2: number): number {
+  if (km2 >= 50000) return 2;
+  if (km2 >= 15000) return 3;
+  if (km2 >= 4000) return 4;
+  if (km2 >= 800) return 5;
+  if (km2 >= 150) return 6;
+  return 7;
+}
 function loadLakes(): void {
   if (lakeGeo || lakesLoading) return;
   lakesLoading = true;
@@ -107,29 +118,41 @@ function loadLakes(): void {
     named.forEach((f) => { f.__a = areaOf(f); });
     const best: Record<string, any> = {};
     named.forEach((f) => { const n = lakeName(f); if (!best[n] || f.__a > best[n].__a) best[n] = f; });
+    const mzByName: Record<string, number> = {}; // a lake's zoom threshold (shared by its polygons)
+    const pending: { layer: L.Path; name: string }[] = [];
     lakeGeo = L.geoJSON({ type: "FeatureCollection", features: named } as any, {
       style: () => ({ color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
-        if (best[lakeName(f)] !== f) return; // only the largest polygon per name gets a label
         const name = lakeName(f);
-        (layer as L.Path).bindTooltip(escapeHtml(name),
-          { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
+        pending.push({ layer: layer as L.Path, name });
+        if (best[name] !== f) return; // only the largest polygon per name gets a label + drives the threshold
         // Rough area from the polygon: shoelace deg² → km² with a latitude correction.
         // (Natural Earth carries no lake area, so this is computed and approximate.)
-        let rows: [string, string][] = [];
-        try {
-          const latC = (layer as L.Polygon).getBounds().getCenter().lat;
-          const km2 = (f.__a || 0) * 12309 * Math.cos(latC * Math.PI / 180);
-          if (km2 > 1) rows = [["Area", "≈ " + fmtInt(km2) + " km²"]];
-        } catch { /* no area */ }
+        let km2 = 0;
+        try { km2 = (f.__a || 0) * 12309 * Math.cos((layer as L.Polygon).getBounds().getCenter().lat * Math.PI / 180); } catch { /* 0 */ }
+        mzByName[name] = lakeMinZoom(km2);
+        const rows: [string, string][] = km2 > 1 ? [["Area", "≈ " + fmtInt(km2) + " km²"]] : [];
+        (layer as L.Path).bindTooltip(escapeHtml(name),
+          { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
         const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", rows);
         layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
     });
+    pending.forEach((p) => lakeEntries.push({ layer: p.layer, mz: mzByName[p.name] ?? 7 }));
     lakesLoading = false;
     refreshLakes();
   }).catch(() => { lakesLoading = false; });
+}
+// Show only the lakes whose area threshold the current zoom has reached.
+function updateLakeVisibility(): void {
+  if (!lakeGeo) return;
+  const z = map.getZoom();
+  lakeEntries.forEach((e) => {
+    const show = z >= e.mz;
+    if (show && !lakeGeo!.hasLayer(e.layer)) lakeGeo!.addLayer(e.layer);
+    else if (!show && lakeGeo!.hasLayer(e.layer)) lakeGeo!.removeLayer(e.layer);
+  });
 }
 export function refreshLakes(): void {
   const on = app.showLakes && app.mode === "explore";
@@ -137,7 +160,7 @@ export function refreshLakes(): void {
   if (!lakeGeo) return;
   if (on && !lakeLayer.hasLayer(lakeGeo)) lakeLayer.addLayer(lakeGeo);
   else if (!on && lakeLayer.hasLayer(lakeGeo)) lakeLayer.removeLayer(lakeGeo);
-  updatePeakLabels();
+  if (on) updateLakeVisibility();
 }
 
 export function updatePeakSizes(): void {

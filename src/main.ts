@@ -159,6 +159,7 @@ map.on("zoomend", updatePeakSizes);
 map.on("moveend", scheduleCityUpdate);  // re-render in-view cities after pan/zoom
 map.on("moveend", refreshCapitals);     // re-evaluate which capitals fit the view
 map.on("moveend", refreshCountryLabels); // re-evaluate which country names fit the view
+map.on("zoomend", refreshLakes);         // reveal more lakes as you zoom in
 
 // Zoom-level readout, stacked under the +/- control.
 const ZoomReadout = L.Control.extend({

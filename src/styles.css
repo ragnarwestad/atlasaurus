@@ -202,10 +202,9 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .river-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .river-label a:hover { text-decoration: underline; }
 #map.river-labels-on .river-label { display: block; }
-.lake-label { font: italic 600 11px system-ui, sans-serif; color: #1f5f96; padding: 0; display: none; }
+.lake-label { font: italic 600 11px system-ui, sans-serif; color: #1f5f96; padding: 0; }
 .lake-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .lake-label a:hover { text-decoration: underline; }
-#map.lake-labels-on .lake-label { display: block; }
 .city-label { font: 600 11px system-ui, sans-serif; color: #333; padding: 0; }
 .city-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .city-label a:hover { text-decoration: underline; }

@@ -55,8 +55,9 @@ const flagLayer = L.layerGroup().addTo(map);       // flag images
 const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
 const riverLayer = L.layerGroup().addTo(map);      // major river centerlines
 const lakeLayer = L.layerGroup().addTo(map);       // major lakes
-const cityLayer = L.layerGroup().addTo(map);       // cities (revealed by zoom)
-const cityCanvas = L.canvas({ padding: 0.5 });     // fast renderer for the many city dots
+const cityLayer = L.layerGroup().addTo(map);       // city dots (canvas, in-view only)
+const cityLabelLayer = L.layerGroup().addTo(map);  // city name labels (top few, DOM)
+const cityCanvas = L.canvas({ padding: 0.5 });     // fast renderer for the city dots
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
@@ -728,13 +729,16 @@ function refreshLakes(): void {
   updatePeakLabels();
 }
 
-// --- Cities (Explore "Cities" layer) — the 10m populated-places set, revealed
-//     progressively by each place's min_zoom: only cities that "belong" at the
-//     current map zoom are shown, so more towns appear as you zoom in. ---
-const CITY_ZOOM_BIAS = 1; // show cities a level earlier than their nominal min_zoom
-type CityMarker = L.CircleMarker & { _mz: number };
-const cityMarkers: CityMarker[] = [];
-let citiesBuilt = false;
+// --- Cities (Explore "Cities" layer) — the 10m populated-places set (~7k). To
+//     keep zooming smooth we keep the raw data and, on each view change, render
+//     only the in-view cities above the zoom's min_zoom — capped, with DOM name
+//     labels only for the top few. (Thousands of permanent labels = big lag.) ---
+const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
+const CITY_MAX_DOTS = 800; // dots rendered per view
+const CITY_MAX_LABELS = 60; // DOM name labels per view
+interface CityRec { lat: number; lng: number; name: string; mz: number; }
+let cityData: CityRec[] = [];
+let cityDataLoaded = false;
 let citiesLoading = false;
 // The zoom at/above which a place should appear: prefer NE's min_zoom, fall back
 // to scalerank, then to a population-based guess.
@@ -744,41 +748,45 @@ function placeMinZoom(p: any): number {
   const pop = +(p.pop_max || 0);
   return pop > 5e6 ? 1 : pop > 1e6 ? 3 : pop > 2e5 ? 5 : 7;
 }
-function buildCityMarkers(geo: any): void {
-  if (citiesBuilt) return;
-  ((geo.features || []) as any[]).forEach((f) => {
-    const p = f.properties || {};
-    const c = f.geometry && f.geometry.coordinates;
-    const name = p.name || p.nameascii;
-    if (!c || !name) return;
-    const m = L.circleMarker([c[1], c[0]], {
-      renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1,
-    }) as CityMarker;
-    m._mz = placeMinZoom(p);
-    m.bindTooltip('<a href="' + cityWikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
-      { permanent: true, interactive: true, direction: "right", offset: [5, 0], className: "map-label city-label" });
-    cityMarkers.push(m);
-  });
-  citiesBuilt = true;
-}
 function loadCities(): void {
-  if (citiesBuilt) { refreshCities(); return; }
-  if (citiesLoading) return;
+  if (cityDataLoaded || citiesLoading) return;
   citiesLoading = true;
-  fetchJson(CITY_URLS).then((geo) => { citiesLoading = false; buildCityMarkers(geo); refreshCities(); })
-    .catch(() => { citiesLoading = false; });
+  fetchJson(CITY_URLS).then((geo) => {
+    cityData = (((geo.features || []) as any[]).map((f) => {
+      const p = f.properties || {};
+      const c = f.geometry && f.geometry.coordinates;
+      const name = p.name || p.nameascii;
+      if (!c || !name) return null;
+      return { lat: c[1], lng: c[0], name, mz: placeMinZoom(p) } as CityRec;
+    }).filter(Boolean)) as CityRec[];
+    cityDataLoaded = true; citiesLoading = false;
+    updateCities();
+  }).catch(() => { citiesLoading = false; });
 }
-function refreshCities(): void {
-  const on = showCities && mode === "explore";
-  if (on && !citiesBuilt) { loadCities(); return; }
-  const z = map.getZoom() + CITY_ZOOM_BIAS;
-  cityMarkers.forEach((m) => {
-    const vis = on && z >= m._mz;
-    if (vis && !cityLayer.hasLayer(m)) cityLayer.addLayer(m);
-    else if (!vis && cityLayer.hasLayer(m)) cityLayer.removeLayer(m);
-  });
-  updatePeakLabels();
+function updateCities(): void {
+  if (!(showCities && mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
+  if (!cityDataLoaded) { loadCities(); return; }
+  const zReal = map.getZoom();
+  const z = zReal + CITY_ZOOM_BIAS;
+  const b = map.getBounds().pad(0.15);
+  const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz);
+  cityLayer.clearLayers();
+  vis.slice(0, CITY_MAX_DOTS).forEach((d) =>
+    L.circleMarker([d.lat, d.lng], { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 }).addTo(cityLayer));
+  cityLabelLayer.clearLayers();
+  if (zReal >= 4) vis.slice(0, CITY_MAX_LABELS).forEach((d) =>
+    L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: true, className: "map-label city-label" })
+      .setLatLng([d.lat, d.lng])
+      .setContent('<a href="' + cityWikiUrl(d.name) + '" target="_blank" rel="noopener">' + escapeHtml(d.name) + "</a>")
+      .addTo(cityLabelLayer));
 }
+let cityUpdateScheduled = false;
+function scheduleCityUpdate(): void {
+  if (cityUpdateScheduled) return;
+  cityUpdateScheduled = true;
+  requestAnimationFrame(() => { cityUpdateScheduled = false; updateCities(); });
+}
+function refreshCities(): void { updateCities(); }
 // Peak/river names get crowded when zoomed out, so hide the labels below a zoom
 // threshold — the icons and lines still show every feature.
 function updatePeakLabels(): void {
@@ -788,7 +796,6 @@ function updatePeakLabels(): void {
   mapEl.classList.toggle("peak-labels-on", on);
   mapEl.classList.toggle("river-labels-on", on);
   mapEl.classList.toggle("lake-labels-on", on);
-  mapEl.classList.toggle("city-labels-on", on);
 }
 function updatePeakSizes(): void {
   const z = map.getZoom();
@@ -1916,7 +1923,7 @@ map.on("click", () => {        // background click clears selection
 });
 map.on("zoomend", updateFlagSizes);
 map.on("zoomend", updatePeakSizes);
-map.on("zoomend", refreshCities);
+map.on("moveend", scheduleCityUpdate); // re-render in-view cities after pan/zoom
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;

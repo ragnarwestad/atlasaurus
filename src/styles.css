@@ -204,10 +204,9 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .lake-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .lake-label a:hover { text-decoration: underline; }
 #map.lake-labels-on .lake-label { display: block; }
-.city-label { font: 600 11px system-ui, sans-serif; color: #333; padding: 0; display: none; }
+.city-label { font: 600 11px system-ui, sans-serif; color: #333; padding: 0; }
 .city-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .city-label a:hover { text-decoration: underline; }
-#map.city-labels-on .city-label { display: block; }
 #map.peak-labels-on .peak-label { display: block; }
 
 #country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }

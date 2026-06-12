@@ -694,13 +694,21 @@ function loadLakes(): void {
   if (lakeGeo || lakesLoading) return;
   lakesLoading = true;
   fetchJson(LAKE_URLS).then((geo) => {
-    lakeGeo = L.geoJSON(geo, {
-      filter: (f: any) => !!((f.properties || {}).name || (f.properties || {}).name_en), // named lakes only
+    const lakeName = (f: any) => (f.properties || {}).name || (f.properties || {}).name_en;
+    const areaOf = (f: any) => { try { return allPolygonParts(f.geometry).reduce((s: number, p) => s + Math.abs(p.area), 0); } catch { return 0; } };
+    // Named lakes only, and when a name appears on several polygons (NE splits or
+    // mislabels — e.g. a second "Femunden" that's really Isteren) keep the label on
+    // the largest one so it isn't shown twice.
+    const named = ((geo.features || []) as any[]).filter((f) => lakeName(f));
+    named.forEach((f) => { f.__a = areaOf(f); });
+    const best: Record<string, any> = {};
+    named.forEach((f) => { const n = lakeName(f); if (!best[n] || f.__a > best[n].__a) best[n] = f; });
+    lakeGeo = L.geoJSON({ type: "FeatureCollection", features: named } as any, {
       style: () => ({ color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
-        const name = (f.properties || {}).name || (f.properties || {}).name_en;
-        if (name) (layer as L.Path).bindTooltip(
-          '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
+        if (best[lakeName(f)] !== f) return; // only the largest polygon per name gets a label
+        (layer as L.Path).bindTooltip(
+          '<a href="' + wikiUrl(lakeName(f)) + '" target="_blank" rel="noopener">' + escapeHtml(lakeName(f)) + "</a>",
           { permanent: true, direction: "center", interactive: true, className: "map-label lake-label" });
       },
     });

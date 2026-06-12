@@ -184,7 +184,10 @@ function pickPolygon(arr: any): any {
   return hit ? hit.geojson : null;
 }
 function nominatim(qs: string): Promise<any> {
-  return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=10&" + qs, { headers: { Accept: "application/json" } })
+  // dedupe=0 keeps both the city *point* and its boundary *relation* in the result
+  // set; without it Nominatim collapses to whichever ranks higher (often the point,
+  // e.g. for Danish cities) and the boundary polygon is never returned.
+  return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&dedupe=0&limit=10&" + qs, { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : []))
     .then(pickPolygon)
     .catch(() => null);

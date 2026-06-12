@@ -75,10 +75,11 @@ function loadRivers(): void {
     const lenByName: Record<string, number> = {};
     feats.forEach((f) => { lenByName[riverName(f)] = (lenByName[riverName(f)] || 0) + lineLengthKm(f.geometry); });
     const names = Object.keys(lenByName).sort((a, b) => lenByName[b] - lenByName[a]);
-    const n = Math.max(1, names.length - 1);
+    const len = Math.max(1, names.length);
     const minZ = map.getMinZoom() || 2, span = (map.getMaxZoom() || 8) - minZ;
     const mzByName: Record<string, number> = {};
-    names.forEach((nm, i) => { mzByName[nm] = minZ + Math.floor((i * span) / n); });
+    // sqrt curve front-loads the low end: only the few longest rivers at world view.
+    names.forEach((nm, i) => { mzByName[nm] = minZ + Math.floor(Math.sqrt(i / len) * span); });
     riverGeo = L.geoJSON({ type: "FeatureCollection", features: feats } as any, {
       style: () => ({ color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
@@ -92,27 +93,26 @@ function loadRivers(): void {
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
     });
+    riverGeo.clearLayers(); // detach; we add/remove the individual lines via riverLayer below
     riversLoading = false;
     refreshRivers();
   }).catch(() => { riversLoading = false; });
 }
-// Show only the rivers whose length-rank threshold the current zoom has reached.
+// Manage each river line directly in riverLayer: show it only when the toggle is on
+// AND the zoom has reached its threshold. (Direct membership, no nested group, so
+// the result is the same whether triggered by the toggle or by zooming.)
 function updateRiverVisibility(): void {
-  if (!riverGeo) return;
+  const on = app.showRivers && app.mode === "explore";
   const z = map.getZoom();
   riverEntries.forEach((e) => {
-    const show = z >= e.mz;
-    if (show && !riverGeo!.hasLayer(e.layer)) riverGeo!.addLayer(e.layer);
-    else if (!show && riverGeo!.hasLayer(e.layer)) riverGeo!.removeLayer(e.layer);
+    const show = on && z >= e.mz;
+    if (show && !riverLayer.hasLayer(e.layer)) riverLayer.addLayer(e.layer);
+    else if (!show && riverLayer.hasLayer(e.layer)) riverLayer.removeLayer(e.layer);
   });
 }
 export function refreshRivers(): void {
-  const on = app.showRivers && app.mode === "explore";
-  if (on && !riverGeo) { loadRivers(); return; }
-  if (!riverGeo) return;
-  if (on && !riverLayer.hasLayer(riverGeo)) riverLayer.addLayer(riverGeo);
-  else if (!on && riverLayer.hasLayer(riverGeo)) riverLayer.removeLayer(riverGeo);
-  if (on) updateRiverVisibility();
+  if (app.showRivers && app.mode === "explore" && !riverGeo) { loadRivers(); return; }
+  updateRiverVisibility();
 }
 
 // --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---
@@ -164,27 +164,25 @@ function loadLakes(): void {
       },
     });
     pending.forEach((p) => lakeEntries.push({ layer: p.layer, mz: mzByName[p.name] ?? 7 }));
+    lakeGeo.clearLayers(); // detach; we add/remove the individual lakes via lakeLayer below
     lakesLoading = false;
     refreshLakes();
   }).catch(() => { lakesLoading = false; });
 }
-// Show only the lakes whose area threshold the current zoom has reached.
+// Manage each lake directly in lakeLayer: show only when the toggle is on AND the
+// zoom has reached its area threshold (direct membership, no nested group).
 function updateLakeVisibility(): void {
-  if (!lakeGeo) return;
+  const on = app.showLakes && app.mode === "explore";
   const z = map.getZoom();
   lakeEntries.forEach((e) => {
-    const show = z >= e.mz;
-    if (show && !lakeGeo!.hasLayer(e.layer)) lakeGeo!.addLayer(e.layer);
-    else if (!show && lakeGeo!.hasLayer(e.layer)) lakeGeo!.removeLayer(e.layer);
+    const show = on && z >= e.mz;
+    if (show && !lakeLayer.hasLayer(e.layer)) lakeLayer.addLayer(e.layer);
+    else if (!show && lakeLayer.hasLayer(e.layer)) lakeLayer.removeLayer(e.layer);
   });
 }
 export function refreshLakes(): void {
-  const on = app.showLakes && app.mode === "explore";
-  if (on && !lakeGeo) { loadLakes(); return; }
-  if (!lakeGeo) return;
-  if (on && !lakeLayer.hasLayer(lakeGeo)) lakeLayer.addLayer(lakeGeo);
-  else if (!on && lakeLayer.hasLayer(lakeGeo)) lakeLayer.removeLayer(lakeGeo);
-  if (on) updateLakeVisibility();
+  if (app.showLakes && app.mode === "explore" && !lakeGeo) { loadLakes(); return; }
+  updateLakeVisibility();
 }
 
 export function updatePeakSizes(): void {

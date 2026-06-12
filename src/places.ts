@@ -176,20 +176,27 @@ function drawOutlineGeom(geom: any): void {
 }
 export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
 
-// First result that actually carries an areal boundary (Nominatim often ranks the
-// city *node* — a Point — above the boundary relation, so we scan past it).
-function pickPolygon(arr: any): any {
-  if (!Array.isArray(arr)) return null;
-  const hit = arr.find((x) => x.geojson && (x.geojson.type === "Polygon" || x.geojson.type === "MultiPolygon"));
+// First Polygon/MultiPolygon in a Nominatim payload (reverse = one object,
+// search = an array of results).
+function polyFrom(data: any): any {
+  const items = Array.isArray(data) ? data : [data];
+  const hit = items.find((x) => x && x.geojson && (x.geojson.type === "Polygon" || x.geojson.type === "MultiPolygon"));
   return hit ? hit.geojson : null;
 }
-function nominatim(qs: string): Promise<any> {
-  // dedupe=0 keeps both the city *point* and its boundary *relation* in the result
-  // set; without it Nominatim collapses to whichever ranks higher (often the point,
-  // e.g. for Danish cities) and the boundary polygon is never returned.
+// Reverse-geocode the city's coordinates: returns the admin area that *contains*
+// the point, independent of how that area is named (Danish cities' boundaries are
+// the municipality, e.g. "Københavns Kommune", which a name search never matches).
+// zoom≈10 targets the city/municipality level.
+function reverseBoundary(lat: number, lng: number, zoom: number): Promise<any> {
+  return fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&polygon_geojson=1&zoom=" + zoom + "&lat=" + lat + "&lon=" + lng, { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then(polyFrom)
+    .catch(() => null);
+}
+function searchBoundary(qs: string): Promise<any> {
   return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&dedupe=0&limit=10&" + qs, { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : []))
-    .then(pickPolygon)
+    .then(polyFrom)
     .catch(() => null);
 }
 function showCityOutline(d: CityRec): void {
@@ -197,12 +204,10 @@ function showCityOutline(d: CityRec): void {
   const key = (d.name + "|" + d.adm0).toLowerCase();
   const reqId = ++outlineReqId;
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
-  const structured = "city=" + encodeURIComponent(d.name) + (d.adm0 ? "&country=" + encodeURIComponent(d.adm0) : "");
-  const freeform = "q=" + encodeURIComponent(d.name + (d.adm0 ? ", " + d.adm0 : ""));
-  // Structured query first; if it yields no boundary, retry free-form (more likely
-  // to surface the administrative relation, e.g. for Copenhagen).
-  nominatim(structured)
-    .then((geom) => geom || nominatim(freeform))
+  // Reverse-geocode at the coordinates first (name-independent, fixes Denmark); if
+  // that yields no polygon, fall back to a free-form name search.
+  reverseBoundary(d.lat, d.lng, 10)
+    .then((geom) => geom || searchBoundary("q=" + encodeURIComponent(d.name + (d.adm0 ? ", " + d.adm0 : ""))))
     .then((geom) => {
       outlineCache.set(key, geom || null);
       if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection

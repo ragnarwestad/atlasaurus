@@ -81,8 +81,9 @@ export const CITY_OVERRIDES: Record<string, string> = {
 
 // --- Polygon styles ---
 // opacity (stroke) is set explicitly on every visible style so that restoring
-// from hiddenStyle (opacity 0) always brings the blue borders back.
-export const baseStyle: PathOptions     = { color: "#3878c7", weight: 1,   opacity: 1, fillColor: "#7fb2e8", fillOpacity: 0.25 };
+// from hiddenStyle (opacity 0) always brings the borders back.
+// Borders are a neutral slate grey so they don't read as rivers (which are blue).
+export const baseStyle: PathOptions     = { color: "#6c7a89", weight: 1,   opacity: 1, fillColor: "#aec4dc", fillOpacity: 0.22 };
 export const hoverStyle: PathOptions    = { color: "#e0922b", weight: 1.5, opacity: 1, fillColor: "#ffd9a3", fillOpacity: 0.55 };
 export const selectedStyle: PathOptions = { color: "#8a3b00", weight: 2.5, opacity: 1, fillColor: "#e8740c", fillOpacity: 0.65 };
 export const relatedStyle: PathOptions  = { color: "#a85a1a", weight: 1.5, opacity: 1, fillColor: "#f3b06a", fillOpacity: 0.5 };

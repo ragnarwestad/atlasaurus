@@ -1,5 +1,9 @@
 # Refactor plan — split `src/main.ts` into modules
 
+> **Status: COMPLETED** (June 2026, 11 commits `3d37696`…`bfd9c87` + docs). The
+> module layout below is now reality — see `CLAUDE.md` for the up-to-date map.
+> This file is kept as the rationale record; safe to delete.
+
 `src/main.ts` is ~2070 lines and mixes map setup, data loading, styling, the
 detail/fact panels, the sidebar, all of the quiz, and the DOM wiring. This plan
 breaks it into focused ES modules. **No framework** (we evaluated React/Preact and

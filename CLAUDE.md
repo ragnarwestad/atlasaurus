@@ -21,27 +21,55 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
 ## Architecture — where things live
 - `index.html` — sidebar markup (Map section + Countries/Continents tabs), `#map`,
   info panels, help modal; loads `src/main.ts`.
-- `src/main.ts` — the app:
-  - **State:** `selectedLayer`, `selectedContinent`, `hoveredLayer`,
-    `showNames/showCapitals/showFlags/isolate`, `sortBy`, `activeTab`, `expandedContinent`.
-  - **Central pipeline:** `refreshAll()` → refreshPolygons / refreshConnectors /
-    refreshCountryLabels / refreshCapitals / refreshFlags / updateInfoPanel /
-    markActiveContinent. Hover uses a lighter path (refreshPolygons + hover panel).
-  - **Selection:** `selectLayer` (country), `selectContinent`, `deselect`. Selecting
-    a country keeps the continent highlight (country orange over green members).
-  - **Paint/visibility:** `styleForLayer` (selected=orange, continent member=green,
-    realm sibling, hover, base) and `countryVisible` (isolate hides non-selection).
-  - **Connectors:** `computeConnectors` — shared by the dashed lines AND the fact
-    panel's "Territories" list, so they never drift.
-  - **Sidebar:** `buildSidebar` (flat list), `buildContinentList`, `applyFilter`,
-    `cmpCountries` (sort), tab/sort wiring.
-  - **Data loading:** `loadBorders`, `loadCapitals`, `loadSubunits`, `loadCountryData`
-    (mledoze; also drives continent assignment).
+- `src/main.ts` — entry point only: imports the modules, defines the `refreshAll()`
+  coordinator (assigned to `hooks.refreshAll`), wires all DOM event listeners and
+  kicks off `loadBorders()`.
+- `src/state.ts` — **shared mutable state**: the single exported `app` object
+  (selection/hover, toggles, quiz state, `sortBy`, `activeTab`, `groupScheme`, …),
+  the collections (`countries`, `byIso`, `capitalMarkers`, `subunitsByIso`,
+  `territoriesBySov`), shared types (`CountryEntry`, …), `hooks` (cross-module
+  callbacks — modules call `hooks.refreshAll()`, never import `refreshAll` directly),
+  and small shared helpers (`fmtInt`, `fetchJson`, `realCountries`, `popOf`,
+  `areaOf`, `layerCenter`, `loadCountryData` for mledoze data). ES module imports
+  are read-only bindings, so mutable flags MUST live as `app.x` properties.
+- `src/map.ts` — Leaflet singletons: the `L.map` instance, tile layer, all
+  `L.layerGroup`s and `cityCanvas`. Pure setup, no logic.
+- `src/countries.ts` — borders load (`loadBorders` incl. hover/click handlers),
+  **paint/visibility** (`styleForLayer`: selected=orange, continent member=green,
+  realm sibling, hover, base; `countryVisible`: isolate hides non-selection;
+  `inToggleScope`, `isRevealed`, `sameRealm`), `refreshPolygons`, **selection**
+  (`selectLayer`, `selectContinent`, `deselect` — selecting a country keeps the
+  continent highlight), and **connectors** (`computeConnectors` — shared by the
+  dashed lines AND the fact panel's "Territories" list, so they never drift;
+  `refreshConnectors`), plus `loadSubunits`.
+- `src/panel.ts` — detail boxes: cursor hover panel (`showHoverInfo`/`hideHoverInfo`/
+  `trackMouse`), the country/continent fact panel (`updateInfoPanel`), the feature
+  detail box (`renderFeatureInfo`), `makeDraggable`, `attachLabelClick`, `isNarrow`.
+- `src/labels.ts` — on-map country name labels (`placeCountryLabels`,
+  `refreshCountryLabels`), flags (`flagIcon`/`refreshFlags`/`updateFlagSizes`) and
+  the zoom-gated label classes (`updatePeakLabels`).
+- `src/physical.ts` — peaks (`refreshPeaks`, `peakIcon`, `peakCountryNames`,
+  `updatePeakSizes`), rivers (`refreshRivers`) and lakes (`refreshLakes`), lazy-loaded.
+- `src/places.ts` — capitals (`loadCapitals`, `refreshCapitals`) and the Cities
+  layer (canvas dots + capped DOM labels, `scheduleCityUpdate`/`refreshCities`).
+- `src/regions.ts` — region grouping (`groupOf`, `SCHEME_LABEL`,
+  `rebuildRegionColors`/`app.regionHue`), `updateRegionLabels`, and the continent
+  quiz tint/label tables (`CONTINENT_QUIZ_STYLES`, `CONTINENT_LABEL_POS`).
+- `src/sidebar.ts` — `buildSidebar` (flat list), `buildContinentList`, `applyFilter`,
+  `cmpCountries` (sort), `setActiveTab`, `markActiveContinent`, fold state.
+- `src/quiz.ts` — everything quiz: `nextQuestion`, the locate/neighbour/continent/
+  peak rounds, answer handlers, `addQuizDot`, `setMode` (Explore↔Quiz), `setQuizCat`.
 - `src/geo.ts` — geometry: ring area, antimeridian unwrap (`normRing`/`wrapLng`),
   `allPolygonParts`, `centerOf` (polylabel pole-of-inaccessibility).
 - `src/config.ts` — data-source URLs, Wikipedia/city overrides, polygon styles, tuning.
 - `src/wiki.ts` — Wikipedia URL builders + `escapeHtml`.
 - `src/styles.css` — all styling.
+
+**Central pipeline:** `refreshAll()` (main.ts) → refreshPolygons / refreshConnectors /
+refreshCountryLabels / refreshCapitals / refreshFlags / refreshPeaks / refreshRivers /
+refreshLakes / refreshCities / updateInfoPanel / markActiveContinent /
+updateRegionLabels. Hover uses a lighter path (refreshPolygons + hover panel).
+Modules trigger a full refresh via `hooks.refreshAll()` — never import it.
 
 ## Interaction gotchas — don't regress these
 - On-map labels reveal on **select**, not hover. Hover info is an off-map floating

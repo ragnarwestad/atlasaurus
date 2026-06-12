@@ -21,6 +21,7 @@ export const lakeLayer = L.layerGroup().addTo(map);       // major lakes
 export const cityLayer = L.layerGroup().addTo(map);       // city dots (canvas, in-view only)
 export const cityLabelLayer = L.layerGroup().addTo(map);  // city name labels (top few, DOM)
 export const cityCanvas = L.canvas({ padding: 0.5 });     // fast renderer for the city dots
+export const featureCanvas = L.canvas({ padding: 0.5 });  // canvas for rivers/lakes (clips to view; avoids the SVG-pane offset bug)
 export const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 export const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 export const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)

@@ -5,7 +5,7 @@ import { RIVER_URLS, LAKE_URLS } from "./config";
 import { allPolygonParts, lineLengthKm } from "./geo";
 import { wikiUrl, escapeHtml } from "./wiki";
 import { PEAKS, type Peak } from "./peaks";
-import { map, peakLayer, riverLayer, lakeLayer } from "./map";
+import { map, peakLayer, riverLayer, lakeLayer, featureCanvas } from "./map";
 import { app, byIso, fmtInt, fetchJson } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { updatePeakLabels } from "./labels";
@@ -63,6 +63,17 @@ let riversLoading = false;
 // Each named river (all its segments) appears from this zoom, by mapped length
 // rank, so the long ones show early and the short ones don't all flood in at once.
 const riverEntries: { layer: L.Path; mz: number }[] = [];
+// Longitude span of a geometry; a span > 180° means it wraps the antimeridian,
+// which renders as a stray line right across the map — drop those features.
+function lngSpan(geom: any): number {
+  let min = Infinity, max = -Infinity;
+  const walk = (a: any) => {
+    if (typeof a[0] === "number") { if (a[0] < min) min = a[0]; if (a[0] > max) max = a[0]; }
+    else for (const c of a) walk(c);
+  };
+  if (geom && geom.coordinates) walk(geom.coordinates);
+  return max - min;
+}
 function loadRivers(): void {
   if (riverGeo || riversLoading) return;
   riversLoading = true;
@@ -71,7 +82,7 @@ function loadRivers(): void {
     const isRiver = (f: any) => String((f.properties || {}).featurecla || "").toLowerCase().indexOf("lake") === -1;
     // Named rivers only (drops the unnamed minor segments). Sum each river's mapped
     // length across its segments, then rank-spread a zoom threshold across 2→max.
-    const feats = ((geo.features || []) as any[]).filter((f) => isRiver(f) && riverName(f));
+    const feats = ((geo.features || []) as any[]).filter((f) => isRiver(f) && riverName(f) && lngSpan(f.geometry) <= 180);
     const lenByName: Record<string, number> = {};
     feats.forEach((f) => { lenByName[riverName(f)] = (lenByName[riverName(f)] || 0) + lineLengthKm(f.geometry); });
     const names = Object.keys(lenByName).sort((a, b) => lenByName[b] - lenByName[a]);
@@ -81,7 +92,7 @@ function loadRivers(): void {
     // sqrt curve front-loads the low end: only the few longest rivers at world view.
     names.forEach((nm, i) => { mzByName[nm] = minZ + Math.floor(Math.sqrt(i / len) * span); });
     riverGeo = L.geoJSON({ type: "FeatureCollection", features: feats } as any, {
-      style: () => ({ color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
+      style: () => ({ renderer: featureCanvas, color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = riverName(f);
         riverEntries.push({ layer: layer as L.Path, mz: mzByName[name] ?? (map.getMaxZoom() || 8) });
@@ -138,14 +149,14 @@ function loadLakes(): void {
     // Named lakes only, and when a name appears on several polygons (NE splits or
     // mislabels — e.g. a second "Femunden" that's really Isteren) keep the label on
     // the largest one so it isn't shown twice.
-    const named = ((geo.features || []) as any[]).filter((f) => lakeName(f));
+    const named = ((geo.features || []) as any[]).filter((f) => lakeName(f) && lngSpan(f.geometry) <= 180);
     named.forEach((f) => { f.__a = areaOf(f); });
     const best: Record<string, any> = {};
     named.forEach((f) => { const n = lakeName(f); if (!best[n] || f.__a > best[n].__a) best[n] = f; });
     const mzByName: Record<string, number> = {}; // a lake's zoom threshold (shared by its polygons)
     const pending: { layer: L.Path; name: string }[] = [];
     lakeGeo = L.geoJSON({ type: "FeatureCollection", features: named } as any, {
-      style: () => ({ color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
+      style: () => ({ renderer: featureCanvas, color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = lakeName(f);
         pending.push({ layer: layer as L.Path, name });

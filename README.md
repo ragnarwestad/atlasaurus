@@ -73,7 +73,9 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
   with the country shown selected (orange) on top.
 - Flags scale with zoom (smaller when zoomed out); click the background (ocean) to
   clear the selection.
-- Country/capital/territory/continent names all link to English Wikipedia.
+- Map labels are plain text; clicking a feature (country, capital, city, peak, river
+  or lake) opens a detail box whose title links to English Wikipedia. (Keeps stray
+  taps — common on mobile — from opening Wikipedia by accident.)
 
 ## Data sources (loaded at runtime via jsDelivr)
 

@@ -369,6 +369,26 @@ function makeDraggable(panel: HTMLElement, handle: HTMLElement, onClick?: () => 
   });
 }
 
+// Detail box for a non-country feature (peak, river, lake, city, capital). The
+// Wikipedia link lives here on the title — map labels are plain text — so a stray
+// tap on a label (common on mobile) can't open Wikipedia by accident.
+function renderFeatureInfo(title: string, wikiHref: string, sub: string, rows: [string, string][]): void {
+  if (selectedLayer || selectedContinent) deselect(); // drop any country/region selection
+  const titleLink = '<a href="' + wikiHref + '" target="_blank" rel="noopener">' + escapeHtml(title) + ' <span class="ext">↗</span></a>';
+  const dl = rows.length ? "<dl>" + rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("") + "</dl>" : "";
+  countryInfoEl.classList.remove("collapsed");
+  countryInfoEl.style.left = ""; countryInfoEl.style.top = ""; countryInfoEl.style.bottom = "";
+  countryInfoEl.innerHTML =
+    '<div class="ci-head"><div><div class="ci-title">' + titleLink + "</div>" +
+    '<div class="ci-sub">' + escapeHtml(sub) + "</div></div>" +
+    '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' + dl;
+  countryInfoEl.hidden = false;
+  const close = countryInfoEl.querySelector(".ci-close");
+  if (close) close.addEventListener("click", () => { countryInfoEl.hidden = true; });
+  const head = countryInfoEl.querySelector(".ci-head");
+  if (head) makeDraggable(countryInfoEl, head as HTMLElement);
+}
+
 // Bottom panel shows the selected COUNTRY, or the selected CONTINENT, or nothing.
 function updateInfoPanel(): void {
   if (mode === "quiz") { countryInfoEl.hidden = true; return; }
@@ -660,10 +680,12 @@ function buildPeakMarkers(): void {
   const z = map.getZoom();
   PEAKS.forEach((p) => {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
-    const label = '<a href="' + wikiUrl(p.wiki || p.name) + '" target="_blank" rel="noopener">' + escapeHtml(p.name) +
-      '</a> <span class="peak-elev">(' + fmtInt(p.elevation) + " m)</span>";
-    m.bindTooltip(label, { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: true, className: "map-label peak-label" });
-    m.on("click", (e) => L.DomEvent.stop(e)); // don't let the icon clear the selection
+    m.bindTooltip(escapeHtml(p.name), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
+    m.on("click", (e) => {
+      L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+      renderFeatureInfo(p.name, wikiUrl(p.wiki || p.name), "Mountain peak",
+        [["Elevation", fmtInt(p.elevation) + " m"], ["Country", peakCountryNames(p)], ["Region", escapeHtml(p.region)]]);
+    });
     peakMarkers.push(m);
   });
 }
@@ -690,9 +712,13 @@ function loadRivers(): void {
       style: () => ({ color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = (f.properties || {}).name || (f.properties || {}).name_en;
-        if (name) (layer as L.Path).bindTooltip(
-          '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
-          { permanent: true, direction: "center", interactive: true, className: "map-label river-label" });
+        if (!name) return;
+        (layer as L.Path).bindTooltip(escapeHtml(name),
+          { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
+        layer.on("click", (ev) => {
+          L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+          renderFeatureInfo(name, wikiUrl(name), "River", []);
+        });
       },
     });
     riversLoading = false;
@@ -728,9 +754,13 @@ function loadLakes(): void {
       style: () => ({ color: "#2e7cc4", weight: 0.8, opacity: 0.9, fillColor: "#7bb8e8", fillOpacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
         if (best[lakeName(f)] !== f) return; // only the largest polygon per name gets a label
-        (layer as L.Path).bindTooltip(
-          '<a href="' + wikiUrl(lakeName(f)) + '" target="_blank" rel="noopener">' + escapeHtml(lakeName(f)) + "</a>",
-          { permanent: true, direction: "center", interactive: true, className: "map-label lake-label" });
+        const name = lakeName(f);
+        (layer as L.Path).bindTooltip(escapeHtml(name),
+          { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
+        layer.on("click", (ev) => {
+          L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+          renderFeatureInfo(name, wikiUrl(name), "Lake", []);
+        });
       },
     });
     lakesLoading = false;
@@ -752,7 +782,7 @@ function refreshLakes(): void {
 //     labels only for the top few. (Thousands of permanent labels = big lag.) ---
 const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
 const CITY_MAX = 70;       // ceiling on cities rendered per view (each gets a dot AND a label)
-interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; }
+interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; pop: number; }
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
 let citiesLoading = false;
@@ -1093,11 +1123,10 @@ function placeCountryLabels(): void {
     if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;
 
     const center = centerOf(parts[0].rings);
-    const html = '<a href="' + wikiUrl(entry.name) + '" target="_blank" rel="noopener">' + escapeHtml(entry.name) + "</a>";
     entry.labelTooltip = L.tooltip({
       permanent: true, direction: "center", offset: [0, 0],
-      className: "map-label country-label", opacity: 1, interactive: true,
-    }).setLatLng(center).setContent(html).addTo(map);
+      className: "map-label country-label", opacity: 1, interactive: false,
+    }).setLatLng(center).setContent(escapeHtml(entry.name)).addTo(map);
 
     if (entry.iso2) {
       entry.flagMarker = L.marker(center, {
@@ -1156,15 +1185,18 @@ function loadCapitals(): void {
       const marker = L.circleMarker([lat, lng], {
         radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#ffffff", fillOpacity: 1,
       }) as CapitalMarker;
-      const capLink = '<a href="' + cityWikiUrl(capName) + '" target="_blank" rel="noopener">' + escapeHtml(capName) + "</a>";
-      marker.bindTooltip(capLink, {
-        permanent: true, interactive: true, direction: "right", offset: [6, 0],
+      marker.bindTooltip(escapeHtml(capName), {
+        permanent: true, interactive: false, direction: "right", offset: [6, 0],
         className: "map-label capital-label", opacity: 1,
       });
 
       const e = (cIso && entryByIso[cIso]) || entryByName[cCountry] || null;
       marker._entry = e;
       if (e) { e.capitalMarker = marker; e.capitalName = capName; }
+      marker.on("click", (ev) => {
+        L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+        renderFeatureInfo(capName, cityWikiUrl(capName), e ? "Capital of " + e.name : "Capital", []);
+      });
       capitalMarkers.push(marker);
     });
     refreshCapitals();
@@ -1941,9 +1973,10 @@ schemeSelect.addEventListener("change", () => {
   refreshAll();
 });
 
-map.on("click", () => {        // background click clears selection
-  if (suppressMapClick) return; // ignore the click that came from a country
+map.on("click", () => {        // background click clears selection / closes panels
+  if (suppressMapClick) return; // ignore the click that came from a feature
   deselect();
+  countryInfoEl.hidden = true;  // also close a feature detail box
 });
 map.on("zoomend", updateFlagSizes);
 map.on("zoomend", updatePeakSizes);

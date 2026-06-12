@@ -80,6 +80,7 @@
         <div class="sb-tabs" id="quiz-cat">
           <button type="button" class="qc-tab active" data-cat="country">Country</button>
           <button type="button" class="qc-tab" data-cat="continent">Continent</button>
+          <button type="button" class="qc-tab" data-cat="mountains">Mountains</button>
         </div>
         <div id="quiz-type">
           <button type="button" class="qt-btn active" data-qtype="name">By name</button>
@@ -87,6 +88,10 @@
           <button type="button" class="qt-btn" data-qtype="capital">By capital</button>
           <button type="button" class="qt-btn" data-qtype="spot">Spot it</button>
           <button type="button" class="qt-btn" data-qtype="neighbour">Neighbour</button>
+        </div>
+        <div id="mtn-type" hidden>
+          <button type="button" class="qt-btn active" data-qtype="peakname">Name it</button>
+          <button type="button" class="qt-btn" data-qtype="peakcountry">Which country</button>
         </div>
         <div id="quiz-prompt"></div>
         <div id="loc-box" hidden>
@@ -141,14 +146,16 @@
         <li><b>Hover</b> a country for a flag · name · capital tooltip at the cursor.</li>
         <li><b>Select</b> a country for a fact panel (population, area, GDP, currency,
             languages…) plus dashed lines to its territories (e.g. Alaska, Greenland, Réunion).</li>
-        <li><b>Show names / capitals / flags</b> toggles, and <b>Isolate</b> to hide
-            everything except the selection.</li>
+        <li><b>Show names / capitals / flags / mountains</b> toggles, and <b>Isolate</b> to
+            hide everything except the selection. <b>Show mountains</b> marks notable peaks;
+            click one for its height, country and Wikipedia link.</li>
         <li>Names link to Wikipedia. Click the ocean to clear the selection.</li>
       </ul>
 
       <h3>Quiz</h3>
       <p>Switch to the <b>Quiz</b> tab (top of the sidebar) for several rounds with a
-         running score. Pick what to find — <b>Country</b> or <b>Continent</b>:</p>
+         running score. Pick what to find — <b>Country</b>, <b>Continent</b> or
+         <b>Mountains</b>:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.
             <b>By flag / By capital</b> — answer by <b>Click on map</b> or
@@ -161,6 +168,9 @@
             to answer: <b>Click on map</b> or <b>Select countries</b> (search by name),
             then <b>Check</b>. Found neighbours show green, missed ones and wrong picks are
             marked too.</li>
+        <li><b>Mountains</b> — a peak is marked on the map. <b>Name it</b> (pick from four
+            options) or <b>Which country</b> (click the country it's in; border peaks accept
+            any of their countries).</li>
         <li>Wrong answers are revealed on the map (correct green, wrong red) with flag and
             name; use <b>Skip</b> or <b>Next →</b> to move on.</li>
       </ul>

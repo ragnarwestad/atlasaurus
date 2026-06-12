@@ -104,7 +104,9 @@ function rebuildRegionColors(): void {
 
 // Quiz mode
 let mode: "explore" | "quiz" = "explore";
-let quizType: "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" = "name";
+type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry";
+let quizType: QuizType = "name";
+let quizPeak: Peak | null = null;
 let quizStarted = false;
 let quizNeighbourSet = new Set<CountryEntry>();
 let quizTarget: CountryEntry | null = null;
@@ -450,6 +452,12 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         if (quizNeighbourSet.has(e)) return quizCorrectStyle; // its neighbours (green)
         if (nbSelected.has(e)) return quizWrongStyle;        // a wrong pick (red)
         return baseStyle; // answered → no per-country hover
+      } else if (quizType === "peakcountry") {
+        if (quizPeak && e.iso && quizPeak.iso.includes(e.iso)) return quizCorrectStyle; // the peak's country (green)
+        if (quizGuess && e === quizGuess) return quizWrongStyle;                          // wrong pick (red)
+        return baseStyle;
+      } else if (quizType === "peakname") {
+        return baseStyle; // answer shown on the marker, not the countries
       } else {
         if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
         if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
@@ -1068,6 +1076,8 @@ function loadBorders(): void {
             if (mode === "quiz") {
               if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
               else if (quizType === "neighbour") { if (nbMode === "map" && !entry.isLandmass && entry !== quizTarget) toggleNbPick(entry); }
+              else if (quizType === "peakcountry") { if (!entry.isLandmass) handlePeakCountryGuess(entry); }
+              else if (quizType === "peakname") { /* answered via the choice buttons */ }
               else { if (locMode === "map") handleGuess(entry); }
               return;
             }
@@ -1119,6 +1129,14 @@ const quizNextBtn = document.getElementById("quiz-next") as HTMLButtonElement;
 const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
 
 function renderQuizPrompt(): void {
+  if (quizType === "peakname") {
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>Which mountain?</span>';
+    return;
+  }
+  if (quizType === "peakcountry") {
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>' + escapeHtml(quizPeak ? quizPeak.name : "") + "</span>";
+    return;
+  }
   if (!quizTarget) { quizPromptEl.innerHTML = ""; return; }
   if (quizType === "flag") {
     // Flag quiz: show only the flag (no name) — identify it and click it.
@@ -1166,6 +1184,7 @@ function nextQuestion(): void {
     loadCountryData().then(() => nextQuestion()).catch(() => { /* ignore */ });
     return;
   }
+  if (quizType === "peakname" || quizType === "peakcountry") { nextPeakQuestion(); return; }
   // Restrict the pool to countries that have what the prompt needs.
   const pool = quizType === "flag" ? realCountries().filter((c) => c.iso2)
     : quizType === "capital" ? realCountries().filter((c) => c.capitalName)
@@ -1235,6 +1254,94 @@ function nextQuestion(): void {
     applyLocMode();
   }
   quizNextBtn.disabled = true;
+  refreshPolygons();
+}
+
+// ---------------------------------------------------------------------------
+// Mountain-peak quiz (Name it / Which country)
+// ---------------------------------------------------------------------------
+function shuffle<T>(arr: T[]): T[] {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function drawQuizPeak(withLabel: boolean): void {
+  quizLayer.clearLayers();
+  if (!quizPeak) return;
+  const m = L.marker([quizPeak.lat, quizPeak.lng], { icon: peakIcon(map.getZoom(), true), keyboard: false });
+  if (withLabel) {
+    m.bindTooltip('<a href="' + wikiUrl(quizPeak.wiki || quizPeak.name) + '" target="_blank" rel="noopener">' +
+      escapeHtml(quizPeak.name) + "</a>", { permanent: true, direction: "top", interactive: true, className: "map-label" });
+  }
+  m.addTo(quizLayer);
+}
+function renderPeakChoices(): void {
+  if (!quizPeak) return;
+  const distract = shuffle(PEAKS.filter((p) => p !== quizPeak)).slice(0, 3);
+  quizChoicesEl.innerHTML = "";
+  shuffle([quizPeak, ...distract]).forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = p.name; b.dataset.peak = p.name;
+    b.addEventListener("click", () => handlePeakNameGuess(p.name));
+    quizChoicesEl.appendChild(b);
+  });
+}
+function nextPeakQuestion(): void {
+  const pool = quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
+  if (!pool.length) return;
+  let p = quizPeak;
+  for (let i = 0; i < 20 && (!p || p === quizPeak); i++) p = pool[Math.floor(Math.random() * pool.length)];
+  quizPeak = p;
+  quizTarget = null; quizGuess = null; quizAnswered = false;
+  quizContCorrect = null; quizContWrong = null; quizNeighbourSet = new Set();
+  nbBox.hidden = true; locBox.hidden = true;
+  quizContLayer.clearLayers();
+  renderQuizPrompt();
+  quizFeedbackEl.className = "";
+  if (quizType === "peakname") {
+    renderPeakChoices();
+    quizChoicesEl.hidden = false;
+    quizFeedbackEl.textContent = "Which mountain is marked? Pick one.";
+  } else {
+    quizChoicesEl.hidden = true;
+    quizFeedbackEl.textContent = "In which country is " + (quizPeak ? quizPeak.name : "") + "? Click it on the map.";
+  }
+  if (quizPeak) map.setView([quizPeak.lat, quizPeak.lng], 4);
+  drawQuizPeak(false);
+  quizNextBtn.disabled = true;
+  refreshPolygons();
+}
+function handlePeakNameGuess(name: string): void {
+  if (mode !== "quiz" || quizAnswered || !quizPeak) return;
+  quizAnswered = true; quizTotal++;
+  const ok = name === quizPeak.name;
+  if (ok) quizCorrect++;
+  quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+    btn.disabled = true;
+    const n = btn.dataset.peak;
+    if (n === quizPeak!.name) btn.classList.add("correct");
+    else if (n === name && !ok) btn.classList.add("wrong");
+  });
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + quizPeak.name +
+    " — " + fmtInt(quizPeak.elevation) + " m, " + peakCountryNames(quizPeak) + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  drawQuizPeak(true);
+}
+function handlePeakCountryGuess(entry: CountryEntry): void {
+  if (mode !== "quiz" || quizAnswered || !quizPeak || entry.isLandmass) return;
+  quizGuess = entry; quizAnswered = true; quizTotal++;
+  const ok = !!entry.iso && quizPeak.iso.includes(entry.iso);
+  if (ok) quizCorrect++;
+  const names = peakCountryNames(quizPeak);
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = ok
+    ? "✓ Correct! " + quizPeak.name + " is in " + names + "."
+    : "✗ That's " + entry.name + ". " + quizPeak.name + " is in " + names + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  drawQuizPeak(true);
   refreshPolygons();
 }
 
@@ -1567,27 +1674,33 @@ document.querySelectorAll<HTMLInputElement>('#loc-mode input[name="locmode"]').f
 });
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
-    quizType = b.dataset.qtype as "name" | "flag" | "capital" | "spot" | "continent" | "neighbour";
-    document.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
+    quizType = b.dataset.qtype as QuizType;
+    // Scope the active state to the button's own row (Country vs Mountains).
+    b.parentElement!.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
     if (mode === "quiz") nextQuestion();
   });
 });
 // Top-level quiz category: "Country" (sub-types By name/flag/capital/Neighbour) or
 // "Continent" (its own round — no sub-types).
 const quizTypeEl = document.getElementById("quiz-type") as HTMLElement;
-function setQuizCat(cat: "country" | "continent"): void {
+const mtnTypeEl = document.getElementById("mtn-type") as HTMLElement;
+function setQuizCat(cat: "country" | "continent" | "mountains"): void {
   document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
   quizTypeEl.hidden = cat !== "country";
+  mtnTypeEl.hidden = cat !== "mountains";
   if (cat === "continent") {
     quizType = "continent";
+  } else if (cat === "mountains") {
+    const active = document.querySelector<HTMLElement>("#mtn-type .qt-btn.active");
+    quizType = (active && (active.dataset.qtype as QuizType)) || "peakname";
   } else {
-    const active = document.querySelector<HTMLElement>(".qt-btn.active");
-    quizType = (active && (active.dataset.qtype as "name" | "flag" | "capital" | "spot" | "neighbour")) || "name";
+    const active = document.querySelector<HTMLElement>("#quiz-type .qt-btn.active");
+    quizType = (active && (active.dataset.qtype as QuizType)) || "name";
   }
   if (mode === "quiz") nextQuestion();
 }
 document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => {
-  b.addEventListener("click", () => setQuizCat(b.dataset.cat as "country" | "continent"));
+  b.addEventListener("click", () => setQuizCat(b.dataset.cat as "country" | "continent" | "mountains"));
 });
 
 const capToggle = document.getElementById("show-capitals") as HTMLInputElement;

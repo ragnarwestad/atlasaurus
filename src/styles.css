@@ -27,8 +27,13 @@ body { display: flex; font-family: system-ui, sans-serif; }
 }
 .qc-tab:hover { color: #3878c7; }
 .qc-tab.active { color: #1b3a5c; border-bottom-color: #3878c7; }
-#quiz-type { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-#quiz-type[hidden] { display: none; }
+#quiz-type, #mtn-type { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#quiz-type[hidden], #mtn-type[hidden] { display: none; }
+#mtn-type .qt-btn {
+  padding: 4px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
+  border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
+}
+#mtn-type .qt-btn.active { background: #3878c7; color: #fff; border-color: #3878c7; }
 #quiz-type .qt-btn {
   padding: 4px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
   border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;

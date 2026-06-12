@@ -157,6 +157,7 @@ map.on("zoomend", updateFlagSizes);
 map.on("zoomend", updatePeakSizes);
 map.on("moveend", scheduleCityUpdate);  // re-render in-view cities after pan/zoom
 map.on("moveend", refreshCapitals);     // re-evaluate which capitals fit the view
+map.on("moveend", refreshCountryLabels); // re-evaluate which country names fit the view
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;

@@ -4,16 +4,33 @@ import L from "leaflet";
 import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
-import { app, countries } from "./state";
+import { app, countries, popOf } from "./state";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
 
+// Like capitals/cities: show only a few (biggest) country names when zoomed out,
+// more as you zoom in, and only the ones in view — so the world view isn't a wall
+// of ~200 labels. Ranked by population; the selected country is always shown.
+const NAME_MAX = 70; // ceiling, grows with zoom
 export function refreshCountryLabels(): void {
+  if (app.mode === "quiz") {
+    countries.forEach((e) => { const el = e.labelTooltip && e.labelTooltip.getElement(); if (el) el.style.display = "none"; });
+    return;
+  }
+  const z = map.getZoom();
+  const cap = Math.max(8, Math.min(NAME_MAX, Math.round((z - 1) * 12)));
+  const b = map.getBounds().pad(0.15);
+  const shown = new Set(
+    countries
+      .filter((e) => e.labelTooltip && countryVisible(e) && app.showNames && inToggleScope(e))
+      .filter((e) => { const ll = e.labelTooltip!.getLatLng(); return !!ll && b.contains(ll); })
+      .sort((a, c) => popOf(c) - popOf(a))
+      .slice(0, cap),
+  );
+  // The selected/revealed country's name is always shown (even with the toggle off).
+  countries.forEach((e) => { if (e.labelTooltip && countryVisible(e) && isRevealed(e)) shown.add(e); });
   countries.forEach((e) => {
-    if (!e.labelTooltip) return;
-    const el = e.labelTooltip.getElement();
-    if (!el) return;
-    if (app.mode === "quiz") { el.style.display = "none"; return; } // clean map for the quiz
-    el.style.display = countryVisible(e) && ((app.showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
+    const el = e.labelTooltip && e.labelTooltip.getElement();
+    if (el) el.style.display = shown.has(e) ? "" : "none";
   });
 }
 

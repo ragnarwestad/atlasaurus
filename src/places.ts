@@ -9,8 +9,7 @@ import {
   type CountryEntry, type CapitalMarker,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
-// TODO(refactor): these move to ./countries in a later step.
-import { countryVisible, inToggleScope, isRevealed } from "./main";
+import { countryVisible, inToggleScope, isRevealed } from "./countries";
 
 const CAPITAL_MAX = 70; // ceiling on capitals shown per view (grows with zoom)
 export function refreshCapitals(): void {

@@ -5,8 +5,7 @@ import { allPolygonParts, centerOf } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
 import { app, countries } from "./state";
-// TODO(refactor): these move to ./countries in a later step.
-import { countryVisible, inToggleScope, isRevealed } from "./main";
+import { countryVisible, inToggleScope, isRevealed } from "./countries";
 
 export function refreshCountryLabels(): void {
   countries.forEach((e) => {

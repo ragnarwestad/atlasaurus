@@ -225,21 +225,15 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #country-list a:hover, #continent-list a:hover { text-decoration: underline; }
 
 /* Physical-feature lists (Lakes / Mountains / Rivers) — collapsible sections
-   under the country list, each with its own search box + scrollable list. */
-#feature-lists { flex: 0 0 auto; border-top: 1px solid #e1e7ec; }
+   under the country list, reusing the .sb-fold / .fold-caret / .sb-title header
+   element (same as "Map options"), each with its own search box + list. */
+#feature-lists { flex: 0 0 auto; }
 #feature-lists[hidden] { display: none; }
-.feat-sec { border-bottom: 1px solid #eef2f5; }
-.feat-head {
-  width: 100%; display: flex; align-items: center; gap: 6px; cursor: pointer;
-  background: #f7f9fb; border: 0; padding: 8px 14px; text-align: left;
-  font: 600 13px system-ui, sans-serif; color: #33414d;
-}
-.feat-head:hover { background: #eef3f8; }
-.feat-head .caret { display: inline-block; font-size: 9px; transition: transform .15s; }
-.feat-sec:not(.expanded) .feat-head .caret { transform: rotate(-90deg); }
-.feat-head .feat-count { margin-left: auto; color: #9aa7b3; font-weight: 400; font-size: 12px; }
-.feat-sec:not(.expanded) .feat-body { display: none; }
-.feat-search-wrap { display: flex; padding: 8px 14px 6px; }
+.feat-sec { border-top: 1px solid #e6ebf0; }
+.feat-head-row { padding: 11px 14px; }
+.feat-sec.collapsed .sb-fold .fold-caret { transform: rotate(-90deg); }
+.feat-sec.collapsed .feat-body { display: none; }
+.feat-search-wrap { display: flex; padding: 0 14px 10px; }
 .feat-search { width: 100%; }
 .feat-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
 .feat-list li.feat-item {

@@ -219,7 +219,7 @@ function applyFeatureFilter(id: string): void {
     if (m) shown++;
     li.style.display = m ? "" : "none";
   });
-  if (countEl) countEl.textContent = q ? shown + " / " + items.length : String(items.length);
+  if (countEl) countEl.textContent = q ? shown + " of " + items.length : String(items.length);
 }
 
 // (Re)render all three lists from the current data (called once on startup and
@@ -238,7 +238,7 @@ export function buildFeatureLists(): void {
 export function initFeatureLists(): void {
   FEATURE_SECTIONS.forEach((sec) => {
     const secEl = document.getElementById("feat-sec-" + sec.id);
-    document.getElementById("feat-head-" + sec.id)?.addEventListener("click", () => secEl?.classList.toggle("expanded"));
+    document.getElementById("feat-head-" + sec.id)?.addEventListener("click", () => secEl?.classList.toggle("collapsed"));
     document.getElementById("feat-search-" + sec.id)?.addEventListener("input", () => applyFeatureFilter(sec.id));
   });
   buildFeatureLists();

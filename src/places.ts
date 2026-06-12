@@ -15,7 +15,7 @@ const CAPITAL_MAX = 70; // ceiling on capitals shown per view (grows with zoom)
 export function refreshCapitals(): void {
   if (app.mode === "quiz") { capitalMarkers.forEach((m) => { if (capitalLayer.hasLayer(m)) capitalLayer.removeLayer(m); }); return; }
   const z = map.getZoom();
-  const cap = Math.max(8, Math.min(CAPITAL_MAX, Math.round((z - 1) * 12)));
+  const cap = Math.max(8, Math.min(CAPITAL_MAX, Math.round((z - 1) * 20)));
   const b = map.getBounds().pad(0.15);
   // Capitals allowed by the toggle + tab scope (the selected region on the Regions tab).
   const eligible = capitalMarkers.filter((m) => {
@@ -141,7 +141,7 @@ function updateCities(): void {
   const zReal = map.getZoom();
   const z = zReal + CITY_ZOOM_BIAS;
   // Show only a few (biggest) cities when zoomed out, more as you zoom in.
-  const cap = Math.max(8, Math.min(CITY_MAX, Math.round((zReal - 1) * 12)));
+  const cap = Math.max(8, Math.min(CITY_MAX, Math.round((zReal - 1) * 20)));
   const b = map.getBounds().pad(0.15);
   const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz).slice(0, cap);
   vis.forEach((d) => {

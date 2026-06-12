@@ -17,7 +17,7 @@ export function refreshCountryLabels(): void {
     return;
   }
   const z = map.getZoom();
-  const cap = Math.max(8, Math.min(NAME_MAX, Math.round((z - 1) * 12)));
+  const cap = Math.max(8, Math.min(NAME_MAX, Math.round((z - 1) * 20)));
   const b = map.getBounds().pad(0.15);
   const shown = new Set(
     countries

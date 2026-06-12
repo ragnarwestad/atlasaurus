@@ -9,7 +9,7 @@ import { app, hooks, loadCountryData, type GroupScheme, type QuizType } from "./
 import { trackMouse, hideHoverInfo, countryInfoEl, updateInfoPanel, isNarrow } from "./panel";
 import { refreshCountryLabels, refreshFlags, updateFlagSizes } from "./labels";
 import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes, schedulePhysicalUpdate, loadPhysicalData } from "./physical";
-import { refreshCapitals, scheduleCityUpdate, refreshCities, loadCityData } from "./places";
+import { refreshCapitals, scheduleCityUpdate, refreshCities, loadCityData, clearCityOutline } from "./places";
 import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
@@ -40,6 +40,7 @@ function refreshAll(): void {
 }
 hooks.refreshAll = refreshAll; // modules trigger full refreshes via this hook
 hooks.rebuildFeatureLists = buildFeatureLists; // physical.ts repopulates the lists when its data lands
+hooks.clearCityOutline = clearCityOutline;     // panel/countries clear the city outline via this hook
 
 // ---------------------------------------------------------------------------
 // Wire UI + go

@@ -4,7 +4,7 @@
 import L from "leaflet";
 import { wikiUrl, cityWikiUrl, escapeHtml } from "./wiki";
 import {
-  app, countries, fmtInt, entryForLayer, loadCountryData,
+  app, hooks, countries, fmtInt, entryForLayer, loadCountryData,
   type CountryEntry, type RestInfo,
 } from "./state";
 import { groupOf, SCHEME_LABEL } from "./regions";
@@ -135,6 +135,7 @@ function makeDraggable(panel: HTMLElement, handle: HTMLElement, onClick?: () => 
 // Wikipedia link lives here on the title — map labels are plain text — so a stray
 // tap on a label (common on mobile) can't open Wikipedia by accident.
 export function renderFeatureInfo(title: string, wikiHref: string, sub: string, rows: [string, string][]): void {
+  hooks.clearCityOutline(); // a new feature box supersedes any city outline (cityOpen redraws after)
   if (app.selectedLayer || app.selectedContinent) deselect(); // drop any country/region selection
   const titleLink = '<a href="' + wikiHref + '" target="_blank" rel="noopener">' + escapeHtml(title) + ' <span class="ext">↗</span></a>';
   const dl = rows.length ? "<dl>" + rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("") + "</dl>" : "";

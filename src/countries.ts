@@ -223,11 +223,13 @@ export function refreshConnectors(): void {
  *  A selected continent is kept, so picking a country inside it keeps the
  *  continent highlighted (green) with the country shown selected (orange). */
 export function selectLayer(layer: L.Polygon, toggle: boolean): void {
+  hooks.clearCityOutline(); // selecting a country supersedes a city outline
   app.selectedLayer = toggle && app.selectedLayer === layer ? null : layer;
   if (app.selectedLayer) app.selectedLayer.bringToFront();
   hooks.refreshAll();
 }
 export function deselect(): void {
+  hooks.clearCityOutline();
   if (app.selectedLayer || app.selectedContinent) { app.selectedLayer = null; app.selectedContinent = null; hooks.refreshAll(); }
 }
 
@@ -235,6 +237,7 @@ export function deselect(): void {
 // info. Clicking the active continent again clears it. (Mutually exclusive with
 // single-country selection.)
 export function selectContinent(name: string): void {
+  hooks.clearCityOutline(); // selecting a region supersedes a city outline
   app.selectedLayer = null;
   app.selectedContinent = app.selectedContinent === name ? null : name;
   if (app.selectedContinent) {

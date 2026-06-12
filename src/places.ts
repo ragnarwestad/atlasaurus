@@ -1,9 +1,9 @@
 // Populated places: national capitals (Natural Earth admin-0 capitals) and the
 // Cities layer (10m populated places, canvas dots + a few DOM name labels).
 import L from "leaflet";
-import { CAPITAL_URLS, CITY_URLS } from "./config";
+import { CAPITAL_URLS, CITY_URLS, URBAN_URLS } from "./config";
 import { cityWikiUrl, escapeHtml } from "./wiki";
-import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
+import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas, cityOutlineLayer } from "./map";
 import {
   app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom,
   type CountryEntry, type CapitalMarker,
@@ -151,14 +151,80 @@ function loadCities(): void {
 // Load the city dataset up front so the sidebar Cities list is populated even
 // before the Cities map layer is switched on.
 export function loadCityData(): void { loadCities(); }
-// The feature detail box for a city (shared by the map markers and the list).
+// The feature detail box for a city (shared by the map markers and the list),
+// plus the urban-area outline.
 function cityOpen(d: CityRec): void {
   const sub = d.cap ? (d.adm0 ? "Capital of " + d.adm0 : "Capital") : (d.adm0 ? "City in " + d.adm0 : "City");
   const rows: [string, string][] = [];
   if (d.adm1 && d.adm1 !== d.adm0) rows.push(["Region", escapeHtml(d.adm1)]);
   if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
   if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
-  renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
+  renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows); // clears the previous outline via hooks.clearCityOutline
+  showCityOutline(d.lat, d.lng);
+}
+
+// --- City outline: the Natural Earth urban-area polygon that contains the city's
+//     point, loaded lazily the first time a city is selected. ---
+type UrbanFeat = { bbox: [number, number, number, number]; geom: any };
+let urbanFeats: UrbanFeat[] = [];
+let urbanLoaded = false, urbanLoading = false;
+let pendingOutline: { lat: number; lng: number } | null = null;
+const cityOutlineStyle = { color: "#8a3b00", weight: 2, opacity: 0.95, fillColor: "#e8740c", fillOpacity: 0.18 };
+
+function geomBbox(geom: any): [number, number, number, number] | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const walk = (a: any) => {
+    if (typeof a[0] === "number") {
+      if (a[0] < minX) minX = a[0]; if (a[0] > maxX) maxX = a[0];
+      if (a[1] < minY) minY = a[1]; if (a[1] > maxY) maxY = a[1];
+    } else for (const c of a) walk(c);
+  };
+  if (geom && geom.coordinates) walk(geom.coordinates);
+  return isFinite(minX) ? [minX, minY, maxX, maxY] : null;
+}
+function pointInRing(x: number, y: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function pointInPolygon(x: number, y: number, rings: number[][][]): boolean {
+  if (!rings.length || !pointInRing(x, y, rings[0])) return false;
+  for (let k = 1; k < rings.length; k++) if (pointInRing(x, y, rings[k])) return false; // inside a hole
+  return true;
+}
+function geomContains(x: number, y: number, geom: any): boolean {
+  if (geom && geom.type === "Polygon") return pointInPolygon(x, y, geom.coordinates);
+  if (geom && geom.type === "MultiPolygon") return geom.coordinates.some((poly: number[][][]) => pointInPolygon(x, y, poly));
+  return false;
+}
+function drawCityOutline(lat: number, lng: number): void {
+  cityOutlineLayer.clearLayers();
+  for (const f of urbanFeats) {
+    const b = f.bbox;
+    if (lng < b[0] || lng > b[2] || lat < b[1] || lat > b[3]) continue;
+    if (geomContains(lng, lat, f.geom)) {
+      L.geoJSON({ type: "Feature", geometry: f.geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
+      return;
+    }
+  }
+}
+export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); pendingOutline = null; }
+function showCityOutline(lat: number, lng: number): void {
+  if (urbanLoaded) { drawCityOutline(lat, lng); return; }
+  pendingOutline = { lat, lng };
+  if (urbanLoading) return;
+  urbanLoading = true;
+  fetchJson(URBAN_URLS).then((geo) => {
+    urbanFeats = (((geo.features || []) as any[]).map((f) => {
+      const bb = geomBbox(f.geometry);
+      return bb ? { bbox: bb, geom: f.geometry } : null;
+    }).filter(Boolean)) as UrbanFeat[];
+    urbanLoaded = true; urbanLoading = false;
+    if (pendingOutline) { drawCityOutline(pendingOutline.lat, pendingOutline.lng); pendingOutline = null; }
+  }).catch(() => { urbanLoading = false; });
 }
 function updateCities(): void {
   if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }

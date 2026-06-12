@@ -93,6 +93,7 @@ export const app = {
 export const hooks = {
   refreshAll: () => {},
   rebuildFeatureLists: () => {},
+  clearCityOutline: () => {},
 };
 
 // ---------------------------------------------------------------------------

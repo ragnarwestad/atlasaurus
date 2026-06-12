@@ -18,6 +18,7 @@ export const flagLayer = L.layerGroup().addTo(map);       // flag images
 export const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
 export const riverLayer = L.layerGroup().addTo(map);      // major river centerlines
 export const lakeLayer = L.layerGroup().addTo(map);       // major lakes
+export const cityOutlineLayer = L.layerGroup().addTo(map); // outline of the selected city (urban-area polygon, under the dots)
 export const cityLayer = L.layerGroup().addTo(map);       // city dots (canvas, in-view only)
 export const cityLabelLayer = L.layerGroup().addTo(map);  // city name labels (top few, DOM)
 export const cityCanvas = L.canvas({ padding: 0.5 });     // fast renderer for the city dots

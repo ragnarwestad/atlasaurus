@@ -20,11 +20,9 @@ import { showHoverInfo, hideHoverInfo } from "./panel";
 import { refreshCountryLabels, placeCountryLabels } from "./labels";
 import { loadCapitals } from "./places";
 import { groupOf, CONTINENT_QUIZ_STYLES } from "./regions";
-// TODO(refactor): quiz handlers move to ./quiz, sidebar fns to ./sidebar.
-import {
-  answerContinent, toggleNbPick, handlePeakCountryGuess, handleGuess,
-  buildSidebar, setActiveTab,
-} from "./main";
+import { buildSidebar, setActiveTab } from "./sidebar";
+// TODO(refactor): quiz handlers move to ./quiz in the next step.
+import { answerContinent, toggleNbPick, handlePeakCountryGuess, handleGuess } from "./main";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)

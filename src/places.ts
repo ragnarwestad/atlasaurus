@@ -177,24 +177,54 @@ function drawOutlineGeom(geom: any): void {
 }
 export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
 
-// Polygon/MultiPolygon out of a single Nominatim object (else null).
+// Reject admin areas bigger than a real city (states, prefectures, big counties).
+const MAX_CITY_KM = 120;
 function geomOf(obj: any): any {
   const g = obj && obj.geojson;
   return g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
 }
-// Reverse-geocode the city's coordinates. Returns the full first object so we can
-// use both its geometry AND its address (the address still names the municipality
-// even when the geometry is just the city point, as for Copenhagen).
+function geomExtent(geom: any): { box: [number, number, number, number]; spanKm: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const walk = (a: any) => {
+    if (typeof a[0] === "number") {
+      if (a[0] < minX) minX = a[0]; if (a[0] > maxX) maxX = a[0];
+      if (a[1] < minY) minY = a[1]; if (a[1] > maxY) maxY = a[1];
+    } else for (const c of a) walk(c);
+  };
+  if (geom && geom.coordinates) walk(geom.coordinates);
+  const midLat = (minY + maxY) / 2;
+  const w = (maxX - minX) * 111 * Math.cos(midLat * Math.PI / 180), h = (maxY - minY) * 111;
+  return { box: [minX, minY, maxX, maxY], spanKm: Math.sqrt(w * w + h * h) };
+}
+function pointInRing(x: number, y: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function geomContains(lng: number, lat: number, geom: any): boolean {
+  const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
+  return polys.some((rings: number[][][]) => rings.length > 0 && pointInRing(lng, lat, rings[0]) && !rings.slice(1).some((h) => pointInRing(lng, lat, h)));
+}
 function reverseFull(lat: number, lng: number, zoom: number): Promise<any> {
   return fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&polygon_geojson=1&zoom=" + zoom + "&lat=" + lat + "&lon=" + lng, { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
 }
-// Free-form search, scanning all results for the first areal boundary.
-function searchBoundary(q: string): Promise<any> {
+// Search and return the first city-sized boundary that actually contains the point
+// (skips the state/prefecture that ambiguous names like "New York"/"Tokyo" surface).
+function searchPick(q: string, lat: number, lng: number): Promise<any> {
   return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&dedupe=0&limit=10&q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : []))
-    .then((arr) => (Array.isArray(arr) ? arr : []).map(geomOf).find(Boolean) || null)
+    .then((arr) => {
+      for (const res of Array.isArray(arr) ? arr : []) {
+        const g = geomOf(res);
+        if (g && geomExtent(g).spanKm <= MAX_CITY_KM && geomContains(lng, lat, g)) return g;
+      }
+      return null;
+    })
     .catch(() => null);
 }
 async function showCityOutline(lat: number, lng: number, name: string, adm0: string): Promise<void> {
@@ -204,19 +234,21 @@ async function showCityOutline(lat: number, lng: number, name: string, adm0: str
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
 
   const r = await reverseFull(lat, lng, 10);
-  let geom = geomOf(r); // works directly for most (e.g. Sorø → its kommune)
-  // Big cities reverse to the place *node* (a point); its address still names the
-  // municipality (e.g. "Københavns Kommune"), which we can search for directly.
+  const direct = geomOf(r);
+  // Accept the reverse polygon only if it's city-sized (Sorø → its kommune). Big
+  // cities reverse to the place *node* (a point) — then use the municipality named
+  // in its address, searching for the city-level boundary that contains the point.
+  let geom = direct && geomExtent(direct).spanKm <= MAX_CITY_KM ? direct : null;
   if (!geom && r && r.address) {
     const a = r.address;
     const country = adm0 || a.country || "";
     const cands = [a.municipality, a.city, a.town, a.county].filter((x: any, i: number, arr: any[]) => x && arr.indexOf(x) === i);
     for (const nm of cands) {
-      geom = await searchBoundary(nm + (country ? ", " + country : ""));
+      geom = await searchPick(nm + (country ? ", " + country : ""), lat, lng);
       if (geom) break;
     }
   }
-  if (!geom) geom = await searchBoundary(name + (adm0 ? ", " + adm0 : ""));
+  if (!geom) geom = await searchPick(name + (adm0 ? ", " + adm0 : ""), lat, lng);
 
   outlineCache.set(key, geom || null);
   if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection

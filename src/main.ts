@@ -728,17 +728,16 @@ function refreshLakes(): void {
   updatePeakLabels();
 }
 
-// --- Cities (Explore "Cities" layer) — large non-capital cities, reusing the
-//     populated-places data the Capitals layer already fetches. ---
-const CITY_MIN_POP = 1_000_000;
+// --- Cities (Explore "Cities" layer) — the whole 50m populated-places set the
+//     Capitals layer already fetches. That file is itself a curated list of the
+//     ~major cities worldwide (by Natural Earth's scalerank), so no extra filter
+//     is needed — we just show every place in it (capitals included). ---
 const cityMarkers: L.CircleMarker[] = [];
 let citiesBuilt = false;
 function buildCityMarkers(geo: any): void {
   if (citiesBuilt) return;
   ((geo.features || []) as any[]).forEach((f) => {
     const p = f.properties || {};
-    const pop = +(p.pop_max || p.pop_min || 0);
-    if (pop < CITY_MIN_POP) return; // keep it to the big cities (capitals included)
     const c = f.geometry && f.geometry.coordinates;
     const name = p.name || p.nameascii;
     if (!c || !name) return;

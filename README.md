@@ -79,9 +79,10 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
 
 - **Borders:** Natural Earth `ne_10m_admin_0_countries_ukr` (Ukraine point-of-view,
   so Crimea is shown as part of Ukraine per UN GA Res. 68/262).
-- **Capitals & cities:** Natural Earth `ne_50m_populated_places_simple` — national
-  capitals for the Capitals layer, plus all large cities (pop ≥ 1M, capitals included)
-  for the Cities layer (same file, loaded once).
+- **Capitals & cities:** Natural Earth `ne_50m_populated_places_simple` (one file,
+  loaded once) — national capitals for the Capitals layer; the Cities layer shows the
+  whole set (~1,200 major cities worldwide, curated by Natural Earth's scalerank, so no
+  population filter is applied).
 - **Sub-units:** Natural Earth `ne_10m_admin_0_map_subunits` (satellite labels).
 - **Rivers:** Natural Earth `ne_50m_rivers_lake_centerlines` (loaded lazily when the
   Rivers toggle is first switched on).

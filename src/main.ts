@@ -14,7 +14,7 @@ import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
   applyFilter, buildSidebar, buildContinentList,
-  setActiveTab, markActiveContinent, initSidebarSections, buildFeatureLists,
+  setActiveTab, markActiveContinent, initSidebarSections, buildFeatureLists, setSectionEnabled,
 } from "./sidebar";
 import {
   setMode, nextQuestion, setQuizCat, applyNbMode, applyLocMode, renderNbResults,
@@ -90,22 +90,22 @@ const hoverToggle = document.getElementById("show-hover") as HTMLInputElement;
 hoverToggle.addEventListener("change", () => { app.showHover = hoverToggle.checked; if (!app.showHover) hideHoverInfo(); });
 
 const mtnToggle = document.getElementById("show-mountains") as HTMLInputElement;
-mtnToggle.addEventListener("change", () => { app.showPeaks = mtnToggle.checked; refreshPeaks(); });
+mtnToggle.addEventListener("change", () => { app.showPeaks = mtnToggle.checked; setSectionEnabled("mountains", mtnToggle.checked); refreshPeaks(); });
 
 const rivToggle = document.getElementById("show-rivers") as HTMLInputElement;
-rivToggle.addEventListener("change", () => { app.showRivers = rivToggle.checked; refreshRivers(); });
+rivToggle.addEventListener("change", () => { app.showRivers = rivToggle.checked; setSectionEnabled("rivers", rivToggle.checked); refreshRivers(); });
 
 const lakeToggle = document.getElementById("show-lakes") as HTMLInputElement;
-lakeToggle.addEventListener("change", () => { app.showLakes = lakeToggle.checked; refreshLakes(); });
+lakeToggle.addEventListener("change", () => { app.showLakes = lakeToggle.checked; setSectionEnabled("lakes", lakeToggle.checked); refreshLakes(); });
 
 const cityToggle = document.getElementById("show-cities") as HTMLInputElement;
-cityToggle.addEventListener("change", () => { app.showCities = cityToggle.checked; refreshCities(); });
+cityToggle.addEventListener("change", () => { app.showCities = cityToggle.checked; setSectionEnabled("cities", cityToggle.checked); refreshCities(); });
 
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { app.showNames = nameToggle.checked; refreshCountryLabels(); });
 
 const regionToggle = document.getElementById("show-regions") as HTMLInputElement;
-regionToggle.addEventListener("change", () => setActiveTab(regionToggle.checked ? "continents" : "countries"));
+regionToggle.addEventListener("change", () => { setSectionEnabled("regions", regionToggle.checked); setActiveTab(regionToggle.checked ? "continents" : "countries"); });
 
 
 let mapExpanded = true;

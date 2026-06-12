@@ -236,6 +236,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .feat-head-row .sb-fold { width: 100%; padding: 11px 14px; }
 .feat-sec.collapsed .sb-fold .fold-caret { transform: rotate(-90deg); }
 .feat-sec.collapsed .feat-body { display: none; }
+/* A section whose map layer is switched off: greyed out + non-interactive. */
+.feat-sec.disabled { opacity: 0.45; pointer-events: none; }
 .feat-search-wrap { display: flex; padding: 0 14px 10px; }
 .feat-body .filter-sort { padding: 0 14px 10px; margin-top: 0; }
 .feat-search { width: 100%; }

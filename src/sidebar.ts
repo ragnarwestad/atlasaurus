@@ -264,6 +264,16 @@ export function setActiveTab(tab: "countries" | "continents"): void {
   hooks.refreshAll();     // restyle map, panels, reveals (toggle scope depends on mode)
 }
 
+// Enable/disable a list section in step with its map-layer checkbox. A disabled
+// section is greyed out and non-interactive (and collapsed) so you can't click,
+// say, a river that won't be drawn while the Rivers layer is off.
+export function setSectionEnabled(id: string, on: boolean): void {
+  const sec = document.getElementById("feat-sec-" + id);
+  if (!sec) return;
+  sec.classList.toggle("disabled", !on);
+  if (!on) sec.classList.add("collapsed");
+}
+
 // Wire the Countries (cosmetic) and Regions (drives region mode) fold headers,
 // then the physical-feature lists.
 export function initSidebarSections(): void {

@@ -56,8 +56,8 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
     to list its member countries.
   - **Sort** by Name, Population or Area (applies to both tabs); when sorting by
     population/area the value is shown after each name (compact, 2 decimals).
-- **Map display toggles:** country names, capitals, flags, and mountain peaks.
-  On the Regions tab these toggles apply only to the selected region.
+- **Map display toggles:** country names, capitals, flags, mountain peaks, and
+  major rivers. On the Regions tab these toggles apply only to the selected region.
 - **Hover** shows a small panel that follows the cursor (flag · name · capital);
   the hovered country is highlighted.
 - **Select a country** (map or list) to: highlight it, open a fact panel
@@ -80,6 +80,10 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
   so Crimea is shown as part of Ukraine per UN GA Res. 68/262).
 - **Capitals:** Natural Earth `ne_50m_populated_places_simple` (`Admin-0 capital`).
 - **Sub-units:** Natural Earth `ne_10m_admin_0_map_subunits` (satellite labels).
+- **Rivers:** Natural Earth `ne_50m_rivers_lake_centerlines` (loaded lazily when the
+  Rivers toggle is first switched on).
+- **Mountain peaks:** a small curated list in `src/peaks.ts` (name, ISO country
+  codes, elevation, coordinates; figures from Wikipedia / Britannica).
 - **Flags:** [flagcdn.com](https://flagcdn.com) by ISO 3166-1 alpha-2 code.
 - **Country facts:** population, GDP and region come from the Natural Earth border
   properties; area, currency, languages and the authoritative **continent**

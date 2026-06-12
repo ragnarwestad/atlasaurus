@@ -23,6 +23,13 @@ export const SUBUNIT_URLS = [
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_map_subunits.geojson",
 ];
 
+// Major river centerlines (50m: the big named rivers, light enough for a world
+// overview). Loaded lazily the first time "Rivers" is toggled on.
+export const RIVER_URLS = [
+  "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_rivers_lake_centerlines.geojson",
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_rivers_lake_centerlines.geojson",
+];
+
 // --- English Wikipedia title overrides for dataset country names ---
 export const WIKI_OVERRIDES: Record<string, string> = {
   "United States of America": "United States",

@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
 import {
-  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS,
+  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS, RIVER_URLS,
   baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
   quizCorrectStyle, quizWrongStyle,
   CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
@@ -53,6 +53,7 @@ const capitalLayer = L.layerGroup().addTo(map);    // capital dots + name labels
 const connectorLayer = L.layerGroup().addTo(map);  // satellite/sovereignty lines
 const flagLayer = L.layerGroup().addTo(map);       // flag images
 const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
+const riverLayer = L.layerGroup().addTo(map);      // major river centerlines
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
@@ -74,6 +75,7 @@ let showNames = false;
 let showCapitals = false;
 let showFlags = false;
 let showPeaks = false;
+let showRivers = false;
 let isolate = false;
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
@@ -649,11 +651,45 @@ function refreshPeaks(): void {
   });
   updatePeakLabels();
 }
-// Peak names get crowded when zoomed out (the Himalaya cluster especially), so
-// hide the labels below a zoom threshold — the icons still mark every peak.
+
+// --- Rivers (Explore "Rivers" layer) — major named river centerlines from
+//     Natural Earth, loaded lazily the first time the toggle is switched on. ---
+let riverGeo: L.GeoJSON | null = null;
+let riversLoading = false;
+function loadRivers(): void {
+  if (riverGeo || riversLoading) return;
+  riversLoading = true;
+  fetchJson(RIVER_URLS).then((geo) => {
+    riverGeo = L.geoJSON(geo, {
+      filter: (f: any) => String((f.properties || {}).featurecla || "").toLowerCase().indexOf("lake") === -1,
+      style: () => ({ color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
+      onEachFeature: (f: any, layer: L.Layer) => {
+        const name = (f.properties || {}).name || (f.properties || {}).name_en;
+        if (name) (layer as L.Path).bindTooltip(
+          '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
+          { permanent: true, direction: "center", interactive: true, className: "map-label river-label" });
+      },
+    });
+    riversLoading = false;
+    refreshRivers();
+  }).catch(() => { riversLoading = false; });
+}
+function refreshRivers(): void {
+  const on = showRivers && mode === "explore";
+  if (on && !riverGeo) { loadRivers(); return; }
+  if (!riverGeo) return;
+  if (on && !riverLayer.hasLayer(riverGeo)) riverLayer.addLayer(riverGeo);
+  else if (!on && riverLayer.hasLayer(riverGeo)) riverLayer.removeLayer(riverGeo);
+  updatePeakLabels();
+}
+// Peak/river names get crowded when zoomed out, so hide the labels below a zoom
+// threshold — the icons and lines still show every feature.
 function updatePeakLabels(): void {
   const mapEl = document.getElementById("map");
-  if (mapEl) mapEl.classList.toggle("peak-labels-on", map.getZoom() >= 4);
+  if (!mapEl) return;
+  const on = map.getZoom() >= 4;
+  mapEl.classList.toggle("peak-labels-on", on);
+  mapEl.classList.toggle("river-labels-on", on);
 }
 function updatePeakSizes(): void {
   const z = map.getZoom();
@@ -674,6 +710,7 @@ function refreshAll(): void {
   refreshCapitals();
   refreshFlags();
   refreshPeaks();
+  refreshRivers();
   updateInfoPanel();
   markActiveContinent();
   updateRegionLabels();
@@ -1708,6 +1745,9 @@ flagToggle.addEventListener("change", () => { showFlags = flagToggle.checked; re
 
 const mtnToggle = document.getElementById("show-mountains") as HTMLInputElement;
 mtnToggle.addEventListener("change", () => { showPeaks = mtnToggle.checked; refreshPeaks(); });
+
+const rivToggle = document.getElementById("show-rivers") as HTMLInputElement;
+rivToggle.addEventListener("change", () => { showRivers = rivToggle.checked; refreshRivers(); });
 
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; refreshCountryLabels(); });

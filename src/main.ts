@@ -389,6 +389,20 @@ function renderFeatureInfo(title: string, wikiHref: string, sub: string, rows: [
   if (head) makeDraggable(countryInfoEl, head as HTMLElement);
 }
 
+// Make a map label clickable (opens the detail box, not Wikipedia) — labels are a
+// much bigger tap target than the tiny dots, which matters on mobile.
+function attachLabelClick(tt: L.Tooltip, onClick: () => void): void {
+  const el = tt.getElement();
+  if (!el) return;
+  el.style.pointerEvents = "auto"; // override .map-label { pointer-events: none }
+  el.style.cursor = "pointer";
+  L.DomEvent.on(el, "click", (ev) => {
+    L.DomEvent.stop(ev);
+    suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+    onClick();
+  });
+}
+
 // Bottom panel shows the selected COUNTRY, or the selected CONTINENT, or nothing.
 function updateInfoPanel(): void {
   if (mode === "quiz") { countryInfoEl.hidden = true; return; }
@@ -681,11 +695,10 @@ function buildPeakMarkers(): void {
   PEAKS.forEach((p) => {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
     m.bindTooltip(escapeHtml(p.name), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
-    m.on("click", (e) => {
-      L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
-      renderFeatureInfo(p.name, wikiUrl(p.wiki || p.name), "Mountain peak",
-        [["Elevation", fmtInt(p.elevation) + " m"], ["Country", peakCountryNames(p)], ["Region", escapeHtml(p.region)]]);
-    });
+    const open = () => renderFeatureInfo(p.name, wikiUrl(p.wiki || p.name), "Mountain peak",
+      [["Elevation", fmtInt(p.elevation) + " m"], ["Country", peakCountryNames(p)], ["Region", escapeHtml(p.region)]]);
+    m.on("click", (e) => { L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+    m.on("tooltipopen", (e: any) => attachLabelClick(e.tooltip, open));
     peakMarkers.push(m);
   });
 }
@@ -715,10 +728,9 @@ function loadRivers(): void {
         if (!name) return;
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
-        layer.on("click", (ev) => {
-          L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
-          renderFeatureInfo(name, wikiUrl(name), "River", []);
-        });
+        const open = () => renderFeatureInfo(name, wikiUrl(name), "River", []);
+        layer.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+        layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
     });
     riversLoading = false;
@@ -757,10 +769,9 @@ function loadLakes(): void {
         const name = lakeName(f);
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
-        layer.on("click", (ev) => {
-          L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
-          renderFeatureInfo(name, wikiUrl(name), "Lake", []);
-        });
+        const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", []);
+        layer.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+        layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
     });
     lakesLoading = false;
@@ -827,14 +838,15 @@ function updateCities(): void {
     const style = d.cap
       ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
       : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
+    const open = () => renderFeatureInfo(d.name, cityWikiUrl(d.name), d.cap ? "Capital" : "City", d.pop ? [["Population", fmtInt(d.pop)]] : []);
     L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
-      L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
-      renderFeatureInfo(d.name, cityWikiUrl(d.name), d.cap ? "Capital" : "City", d.pop ? [["Population", fmtInt(d.pop)]] : []);
+      L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open();
     });
-    L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: false, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
+    const tt = L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: false, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
       .setLatLng([d.lat, d.lng])
       .setContent(escapeHtml(d.name))
       .addTo(cityLabelLayer);
+    attachLabelClick(tt, open);
   });
 }
 let cityUpdateScheduled = false;
@@ -1196,10 +1208,9 @@ function loadCapitals(): void {
       const e = (cIso && entryByIso[cIso]) || entryByName[cCountry] || null;
       marker._entry = e;
       if (e) { e.capitalMarker = marker; e.capitalName = capName; }
-      marker.on("click", (ev) => {
-        L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
-        renderFeatureInfo(capName, cityWikiUrl(capName), e ? "Capital of " + e.name : "Capital", []);
-      });
+      const open = () => renderFeatureInfo(capName, cityWikiUrl(capName), e ? "Capital of " + e.name : "Capital", []);
+      marker.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+      marker.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       capitalMarkers.push(marker);
     });
     refreshCapitals();

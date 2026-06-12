@@ -633,9 +633,10 @@ function buildPeakMarkers(): void {
   const z = map.getZoom();
   PEAKS.forEach((p) => {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
-    const label = '<a href="' + wikiUrl(p.wiki || p.name) + '" target="_blank" rel="noopener">' + escapeHtml(p.name) + "</a>";
+    const label = '<a href="' + wikiUrl(p.wiki || p.name) + '" target="_blank" rel="noopener">' + escapeHtml(p.name) +
+      '</a> <span class="peak-elev">(' + fmtInt(p.elevation) + " m)</span>";
     m.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], interactive: true, className: "map-label peak-label" });
-    m.on("click", (e) => { L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); if (mode === "explore") showPeakInfo(p); });
+    m.on("click", (e) => L.DomEvent.stop(e)); // don't let the icon clear the selection
     peakMarkers.push(m);
   });
 }
@@ -663,25 +664,6 @@ function peakCountryNames(p: Peak): string {
   if (!p.iso.length) return "Antarctica";
   return p.iso.map((c) => (byIso[c] ? byIso[c].name : c)).join(" / ");
 }
-function showPeakInfo(p: Peak): void {
-  const wikiHref = wikiUrl(p.wiki || p.name);
-  const rows: [string, string][] = [
-    ["Elevation", fmtInt(p.elevation) + " m"],
-    ["Country", peakCountryNames(p)],
-    ["Region", escapeHtml(p.region)],
-  ];
-  const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
-  const titleLink = '<a href="' + wikiHref + '" target="_blank" rel="noopener">' + escapeHtml(p.name) + ' <span class="ext">↗</span></a>';
-  countryInfoEl.innerHTML =
-    '<div class="ci-head"><div><div class="ci-title">' + titleLink + "</div>" +
-    '<div class="ci-sub">Mountain peak</div></div>' +
-    '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' +
-    "<dl>" + dl + "</dl>";
-  countryInfoEl.hidden = false;
-  const close = countryInfoEl.querySelector(".ci-close");
-  if (close) close.addEventListener("click", () => { countryInfoEl.hidden = true; });
-}
-
 // ---------------------------------------------------------------------------
 // Refresh pipeline + selection
 // ---------------------------------------------------------------------------

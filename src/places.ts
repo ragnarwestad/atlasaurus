@@ -97,6 +97,7 @@ export function loadCapitals(): void {
         if (pop) rows.push(["Population", fmtInt(pop)]);
         if (elev) rows.push(["Elevation", fmtInt(elev) + " m"]);
         renderFeatureInfo(capName, cityWikiUrl(capName), cName ? "Capital of " + cName : "Capital", rows);
+        showCityOutline(lat, lng, capName, cName); // capitals get the same boundary outline as other cities
       };
       marker.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
       marker.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
@@ -160,7 +161,7 @@ function cityOpen(d: CityRec): void {
   if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
   if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
   renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows); // clears the previous outline via hooks.clearCityOutline
-  showCityOutline(d);
+  showCityOutline(d.lat, d.lng, d.name, d.adm0);
 }
 
 // --- City outline: the administrative boundary from OpenStreetMap (Nominatim),
@@ -199,15 +200,15 @@ function searchBoundary(qs: string): Promise<any> {
     .then(polyFrom)
     .catch(() => null);
 }
-function showCityOutline(d: CityRec): void {
+function showCityOutline(lat: number, lng: number, name: string, adm0: string): void {
   cityOutlineLayer.clearLayers();
-  const key = (d.name + "|" + d.adm0).toLowerCase();
+  const key = (name + "|" + adm0).toLowerCase();
   const reqId = ++outlineReqId;
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
   // Reverse-geocode at the coordinates first (name-independent, fixes Denmark); if
   // that yields no polygon, fall back to a free-form name search.
-  reverseBoundary(d.lat, d.lng, 10)
-    .then((geom) => geom || searchBoundary("q=" + encodeURIComponent(d.name + (d.adm0 ? ", " + d.adm0 : ""))))
+  reverseBoundary(lat, lng, 10)
+    .then((geom) => geom || searchBoundary("q=" + encodeURIComponent(name + (adm0 ? ", " + adm0 : ""))))
     .then((geom) => {
       outlineCache.set(key, geom || null);
       if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection

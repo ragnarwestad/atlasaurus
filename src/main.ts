@@ -82,6 +82,7 @@ let showPeaks = false;
 let showRivers = false;
 let showLakes = false;
 let showCities = false;
+let showHover = false; // off = Explore starts empty; hover only highlights the shape
 let isolate = false;
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
@@ -1330,7 +1331,7 @@ function loadBorders(): void {
             refreshPolygons();
             // The selected country already shows its flag + name on the map and in
             // the fact panel, so skip the redundant hover tooltip for it.
-            if (mode === "explore") { if (layerP === selectedLayer) hideHoverInfo(); else showHoverInfo(entry); }
+            if (mode === "explore") { if (layerP === selectedLayer || !showHover) hideHoverInfo(); else showHoverInfo(entry); }
           },
           mouseout: () => { if (hoveredLayer === layerP) { hoveredLayer = null; hoveredContinent = null; } refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
           click: (e) => {
@@ -1972,6 +1973,9 @@ capToggle.addEventListener("change", () => { showCapitals = capToggle.checked; r
 
 const flagToggle = document.getElementById("show-flags") as HTMLInputElement;
 flagToggle.addEventListener("change", () => { showFlags = flagToggle.checked; refreshFlags(); });
+
+const hoverToggle = document.getElementById("show-hover") as HTMLInputElement;
+hoverToggle.addEventListener("change", () => { showHover = hoverToggle.checked; if (!showHover) hideHoverInfo(); });
 
 const mtnToggle = document.getElementById("show-mountains") as HTMLInputElement;
 mtnToggle.addEventListener("change", () => { showPeaks = mtnToggle.checked; refreshPeaks(); });

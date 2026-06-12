@@ -3,6 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
+import L from "leaflet";
 import { map } from "./map";
 import { app, hooks, loadCountryData, type GroupScheme, type QuizType } from "./state";
 import { trackMouse, hideHoverInfo, countryInfoEl, updateInfoPanel, isNarrow } from "./panel";
@@ -158,6 +159,18 @@ map.on("zoomend", updatePeakSizes);
 map.on("moveend", scheduleCityUpdate);  // re-render in-view cities after pan/zoom
 map.on("moveend", refreshCapitals);     // re-evaluate which capitals fit the view
 map.on("moveend", refreshCountryLabels); // re-evaluate which country names fit the view
+
+// Zoom-level readout, stacked under the +/- control.
+const ZoomReadout = L.Control.extend({
+  onAdd() {
+    const div = L.DomUtil.create("div", "leaflet-bar zoom-level");
+    const update = () => { div.textContent = "z " + (+map.getZoom().toFixed(1)); };
+    map.on("zoomend", update);
+    update();
+    return div;
+  },
+});
+new ZoomReadout({ position: "topleft" }).addTo(map);
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;

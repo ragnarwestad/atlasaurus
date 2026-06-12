@@ -7,8 +7,9 @@ import {
   app, countries, fmtInt, entryForLayer, loadCountryData,
   type CountryEntry, type RestInfo,
 } from "./state";
-// TODO(refactor): these move to ./countries and ./regions in later steps.
-import { deselect, computeConnectors, groupOf, SCHEME_LABEL } from "./main";
+import { groupOf, SCHEME_LABEL } from "./regions";
+// TODO(refactor): these move to ./countries in a later step.
+import { deselect, computeConnectors } from "./main";
 
 // --- Hover info panel that floats next to the cursor (flag + name + capital) ---
 const hoverInfoEl = document.getElementById("hoverinfo")!;

@@ -4,12 +4,13 @@ import L from "leaflet";
 import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
-import { app, countries, popOf } from "./state";
+import { app, countries } from "./state";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
 
-// Like capitals/cities: show only a few (biggest) country names when zoomed out,
-// more as you zoom in, and only the ones in view — so the world view isn't a wall
-// of ~200 labels. Ranked by population; the selected country is always shown.
+// Like capitals/cities: show only a few country names when zoomed out, more as you
+// zoom in, and only the ones in view — so the world view isn't a wall of ~200
+// labels. Ranked by land AREA (so big countries like Australia/Canada show first,
+// matching how the map looks); the selected country is always shown.
 const NAME_MAX = 70; // ceiling, grows with zoom
 export function refreshCountryLabels(): void {
   if (app.mode === "quiz") {
@@ -23,7 +24,7 @@ export function refreshCountryLabels(): void {
     countries
       .filter((e) => e.labelTooltip && countryVisible(e) && app.showNames && inToggleScope(e))
       .filter((e) => { const ll = e.labelTooltip!.getLatLng(); return !!ll && b.contains(ll); })
-      .sort((a, c) => popOf(c) - popOf(a))
+      .sort((a, c) => (c.labelArea || 0) - (a.labelArea || 0))
       .slice(0, cap),
   );
   // The selected/revealed country's name is always shown (even with the toggle off).
@@ -79,6 +80,7 @@ export function placeCountryLabels(): void {
     if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;
 
     const center = centerOf(parts[0].rings);
+    entry.labelArea = Math.abs(parts[0].area); // largest landmass, for name-density ranking
     entry.labelTooltip = L.tooltip({
       permanent: true, direction: "center", offset: [0, 0],
       className: "map-label country-label", opacity: 1, interactive: false,

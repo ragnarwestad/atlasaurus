@@ -17,6 +17,8 @@ export interface CountryEntry {
   isLandmass?: boolean; // Antarctica: a continent landmass, not a country
   labelTooltip?: L.Tooltip;
   labelPlaced?: boolean;
+  labelArea?: number; // |area| of the largest polygon part (deg²) — ranks names by size
+
   capitalMarker?: L.CircleMarker;
   capitalName?: string;
   flagMarker?: L.Marker;

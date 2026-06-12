@@ -869,12 +869,12 @@ function updateCities(): void {
       ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
       : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
     const open = () => {
+      const sub = d.cap ? (d.adm0 ? "Capital of " + d.adm0 : "Capital") : (d.adm0 ? "City in " + d.adm0 : "City");
       const rows: [string, string][] = [];
-      if (d.adm0) rows.push(["Country", escapeHtml(d.adm0)]);
       if (d.adm1 && d.adm1 !== d.adm0) rows.push(["Region", escapeHtml(d.adm1)]);
       if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
       if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
-      renderFeatureInfo(d.name, cityWikiUrl(d.name), d.cap ? "Capital" : "City", rows);
+      renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
     };
     L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
       L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open();
@@ -1245,9 +1245,17 @@ function loadCapitals(): void {
       const e = (cIso && entryByIso[cIso]) || entryByName[cCountry] || null;
       marker._entry = e;
       if (e) { e.capitalMarker = marker; e.capitalName = capName; }
+      const cName = p.adm0name || (e ? e.name : "");
+      const adm1 = p.adm1name || "";
+      const elev = +(p.elevation || 0);
       const pop = +(p.pop_max || p.pop_min || 0);
-      const open = () => renderFeatureInfo(capName, cityWikiUrl(capName), e ? "Capital of " + e.name : "Capital",
-        pop ? [["Population", fmtInt(pop)]] : []);
+      const open = () => {
+        const rows: [string, string][] = [];
+        if (adm1) rows.push(["Region", escapeHtml(adm1)]);
+        if (pop) rows.push(["Population", fmtInt(pop)]);
+        if (elev) rows.push(["Elevation", fmtInt(elev) + " m"]);
+        renderFeatureInfo(capName, cityWikiUrl(capName), cName ? "Capital of " + cName : "Capital", rows);
+      };
       marker.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
       marker.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       capitalMarkers.push(marker);

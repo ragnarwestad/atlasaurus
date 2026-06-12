@@ -126,6 +126,16 @@ export function refreshRivers(): void {
   updateRiverVisibility();
 }
 
+// Re-evaluate rivers + lakes after the map has fully settled. Bound to `moveend`
+// (which also fires after a zoom) and deferred to the next frame so the shared
+// canvas renderer has finished repositioning — adding paths to it mid-zoom throws.
+let physUpdateScheduled = false;
+export function schedulePhysicalUpdate(): void {
+  if (physUpdateScheduled) return;
+  physUpdateScheduled = true;
+  requestAnimationFrame(() => { physUpdateScheduled = false; refreshRivers(); refreshLakes(); });
+}
+
 // --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---
 let lakeGeo: L.GeoJSON | null = null;
 let lakesLoading = false;

@@ -8,7 +8,7 @@ import { map } from "./map";
 import { app, hooks, loadCountryData, type GroupScheme, type QuizType } from "./state";
 import { trackMouse, hideHoverInfo, countryInfoEl, updateInfoPanel, isNarrow } from "./panel";
 import { refreshCountryLabels, refreshFlags, updateFlagSizes } from "./labels";
-import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes } from "./physical";
+import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes, schedulePhysicalUpdate } from "./physical";
 import { refreshCapitals, scheduleCityUpdate, refreshCities } from "./places";
 import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
@@ -159,8 +159,7 @@ map.on("zoomend", updatePeakSizes);
 map.on("moveend", scheduleCityUpdate);  // re-render in-view cities after pan/zoom
 map.on("moveend", refreshCapitals);     // re-evaluate which capitals fit the view
 map.on("moveend", refreshCountryLabels); // re-evaluate which country names fit the view
-map.on("zoomend", refreshLakes);         // reveal more lakes as you zoom in
-map.on("zoomend", refreshRivers);        // reveal more rivers as you zoom in
+map.on("moveend", schedulePhysicalUpdate); // reveal more rivers/lakes as you zoom in (deferred; canvas must settle)
 
 // Zoom-level readout, stacked under the +/- control.
 const ZoomReadout = L.Control.extend({

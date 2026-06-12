@@ -96,10 +96,14 @@ function loadRivers(): void {
     const names = Object.keys(lenByName).sort((a, b) => lenByName[b] - lenByName[a]);
     const len = Math.max(1, names.length);
     const minZ = map.getMinZoom() || 2, span = (map.getMaxZoom() || 8) - minZ;
-    const RIVER_ZOOM_BIAS = 1; // reveal each river ~1 level earlier than its length rank alone would give
     const mzByName: Record<string, number> = {};
     // sqrt curve front-loads the low end: only the few longest rivers at world view.
-    names.forEach((nm, i) => { mzByName[nm] = Math.max(minZ, minZ + Math.floor(Math.sqrt(i / len) * span) - RIVER_ZOOM_BIAS); });
+    // Keep z2/z3 sparse (just the giants), but pull everything that would land at
+    // z5+ one level earlier, so mid rivers like the Po show from z4 on.
+    names.forEach((nm, i) => {
+      const natural = minZ + Math.floor(Math.sqrt(i / len) * span);
+      mzByName[nm] = natural >= 5 ? natural - 1 : natural;
+    });
     riverGeo = L.geoJSON({ type: "FeatureCollection", features: feats } as any, {
       style: () => ({ renderer: featureCanvas, color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {

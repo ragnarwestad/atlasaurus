@@ -164,7 +164,8 @@ map.on("moveend", refreshCountryLabels); // re-evaluate which country names fit 
 const ZoomReadout = L.Control.extend({
   onAdd() {
     const div = L.DomUtil.create("div", "leaflet-bar zoom-level");
-    const update = () => { div.textContent = "z " + (+map.getZoom().toFixed(1)); };
+    div.title = "Zoom level";
+    const update = () => { const z = map.getZoom(); div.textContent = Number.isInteger(z) ? String(z) : z.toFixed(1); };
     map.on("zoomend", update);
     update();
     return div;

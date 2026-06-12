@@ -6,6 +6,11 @@
 //     pnpm test:live      (sets RUN_LIVE=1)
 //
 // Paced at ~1 request/second per Nominatim's usage policy, so it takes ~1 minute.
+//
+// Must run in the node environment: happy-dom simulates browser CORS and sends an
+// OPTIONS preflight for every request (the custom User-Agent triggers it), which
+// doubles the request rate and gets the IP 429-throttled by Nominatim.
+// @vitest-environment node
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { resolveCityBoundary, geomContains, geomExtentKm, MAX_CITY_KM } from "./cityBoundary";
 
@@ -49,10 +54,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 beforeAll(() => {
   realFetch = globalThis.fetch;
   vi.stubGlobal("fetch", async (url: any, init: any = {}) => {
-    const wait = Math.max(0, 1100 - (Date.now() - last));
-    if (wait) await sleep(wait);
-    last = Date.now();
-    return realFetch(url, { ...init, headers: { ...(init.headers || {}), "User-Agent": "Atlasaurus-outline-test/1.0" } });
+    // Nominatim throttles bursts with 429 even at ~1 req/s; back off and retry
+    // instead of letting a throttled run masquerade as "no boundary found".
+    for (let attempt = 0; ; attempt++) {
+      const wait = Math.max(0, 1100 - (Date.now() - last));
+      if (wait) await sleep(wait);
+      last = Date.now();
+      const res = await realFetch(url, { ...init, headers: { ...(init.headers || {}), "User-Agent": "Atlasaurus-outline-test/1.0" } });
+      if (res.status !== 429 || attempt >= 3) return res;
+      console.log(`  …429 throttled, backing off 30 s (retry ${attempt + 1}/3)`);
+      await sleep(30_000);
+    }
   });
 });
 afterAll(() => vi.unstubAllGlobals());
@@ -67,5 +79,5 @@ describe.skipIf(!LIVE)("Nominatim live city boundaries", () => {
     expect(res.geom, `${c.name}: no boundary returned`).not.toBeNull();
     expect(geomContains(c.lng, c.lat, res.geom!), `${c.name}: boundary does not contain the point`).toBe(true);
     expect(geomExtentKm(res.geom!), `${c.name}: boundary too large (${span} km)`).toBeLessThanOrEqual(MAX_CITY_KM);
-  }, 60_000);
+  }, 240_000); // headroom for 429 backoff (up to 3 × 30 s per request)
 });

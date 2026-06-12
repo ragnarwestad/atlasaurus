@@ -734,8 +734,8 @@ function refreshLakes(): void {
 //     only the in-view cities above the zoom's min_zoom — capped, with DOM name
 //     labels only for the top few. (Thousands of permanent labels = big lag.) ---
 const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
-const CITY_MAX_DOTS = 800; // dots rendered per view
-const CITY_MAX_LABELS = 60; // DOM name labels per view
+const CITY_SHOW_ZOOM = 4;  // don't show any cities until zoomed in to here
+const CITY_MAX = 70;       // cities rendered per view (each gets a dot AND a label)
 interface CityRec { lat: number; lng: number; name: string; mz: number; }
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
@@ -766,19 +766,20 @@ function loadCities(): void {
 function updateCities(): void {
   if (!(showCities && mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }
+  cityLayer.clearLayers();
+  cityLabelLayer.clearLayers();
   const zReal = map.getZoom();
+  if (zReal < CITY_SHOW_ZOOM) return; // keep cities hidden until zoomed in (no anonymous dots)
   const z = zReal + CITY_ZOOM_BIAS;
   const b = map.getBounds().pad(0.15);
-  const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz);
-  cityLayer.clearLayers();
-  vis.slice(0, CITY_MAX_DOTS).forEach((d) =>
-    L.circleMarker([d.lat, d.lng], { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 }).addTo(cityLayer));
-  cityLabelLayer.clearLayers();
-  if (zReal >= 4) vis.slice(0, CITY_MAX_LABELS).forEach((d) =>
+  const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz).slice(0, CITY_MAX);
+  vis.forEach((d) => {
+    L.circleMarker([d.lat, d.lng], { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 }).addTo(cityLayer);
     L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: true, className: "map-label city-label" })
       .setLatLng([d.lat, d.lng])
       .setContent('<a href="' + cityWikiUrl(d.name) + '" target="_blank" rel="noopener">' + escapeHtml(d.name) + "</a>")
-      .addTo(cityLabelLayer));
+      .addTo(cityLabelLayer);
+  });
 }
 let cityUpdateScheduled = false;
 function scheduleCityUpdate(): void {

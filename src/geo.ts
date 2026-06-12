@@ -63,6 +63,21 @@ export function allPolygonParts(geom: any): PolyPart[] {
     .sort((a, b) => b.area - a.area);
 }
 
+/** Great-circle length (km) of a LineString / MultiLineString geometry. */
+export function lineLengthKm(geom: any): number {
+  const hav = (a: number[], b: number[]) => {
+    const R = 6371, toR = Math.PI / 180;
+    const dLat = (b[1] - a[1]) * toR, dLng = (b[0] - a[0]) * toR;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * toR) * Math.cos(b[1] * toR) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+  if (!geom) return 0;
+  const lines: number[][][] = geom.type === "LineString" ? [geom.coordinates] : geom.type === "MultiLineString" ? geom.coordinates : [];
+  let len = 0;
+  for (const line of lines) for (let i = 1; i < line.length; i++) len += hav(line[i - 1], line[i]);
+  return len;
+}
+
 /**
  * Visual center (pole of inaccessibility) of a set of unwrapped rings, wrapped
  * back into [-180, 180]. Returns [lat, lng] for Leaflet.

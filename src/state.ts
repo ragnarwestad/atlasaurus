@@ -131,6 +131,16 @@ export function areaOf(e: CountryEntry): number {
   return (app.countryData && e.iso && app.countryData[e.iso] && app.countryData[e.iso].area) || 0;
 }
 
+// The zoom at/above which a populated place should appear: prefer Natural
+// Earth's min_zoom, fall back to scalerank, then to a population-based guess.
+// (Lives here rather than places.ts so it stays import-pure and unit-testable.)
+export function placeMinZoom(p: any): number {
+  if (p.min_zoom != null) return +p.min_zoom;
+  if (p.scalerank != null) return +p.scalerank;
+  const pop = +(p.pop_max || 0);
+  return pop > 5e6 ? 1 : pop > 1e6 ? 3 : pop > 2e5 ? 5 : 7;
+}
+
 export function layerCenter(entry: CountryEntry): LatLng | null {
   try {
     const parts = allPolygonParts((entry.layer as any).feature && (entry.layer as any).feature.geometry);

@@ -5,12 +5,26 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
 
 ## Workflow — do this for every change
 1. Edit source under `src/` (and `index.html` / `vite.config.ts`).
-2. Verify before committing: `pnpm typecheck` (must pass) **and** `pnpm build` (must succeed).
+2. Verify before committing: `pnpm typecheck` (must pass), `pnpm test`
+   (Vitest, must pass) **and** `pnpm build` (must succeed).
 3. Commit one logical change with a short, descriptive message.
 
 - `src/` is the single source of truth.
 - **Never commit** `dist/`, `node_modules/`, or a prebuilt `atlasaurus.html` — all are build artifacts / git-ignored.
 - Package manager is **pnpm** (lockfile: `pnpm-lock.yaml`). Don't use npm/yarn.
+
+## Tests (Vitest)
+- Unit tests live next to the source (`src/*.test.ts`), run with `pnpm test`.
+  Config is `vitest.config.ts` (standalone — deliberately does NOT share
+  `vite.config.ts`; the singlefile plugin is build-only).
+- Scope: the **pure helpers only** — `geo.ts` (incl. `lineLengthKm`), `wiki.ts`,
+  and the `state.ts` helpers (`fmtInt`, `popOf`, `areaOf`, `layerCenter`,
+  `placeMinZoom`, …). New pure logic should be placed in (or exported from)
+  these modules so it stays testable.
+- `map.ts` runs `L.map("map")` at import time — anything importing it
+  (countries/panel/labels/physical/places/regions/sidebar/quiz/main) is NOT
+  unit-testable; interaction behaviour is covered by the manual browser
+  smoke-test instead. Environment is `happy-dom` so importing Leaflet works.
 
 ## pnpm notes
 - `pnpm-workspace.yaml` sets `onlyBuiltDependencies: [esbuild]` and `verifyDepsBeforeRun: false`.

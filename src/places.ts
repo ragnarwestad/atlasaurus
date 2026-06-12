@@ -5,7 +5,7 @@ import { CAPITAL_URLS, CITY_URLS } from "./config";
 import { cityWikiUrl, escapeHtml } from "./wiki";
 import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
 import {
-  app, countries, capitalMarkers, popOf, fmtInt, fetchJson,
+  app, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom,
   type CountryEntry, type CapitalMarker,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
@@ -111,14 +111,6 @@ interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boo
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
 let citiesLoading = false;
-// The zoom at/above which a place should appear: prefer NE's min_zoom, fall back
-// to scalerank, then to a population-based guess.
-function placeMinZoom(p: any): number {
-  if (p.min_zoom != null) return +p.min_zoom;
-  if (p.scalerank != null) return +p.scalerank;
-  const pop = +(p.pop_max || 0);
-  return pop > 5e6 ? 1 : pop > 1e6 ? 3 : pop > 2e5 ? 5 : 7;
-}
 function loadCities(): void {
   if (cityDataLoaded || citiesLoading) return;
   citiesLoading = true;

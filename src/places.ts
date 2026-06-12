@@ -174,7 +174,10 @@ let outlineReqId = 0; // guards against a slow request painting over a newer sel
 function drawOutlineGeom(geom: any): void {
   cityOutlineLayer.clearLayers();
   if (!geom) return;
-  L.geoJSON({ type: "Feature", geometry: geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
+  const layer = L.geoJSON({ type: "Feature", geometry: geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
+  // Zoom to the boundary — at the world-ish zoom a city outline is just a dot,
+  // so the whole point of drawing it is lost without moving in.
+  try { map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 10 }); } catch { /* ignore */ }
 }
 export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
 

@@ -116,8 +116,7 @@ function setMapExpanded(on: boolean): void {
 }
 document.querySelector(".sb-fold")!.addEventListener("click", () => setMapExpanded(!mapExpanded));
 
-// Save space on small screens: start with the map options + country list folded.
-if (isNarrow()) document.getElementById("feat-sec-countries")?.classList.add("collapsed");
+// Save space on small screens: start with the map options folded too.
 setMapExpanded(!isNarrow());
 
 const searchInput = document.getElementById("search") as HTMLInputElement;

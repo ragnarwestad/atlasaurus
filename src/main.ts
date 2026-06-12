@@ -26,6 +26,9 @@ import {
   trackMouse, showHoverInfo, hideHoverInfo, countryInfoEl, renderFeatureInfo,
   attachLabelClick, updateInfoPanel, isNarrow,
 } from "./panel";
+import {
+  refreshCountryLabels, refreshFlags, updateFlagSizes, placeCountryLabels, updatePeakLabels,
+} from "./labels";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)
@@ -73,10 +76,10 @@ function sameRealm(e: CountryEntry): boolean {
 // are shown for these (and via the toggles) — NOT on hover. Hover info goes to a
 // separate off-map panel (see showHoverInfo) so it can't fight the polygon's
 // hover/click and cause flicker. On-map labels stay interactive (clickable).
-function isRevealed(e: CountryEntry): boolean {
+export function isRevealed(e: CountryEntry): boolean {
   return e.layer === app.selectedLayer || sameRealm(e);
 }
-function countryVisible(e: CountryEntry): boolean {
+export function countryVisible(e: CountryEntry): boolean {
   if (app.mode === "quiz") return true; // everything visible/clickable in the quiz
   // A selected continent takes precedence: keep showing all its members (the
   // selected country, if any, is one of them).
@@ -88,19 +91,9 @@ function countryVisible(e: CountryEntry): boolean {
 // Scope of the "Show names/capitals/flags" toggles:
 //  - Countries tab: global (all countries).
 //  - Continents tab: only the selected continent's members (nothing if none).
-function inToggleScope(e: CountryEntry): boolean {
+export function inToggleScope(e: CountryEntry): boolean {
   if (app.activeTab === "continents") return app.selectedContinent != null && groupOf(e) === app.selectedContinent;
   return true;
-}
-
-function refreshCountryLabels(): void {
-  countries.forEach((e) => {
-    if (!e.labelTooltip) return;
-    const el = e.labelTooltip.getElement();
-    if (!el) return;
-    if (app.mode === "quiz") { el.style.display = "none"; return; } // clean map for the quiz
-    el.style.display = countryVisible(e) && ((app.showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
-  });
 }
 
 const CAPITAL_MAX = 70; // ceiling on capitals shown per view (grows with zoom)
@@ -130,17 +123,6 @@ function refreshCapitals(): void {
     const has = capitalLayer.hasLayer(m);
     if (shown.has(m) && !has) capitalLayer.addLayer(m);
     else if (!shown.has(m) && has) capitalLayer.removeLayer(m);
-  });
-}
-
-function refreshFlags(): void {
-  if (app.mode === "quiz") { countries.forEach((e) => { if (e.flagMarker && flagLayer.hasLayer(e.flagMarker)) flagLayer.removeLayer(e.flagMarker); }); return; }
-  countries.forEach((e) => {
-    if (!e.flagMarker) return;
-    const visible = countryVisible(e) && ((app.showFlags && inToggleScope(e)) || isRevealed(e));
-    const has = flagLayer.hasLayer(e.flagMarker);
-    if (visible && !has) flagLayer.addLayer(e.flagMarker);
-    else if (!visible && has) flagLayer.removeLayer(e.flagMarker);
   });
 }
 
@@ -290,26 +272,6 @@ function refreshConnectors(): void {
       permanent: true, interactive: true, direction: "right", offset: [6, 0],
       className: "map-label connector-label", opacity: 1,
     }).setLatLng(it.tip).setContent(html).addTo(connectorLayer);
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Flags (scale with zoom)
-// ---------------------------------------------------------------------------
-function flagIcon(iso2: string, zoom: number): L.DivIcon {
-  const scale = Math.min(0.78 + (zoom - 2) * 0.33, 3); // smaller when zoomed out (~19px at z2)
-  const w = Math.round(24 * scale), h = Math.round(18 * scale);
-  return L.divIcon({
-    className: "flag-icon",
-    html: '<img src="https://flagcdn.com/48x36/' + iso2 + '.png" width="' + w + '" height="' + h + '" alt="">',
-    iconSize: [w, h],
-    iconAnchor: [w / 2, h + 8], // sit just above the centroid
-  });
-}
-function updateFlagSizes(): void {
-  const z = map.getZoom();
-  countries.forEach((e) => {
-    if (e.flagMarker && e.iso2) e.flagMarker.setIcon(flagIcon(e.iso2, z));
   });
 }
 
@@ -539,16 +501,6 @@ function scheduleCityUpdate(): void {
   requestAnimationFrame(() => { cityUpdateScheduled = false; updateCities(); });
 }
 function refreshCities(): void { updateCities(); }
-// Peak/river names get crowded when zoomed out, so hide the labels below a zoom
-// threshold — the icons and lines still show every feature.
-function updatePeakLabels(): void {
-  const mapEl = document.getElementById("map");
-  if (!mapEl) return;
-  const on = map.getZoom() >= 4;
-  mapEl.classList.toggle("peak-labels-on", on);
-  mapEl.classList.toggle("river-labels-on", on);
-  mapEl.classList.toggle("lake-labels-on", on);
-}
 function updatePeakSizes(): void {
   const z = map.getZoom();
   const off = peakLabelOffset(z);
@@ -794,33 +746,6 @@ function setActiveTab(tab: "countries" | "continents"): void {
 
   buildContinentList(); // reflect cleared expand/selection state
   refreshAll();         // restyle map, panels, reveals (toggle scope depends on tab)
-}
-
-// ---------------------------------------------------------------------------
-// Labels + flags placement
-// ---------------------------------------------------------------------------
-function placeCountryLabels(): void {
-  countries.forEach((entry) => {
-    if (entry.labelPlaced) return;
-    let parts;
-    try { parts = allPolygonParts(entry.layer.feature && entry.layer.feature.geometry); }
-    catch { parts = []; }
-    if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;
-
-    const center = centerOf(parts[0].rings);
-    entry.labelTooltip = L.tooltip({
-      permanent: true, direction: "center", offset: [0, 0],
-      className: "map-label country-label", opacity: 1, interactive: false,
-    }).setLatLng(center).setContent(escapeHtml(entry.name)).addTo(map);
-
-    if (entry.iso2) {
-      entry.flagMarker = L.marker(center, {
-        interactive: false, keyboard: false, icon: flagIcon(entry.iso2, map.getZoom()),
-      });
-    }
-    entry.labelPlaced = true;
-  });
-  refreshFlags();
 }
 
 // ---------------------------------------------------------------------------

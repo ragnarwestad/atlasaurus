@@ -769,7 +769,15 @@ function loadLakes(): void {
         const name = lakeName(f);
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
-        const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", []);
+        // Rough area from the polygon: shoelace deg² → km² with a latitude correction.
+        // (Natural Earth carries no lake area, so this is computed and approximate.)
+        let rows: [string, string][] = [];
+        try {
+          const latC = (layer as L.Polygon).getBounds().getCenter().lat;
+          const km2 = (f.__a || 0) * 12309 * Math.cos(latC * Math.PI / 180);
+          if (km2 > 1) rows = [["Area", "≈ " + fmtInt(km2) + " km²"]];
+        } catch { /* no area */ }
+        const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", rows);
         layer.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
@@ -1208,7 +1216,9 @@ function loadCapitals(): void {
       const e = (cIso && entryByIso[cIso]) || entryByName[cCountry] || null;
       marker._entry = e;
       if (e) { e.capitalMarker = marker; e.capitalName = capName; }
-      const open = () => renderFeatureInfo(capName, cityWikiUrl(capName), e ? "Capital of " + e.name : "Capital", []);
+      const pop = +(p.pop_max || p.pop_min || 0);
+      const open = () => renderFeatureInfo(capName, cityWikiUrl(capName), e ? "Capital of " + e.name : "Capital",
+        pop ? [["Population", fmtInt(pop)]] : []);
       marker.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
       marker.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       capitalMarkers.push(marker);

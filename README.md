@@ -56,8 +56,8 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
     to list its member countries.
   - **Sort** by Name, Population or Area (applies to both tabs); when sorting by
     population/area the value is shown after each name (compact, 2 decimals).
-- **Map display toggles:** country names, capitals, flags, and "Isolate selected".
-  On the Continents tab these toggles apply only to the selected continent.
+- **Map display toggles:** country names, capitals, flags, and mountain peaks.
+  On the Regions tab these toggles apply only to the selected region.
 - **Hover** shows a small panel that follows the cursor (flag · name · capital);
   the hovered country is highlighted.
 - **Select a country** (map or list) to: highlight it, open a fact panel
@@ -70,8 +70,6 @@ vite.config.ts        # Vite + vite-plugin-singlefile (inline everything)
   The fact panel also lists those territories (scrollable, each Wikipedia-linked).
 - Selecting a country **inside a highlighted continent** keeps the continent green
   with the country shown selected (orange) on top.
-- **Isolate** mode hides all other countries to focus on the selection (a country
-  and its parts, or a continent's members).
 - Flags scale with zoom (smaller when zoomed out); click the background (ocean) to
   clear the selection.
 - Country/capital/territory/continent names all link to English Wikipedia.

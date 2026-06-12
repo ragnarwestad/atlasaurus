@@ -1715,8 +1715,6 @@ mtnToggle.addEventListener("change", () => { showPeaks = mtnToggle.checked; refr
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; refreshCountryLabels(); });
 
-const isoToggle = document.getElementById("isolate") as HTMLInputElement;
-isoToggle.addEventListener("change", () => { isolate = isoToggle.checked; refreshAll(); });
 
 document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
   btn.addEventListener("click", () => { setActiveTab(btn.dataset.tab as "countries" | "continents"); setListExpanded(true); });

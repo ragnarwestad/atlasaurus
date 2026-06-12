@@ -129,11 +129,11 @@ body { display: flex; font-family: system-ui, sans-serif; }
   font-size: 13px; border: 1px solid #ccc; border-radius: 6px;
 }
 .map-toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 9px; }
-#cap-toggle, #name-toggle, #iso-toggle, #flag-toggle {
+#cap-toggle, #name-toggle, #flag-toggle, #mtn-toggle {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; color: #333; cursor: pointer; user-select: none;
 }
-#cap-toggle input, #name-toggle input, #iso-toggle input, #flag-toggle input { cursor: pointer; }
+#cap-toggle input, #name-toggle input, #flag-toggle input, #mtn-toggle input { cursor: pointer; }
 
 /* Countries / Continents tabs (underline style) */
 .sb-tabs { display: flex; gap: 18px; border-bottom: 1px solid #e1e7ec; }

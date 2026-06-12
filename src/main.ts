@@ -614,7 +614,7 @@ function updateFlagSizes(): void {
 // Mountain peaks (Explore "Show mountains" layer + quiz markers)
 // ---------------------------------------------------------------------------
 function peakSize(zoom: number): number { return Math.round(Math.min(22 + (zoom - 2) * 5, 46)); } // grows when zoomed in
-function peakLabelOffset(zoom: number): L.PointExpression { return [Math.round(peakSize(zoom) / 2) + 5, 0]; }
+function peakLabelOffset(zoom: number): L.PointExpression { return [Math.round(peakSize(zoom) / 4) + 5, 0]; }
 function peakIcon(zoom: number, highlight = false): L.DivIcon {
   const w = peakSize(zoom);
   const h = Math.round(w * 22 / 28);

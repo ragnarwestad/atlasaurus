@@ -1,7 +1,7 @@
 // On-map country name labels and flag markers (placement, zoom scaling and
 // visibility), plus the zoom-gated visibility classes for peak/river/lake labels.
 import L from "leaflet";
-import { allPolygonParts, centerOf } from "./geo";
+import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
 import { app, countries } from "./state";
@@ -54,7 +54,7 @@ export function refreshFlags(): void {
 export function placeCountryLabels(): void {
   countries.forEach((entry) => {
     if (entry.labelPlaced) return;
-    let parts;
+    let parts: PolyPart[];
     try { parts = allPolygonParts(entry.layer.feature && entry.layer.feature.geometry); }
     catch { parts = []; }
     if (!parts.length || !parts[0].rings[0] || parts[0].rings[0].length < 3) return;

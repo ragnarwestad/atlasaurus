@@ -5,8 +5,8 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
 
 ## Workflow — do this for every change
 1. Edit source under `src/` (and `index.html` / `vite.config.ts`).
-2. Verify before committing: `pnpm typecheck` (must pass), `pnpm test`
-   (Vitest, must pass) **and** `pnpm build` (must succeed).
+2. Verify before committing: `pnpm typecheck`, `pnpm test` (Vitest),
+   `pnpm lint` (Biome) — all must pass — **and** `pnpm build` (must succeed).
 3. Commit one logical change with a short, descriptive message.
 
 - `src/` is the single source of truth.
@@ -25,6 +25,15 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
   (countries/panel/labels/physical/places/regions/sidebar/quiz/main) is NOT
   unit-testable; interaction behaviour is covered by the manual browser
   smoke-test instead. Environment is `happy-dom` so importing Leaflet works.
+
+## Lint (Biome)
+- `pnpm lint` runs Biome **lint-only** (`biome.jsonc`). The formatter is
+  disabled on purpose — the codebase is deliberately hand-formatted, and a
+  formatter once reverted edits mid-work. Never enable it or run `biome format`.
+- Several rules are off because they flag deliberate house style (`any`,
+  string concatenation, `!` assertions, `a && a.b`, the `(x[k] = x[k] || []).push`
+  idiom, `!important` for Leaflet overrides) — rationale is commented per rule
+  in `biome.jsonc`. Don't "fix" code to satisfy a disabled rule.
 
 ## pnpm notes
 - `pnpm-workspace.yaml` sets `onlyBuiltDependencies: [esbuild]` and `verifyDepsBeforeRun: false`.

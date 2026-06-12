@@ -1,0 +1,43 @@
+// Biome is LINT-ONLY here: the formatter is disabled on purpose. The codebase
+// has deliberate hand-formatting (aligned comments, compact one-liners), and a
+// formatter once reverted edits mid-work (see REFACTOR.md). Don't enable it.
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+	"files": {
+		"includes": ["src/**", "*.ts"]
+	},
+	"formatter": {
+		"enabled": false
+	},
+	"assist": {
+		"enabled": false
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended",
+			"suspicious": {
+				// GeoJSON/Natural Earth properties are untyped throughout — `any` is a
+				// deliberate choice (tsconfig has noImplicitAny: false).
+				"noExplicitAny": "off",
+				// The `(x[k] = x[k] || []).push(…)` grouping idiom is used on purpose.
+				"noAssignInExpressions": "off"
+			},
+			"style": {
+				// String concatenation (not template literals) is the house style.
+				"useTemplate": "off",
+				// `!` on DOM lookups for elements that exist in index.html is deliberate.
+				"noNonNullAssertion": "off",
+				// styles.css relies on its current specificity ordering; reshuffling
+				// selectors for this rule would risk visual regressions.
+				"noDescendingSpecificity": "off"
+			},
+			"complexity": {
+				// `a && a.b` instead of `a?.b` is the house style (ES2019 target).
+				"useOptionalChain": "off",
+				// !important is required to override Leaflet's inline/default styles.
+				"noImportantStyles": "off"
+			}
+		}
+	}
+}

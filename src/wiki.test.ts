@@ -16,7 +16,8 @@ describe("wikiUrl / cityWikiUrl overrides", () => {
     for (const [name, target] of Object.entries(WIKI_OVERRIDES).slice(0, 3)) {
       expect(wikiUrl(name)).toBe(makeWikiUrl(target));
     }
-    expect(wikiUrl("Norway")).toBe(WIKI_OVERRIDES["Norway"] ? makeWikiUrl(WIKI_OVERRIDES["Norway"]) : makeWikiUrl("Norway"));
+    const name = "Norway";
+    expect(wikiUrl(name)).toBe(makeWikiUrl(WIKI_OVERRIDES[name] || name));
   });
   it("applies CITY_OVERRIDES when present", () => {
     for (const [name, target] of Object.entries(CITY_OVERRIDES).slice(0, 3)) {

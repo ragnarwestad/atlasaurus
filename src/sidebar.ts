@@ -166,7 +166,7 @@ export function buildSidebar(): void {
   // Flat country list (Countries tab) — excludes the Antarctica landmass.
   const ul = document.getElementById("country-list")!;
   ul.innerHTML = "";
-  realCountries().sort(cmpCountries).forEach((entry) => ul.appendChild(makeCountryLi(entry)));
+  realCountries().sort(cmpCountries).forEach((entry) => { ul.appendChild(makeCountryLi(entry)); });
   document.getElementById("count-num")!.textContent = String(realCountries().length);
 
   buildContinentList();

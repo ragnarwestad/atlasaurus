@@ -464,7 +464,7 @@ function zoomToTarget(maxZoom: number): void {
 }
 export function setMode(m: "explore" | "quiz"): void {
   app.mode = m;
-  document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
+  document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => { b.classList.toggle("active", b.dataset.mode === m); });
   (document.getElementById("explore-panel") as HTMLElement).hidden = m !== "explore";
   (document.getElementById("quiz-panel") as HTMLElement).hidden = m !== "quiz";
   hideHoverInfo();
@@ -484,7 +484,7 @@ export function setMode(m: "explore" | "quiz"): void {
 const quizTypeEl = document.getElementById("quiz-type") as HTMLElement;
 const mtnTypeEl = document.getElementById("mtn-type") as HTMLElement;
 export function setQuizCat(cat: "country" | "continent" | "mountains"): void {
-  document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
+  document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => { b.classList.toggle("active", b.dataset.cat === cat); });
   quizTypeEl.hidden = cat !== "country";
   mtnTypeEl.hidden = cat !== "mountains";
   if (cat === "continent") {

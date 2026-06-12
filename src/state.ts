@@ -1,7 +1,7 @@
 // Shared types + mutable app state + the data collections every module reads.
 // ES module imports are live but READ-ONLY bindings, so all mutable flags live
 // as properties of the single exported `app` object (modules do `app.mode = …`).
-import L from "leaflet";
+import type L from "leaflet";
 import { allPolygonParts, centerOf, type LatLng } from "./geo";
 import type { Peak } from "./peaks";
 

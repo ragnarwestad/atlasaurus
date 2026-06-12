@@ -70,7 +70,7 @@ document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
     app.quizType = b.dataset.qtype as QuizType;
     // Scope the active state to the button's own row (Country vs Mountains).
-    b.parentElement!.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
+    b.parentElement!.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => { x.classList.toggle("active", x === b); });
     if (app.mode === "quiz") nextQuestion();
   });
 });
@@ -162,7 +162,7 @@ map.on("moveend", refreshCapitals);     // re-evaluate which capitals fit the vi
 const helpModal = document.getElementById("help-modal") as HTMLElement;
 const openHelp = () => { helpModal.hidden = false; };
 const closeHelp = () => { helpModal.hidden = true; };
-document.querySelectorAll<HTMLElement>(".help-btn").forEach((b) => b.addEventListener("click", openHelp));
+document.querySelectorAll<HTMLElement>(".help-btn").forEach((b) => { b.addEventListener("click", openHelp); });
 helpModal.addEventListener("click", (e) => {
   const t = e.target as HTMLElement;
   if (t === helpModal || t.classList.contains("help-close")) closeHelp();

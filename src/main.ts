@@ -734,8 +734,7 @@ function refreshLakes(): void {
 //     only the in-view cities above the zoom's min_zoom — capped, with DOM name
 //     labels only for the top few. (Thousands of permanent labels = big lag.) ---
 const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
-const CITY_SHOW_ZOOM = 4;  // don't show any cities until zoomed in to here
-const CITY_MAX = 70;       // cities rendered per view (each gets a dot AND a label)
+const CITY_MAX = 70;       // ceiling on cities rendered per view (each gets a dot AND a label)
 interface CityRec { lat: number; lng: number; name: string; mz: number; }
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
@@ -769,10 +768,11 @@ function updateCities(): void {
   cityLayer.clearLayers();
   cityLabelLayer.clearLayers();
   const zReal = map.getZoom();
-  if (zReal < CITY_SHOW_ZOOM) return; // keep cities hidden until zoomed in (no anonymous dots)
   const z = zReal + CITY_ZOOM_BIAS;
+  // Show only a few (biggest) cities when zoomed out, more as you zoom in.
+  const cap = Math.max(8, Math.min(CITY_MAX, Math.round((zReal - 1) * 12)));
   const b = map.getBounds().pad(0.15);
-  const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz).slice(0, CITY_MAX);
+  const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz).slice(0, cap);
   vis.forEach((d) => {
     L.circleMarker([d.lat, d.lng], { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 }).addTo(cityLayer);
     L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: true, className: "map-label city-label" })

@@ -134,6 +134,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
   font-size: 13px; color: #333; cursor: pointer; user-select: none;
 }
 #cap-toggle input, #name-toggle input, #flag-toggle input, #mtn-toggle input, #riv-toggle input, #lake-toggle input, #city-toggle input, #hover-toggle input { cursor: pointer; }
+/* Full-width break + divider between the two toggle groups (features vs overlays). */
+.toggle-sep { flex-basis: 100%; height: 0; margin: 1px 0; border: 0; border-top: 1px solid #e1e7ec; }
 /* Hover doesn't exist on touch devices, so hide the Hover-info toggle there. */
 @media (hover: none) { #hover-toggle { display: none; } }
 

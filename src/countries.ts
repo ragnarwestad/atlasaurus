@@ -59,11 +59,11 @@ export function countryVisible(e: CountryEntry): boolean {
   return true;
 }
 
-// Scope of the "Show names/capitals/flags" toggles:
-//  - Countries tab: global (all countries).
-//  - Continents tab: only the selected continent's members (nothing if none).
-export function inToggleScope(e: CountryEntry): boolean {
-  if (app.activeTab === "continents") return app.selectedContinent != null && groupOf(e) === app.selectedContinent;
+// Scope of the "Show names/capitals/flags" toggles. The toggles are global; when
+// the user isolates a country or continent, countryVisible already restricts what
+// shows, so region tint mode no longer gates the toggles (which used to make
+// Capitals/Flags disappear whenever Regions was on without a selection).
+export function inToggleScope(_e: CountryEntry): boolean {
   return true;
 }
 

@@ -17,11 +17,11 @@ export function refreshCapitals(): void {
   const z = map.getZoom();
   const cap = Math.max(8, Math.min(CAPITAL_MAX, Math.round((z - 1) * 20)));
   const b = map.getBounds().pad(0.15);
-  // Capitals allowed by the toggle + tab scope (the selected region on the Regions tab).
+  // Capitals allowed by the toggle (and isolation, via countryVisible).
   const eligible = capitalMarkers.filter((m) => {
     const e = m._entry;
     const cv = e ? countryVisible(e) : !(app.isolate && app.selectedLayer);
-    const byToggle = e ? (app.showCapitals && inToggleScope(e)) : (app.showCapitals && app.activeTab === "countries");
+    const byToggle = e ? (app.showCapitals && inToggleScope(e)) : app.showCapitals;
     return cv && byToggle;
   });
   // Of those, show only the in-view ones, ranked by country population and capped

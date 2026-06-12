@@ -23,8 +23,6 @@ export function updateListVisibility(): void {
   const countries$ = app.activeTab === "countries";
   (document.getElementById("country-list") as HTMLElement).hidden = !listExpanded || !countries$;
   (document.getElementById("continent-list") as HTMLElement).hidden = !listExpanded || countries$;
-  // The physical-feature lists (Lakes/Mountains/Rivers) sit under the country list.
-  (document.getElementById("feature-lists") as HTMLElement).hidden = !listExpanded || !countries$;
   (document.querySelector(".filter-sort") as HTMLElement).style.display = listExpanded ? "" : "none";
   (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
   // The "Group by" scheme picker belongs only to the Regions tab.

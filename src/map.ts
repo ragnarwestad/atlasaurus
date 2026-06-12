@@ -2,14 +2,14 @@
 // group the app draws into. Pure setup — no app logic lives here.
 import L from "leaflet";
 
-export const map = L.map("map", { worldCopyJump: true, minZoom: 2, maxZoom: 8 }).setView([25, 10], 2);
+export const map = L.map("map", { worldCopyJump: true, minZoom: 2, maxZoom: 12 }).setView([25, 10], 2);
 
 L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
   attribution:
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, ' +
     '&copy; <a href="https://carto.com/attributions">CARTO</a> · Borders &amp; capitals: Natural Earth',
   subdomains: "abcd",
-  maxZoom: 8,
+  maxZoom: 12,
 }).addTo(map);
 
 export const capitalLayer = L.layerGroup().addTo(map);    // capital dots + name labels

@@ -15,26 +15,13 @@ import {
   map, capitalLayer, connectorLayer, flagLayer, peakLayer, riverLayer, lakeLayer,
   cityLayer, cityLabelLayer, cityCanvas, quizLayer, quizContLayer, regionLabelLayer,
 } from "./map";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-interface CountryEntry {
-  name: string;
-  layer: L.Polygon & { feature?: any };
-  iso: string | null;
-  iso2: string | null;
-  continent?: string;
-  isLandmass?: boolean; // Antarctica: a continent landmass, not a country
-  labelTooltip?: L.Tooltip;
-  labelPlaced?: boolean;
-  capitalMarker?: L.CircleMarker;
-  capitalName?: string;
-  flagMarker?: L.Marker;
-}
-type CapitalMarker = L.CircleMarker & { _entry?: CountryEntry | null };
-interface Territory { name: string; adm0: string; lat: number; lng: number; }
-interface Subunit { name: string; lat: number; lng: number; }
+import {
+  app, hooks, countries, byIso, capitalMarkers, subunitsByIso, territoriesBySov,
+  CONTINENT_ORDER, fmtInt, fetchJson, realCountries, entryForLayer, popOf, areaOf,
+  layerCenter, loadCountryData,
+  type CountryEntry, type CapitalMarker, type Territory, type Subunit,
+  type RestInfo, type GroupScheme, type QuizType,
+} from "./state";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)
@@ -43,34 +30,8 @@ const statusEl = document.getElementById("status");
 const setStatus = (msg: string) => { if (statusEl) statusEl.textContent = msg; };
 const hideStatus = () => { if (statusEl) statusEl.remove(); };
 
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-const countries: CountryEntry[] = [];
-const byIso: Record<string, CountryEntry> = {}; // ADM0_A3 → entry (for neighbour lookups)
-const capitalMarkers: CapitalMarker[] = [];
-const subunitsByIso: Record<string, Subunit[]> = {};
-const territoriesBySov: Record<string, Territory[]> = {};
-
-let selectedLayer: L.Polygon | null = null;
-let selectedContinent: string | null = null;
-let hoveredLayer: L.Polygon | null = null;
-let hoveredContinent: string | null = null;
-let showNames = false;
-let showCapitals = false;
-let showFlags = false;
-let showPeaks = false;
-let showRivers = false;
-let showLakes = false;
-let showCities = false;
-let showHover = false; // off = Explore starts empty; hover only highlights the shape
-let isolate = false;
-
-// Region grouping scheme for the Explore "Regions" tab. The quiz always uses
-// standard continents. Non-continent schemes read straight from the Natural
+// Region grouping: non-continent schemes read straight from the Natural
 // Earth feature properties we already load (REGION_UN / SUBREGION / REGION_WB).
-type GroupScheme = "continent" | "unRegion" | "subregion" | "wbRegion";
-let groupScheme: GroupScheme = "continent";
 const SCHEME_PROP: Record<Exclude<GroupScheme, "continent">, string> = {
   unRegion: "REGION_UN", subregion: "SUBREGION", wbRegion: "REGION_WB",
 };
@@ -78,37 +39,18 @@ const SCHEME_LABEL: Record<GroupScheme, string> = {
   continent: "Continent", unRegion: "UN region", subregion: "UN subregion", wbRegion: "World Bank region",
 };
 function groupOf(e: CountryEntry): string {
-  if (groupScheme === "continent") return e.continent || "Other";
+  if (app.groupScheme === "continent") return e.continent || "Other";
   const p = (e.layer.feature && e.layer.feature.properties) || {};
-  const v = p[SCHEME_PROP[groupScheme]];
+  const v = p[SCHEME_PROP[app.groupScheme]];
   return (v != null && String(v).trim()) ? String(v).trim() : "Other";
 }
 // Distinct hue per region for the Regions-tab map tint (spread around the wheel).
-let regionHue: Record<string, number> = {};
 function rebuildRegionColors(): void {
   const groups = Array.from(new Set(realCountries().map(groupOf))).filter((g) => g !== "Other").sort();
-  regionHue = {};
+  app.regionHue = {};
   const n = groups.length || 1;
-  groups.forEach((g, i) => { regionHue[g] = Math.round((360 * i) / n); });
+  groups.forEach((g, i) => { app.regionHue[g] = Math.round((360 * i) / n); });
 }
-
-// Quiz mode
-let mode: "explore" | "quiz" = "explore";
-type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry";
-let quizType: QuizType = "name";
-let quizPeak: Peak | null = null;
-let quizStarted = false;
-let quizNeighbourSet = new Set<CountryEntry>();
-let quizTarget: CountryEntry | null = null;
-let quizGuess: CountryEntry | null = null;
-let quizAnswered = false;
-let quizCorrect = 0;
-let quizTotal = 0;
-let quizContCorrect: string | null = null; // continent quiz: correct continent (green)
-let quizContWrong: string | null = null;   // continent quiz: wrongly guessed continent (red)
-// Set on a country click so the map's background-click deselect doesn't fire in
-// the same event dispatch (robust even if stopPropagation is ineffective).
-let suppressMapClick = false;
 
 // ---------------------------------------------------------------------------
 // Visibility / styling helpers
@@ -119,8 +61,8 @@ function sovOf(layer: any): string | null {
 }
 /** Same sovereign state (e.g. Denmark ↔ Greenland/Faroe), different unit. */
 function sameRealm(e: CountryEntry): boolean {
-  if (!selectedLayer || e.layer === selectedLayer) return false;
-  const s = sovOf(selectedLayer), x = sovOf(e.layer);
+  if (!app.selectedLayer || e.layer === app.selectedLayer) return false;
+  const s = sovOf(app.selectedLayer), x = sovOf(e.layer);
   return !!s && s === x;
 }
 // Reveal = country selected (or a realm sibling). On-map labels/capitals/flags
@@ -128,14 +70,14 @@ function sameRealm(e: CountryEntry): boolean {
 // separate off-map panel (see showHoverInfo) so it can't fight the polygon's
 // hover/click and cause flicker. On-map labels stay interactive (clickable).
 function isRevealed(e: CountryEntry): boolean {
-  return e.layer === selectedLayer || sameRealm(e);
+  return e.layer === app.selectedLayer || sameRealm(e);
 }
 function countryVisible(e: CountryEntry): boolean {
-  if (mode === "quiz") return true; // everything visible/clickable in the quiz
+  if (app.mode === "quiz") return true; // everything visible/clickable in the quiz
   // A selected continent takes precedence: keep showing all its members (the
   // selected country, if any, is one of them).
-  if (isolate && selectedContinent) return groupOf(e) === selectedContinent;
-  if (isolate && selectedLayer) return e.layer === selectedLayer || sameRealm(e);
+  if (app.isolate && app.selectedContinent) return groupOf(e) === app.selectedContinent;
+  if (app.isolate && app.selectedLayer) return e.layer === app.selectedLayer || sameRealm(e);
   return true;
 }
 
@@ -143,7 +85,7 @@ function countryVisible(e: CountryEntry): boolean {
 //  - Countries tab: global (all countries).
 //  - Continents tab: only the selected continent's members (nothing if none).
 function inToggleScope(e: CountryEntry): boolean {
-  if (activeTab === "continents") return selectedContinent != null && groupOf(e) === selectedContinent;
+  if (app.activeTab === "continents") return app.selectedContinent != null && groupOf(e) === app.selectedContinent;
   return true;
 }
 
@@ -152,22 +94,22 @@ function refreshCountryLabels(): void {
     if (!e.labelTooltip) return;
     const el = e.labelTooltip.getElement();
     if (!el) return;
-    if (mode === "quiz") { el.style.display = "none"; return; } // clean map for the quiz
-    el.style.display = countryVisible(e) && ((showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
+    if (app.mode === "quiz") { el.style.display = "none"; return; } // clean map for the quiz
+    el.style.display = countryVisible(e) && ((app.showNames && inToggleScope(e)) || isRevealed(e)) ? "" : "none";
   });
 }
 
 const CAPITAL_MAX = 70; // ceiling on capitals shown per view (grows with zoom)
 function refreshCapitals(): void {
-  if (mode === "quiz") { capitalMarkers.forEach((m) => { if (capitalLayer.hasLayer(m)) capitalLayer.removeLayer(m); }); return; }
+  if (app.mode === "quiz") { capitalMarkers.forEach((m) => { if (capitalLayer.hasLayer(m)) capitalLayer.removeLayer(m); }); return; }
   const z = map.getZoom();
   const cap = Math.max(8, Math.min(CAPITAL_MAX, Math.round((z - 1) * 12)));
   const b = map.getBounds().pad(0.15);
   // Capitals allowed by the toggle + tab scope (the selected region on the Regions tab).
   const eligible = capitalMarkers.filter((m) => {
     const e = m._entry;
-    const cv = e ? countryVisible(e) : !(isolate && selectedLayer);
-    const byToggle = e ? (showCapitals && inToggleScope(e)) : (showCapitals && activeTab === "countries");
+    const cv = e ? countryVisible(e) : !(app.isolate && app.selectedLayer);
+    const byToggle = e ? (app.showCapitals && inToggleScope(e)) : (app.showCapitals && app.activeTab === "countries");
     return cv && byToggle;
   });
   // Of those, show only the in-view ones, ranked by country population and capped
@@ -188,10 +130,10 @@ function refreshCapitals(): void {
 }
 
 function refreshFlags(): void {
-  if (mode === "quiz") { countries.forEach((e) => { if (e.flagMarker && flagLayer.hasLayer(e.flagMarker)) flagLayer.removeLayer(e.flagMarker); }); return; }
+  if (app.mode === "quiz") { countries.forEach((e) => { if (e.flagMarker && flagLayer.hasLayer(e.flagMarker)) flagLayer.removeLayer(e.flagMarker); }); return; }
   countries.forEach((e) => {
     if (!e.flagMarker) return;
-    const visible = countryVisible(e) && ((showFlags && inToggleScope(e)) || isRevealed(e));
+    const visible = countryVisible(e) && ((app.showFlags && inToggleScope(e)) || isRevealed(e));
     const has = flagLayer.hasLayer(e.flagMarker);
     if (visible && !has) flagLayer.addLayer(e.flagMarker);
     else if (!visible && has) flagLayer.removeLayer(e.flagMarker);
@@ -225,48 +167,8 @@ function hideHoverInfo(): void {
 }
 
 // --- Selected-country fact panel (population/GDP/region from Natural Earth,
-//     area/currency/languages from REST Countries, fetched + cached on select) ---
-interface RestInfo { area?: number; currencies?: string; languages?: string; continent?: string; borders?: string[]; }
+//     area/currency/languages from mledoze/countries, fetched + cached on select) ---
 const countryInfoEl = document.getElementById("countryinfo")!;
-let currentInfoCode: string | null = null;
-let currentInfoContinent: string | null = null;
-
-// Area / currency / languages come from the mledoze/countries dataset — a static
-// file on jsDelivr (the data REST Countries is built from), keyed by ISO-3.
-// Fetched once on the first selection, then cached for the session.
-const COUNTRY_DATA_URLS = [
-  "https://cdn.jsdelivr.net/gh/mledoze/countries@master/countries.json",
-  "https://raw.githubusercontent.com/mledoze/countries/master/countries.json",
-];
-let countryData: Record<string, RestInfo> | null = null;
-let countryDataPromise: Promise<Record<string, RestInfo>> | null = null;
-
-function loadCountryData(): Promise<Record<string, RestInfo>> {
-  if (countryDataPromise) return countryDataPromise;
-  countryDataPromise = fetchJson(COUNTRY_DATA_URLS).then((arr: any[]) => {
-    const map: Record<string, RestInfo> = {};
-    (arr || []).forEach((c) => {
-      if (!c || !c.cca3) return;
-      const currencies = c.currencies
-        ? Object.keys(c.currencies).map((cc) => {
-            const i = c.currencies[cc];
-            return i.name + " (" + cc + (i.symbol ? ", " + i.symbol : "") + ")";
-          }).join(", ")
-        : undefined;
-      const languages = c.languages ? Object.values(c.languages).join(", ") : undefined;
-      const continent = Array.isArray(c.continents) && c.continents.length ? c.continents[0] : c.region;
-      map[c.cca3] = { area: c.area, currencies, languages, continent, borders: Array.isArray(c.borders) ? c.borders : [] };
-    });
-    countryData = map;
-    return map;
-  });
-  return countryDataPromise;
-}
-
-function fmtInt(n: number): string { return Math.round(n).toLocaleString("en-US"); }
-function entryForLayer(layer: L.Layer | null): CountryEntry | null {
-  return layer ? (countries.find((e) => e.layer === layer) || null) : null;
-}
 
 function buildInfoHTML(props: any, entry: CountryEntry | null, extra: RestInfo | null, territories: string[]): string {
   const name = props.FORMAL_EN || props.NAME_LONG || props.ADMIN || (entry && entry.name) || "Unknown";
@@ -355,7 +257,7 @@ function makeDraggable(panel: HTMLElement, handle: HTMLElement, onClick?: () => 
 // Wikipedia link lives here on the title — map labels are plain text — so a stray
 // tap on a label (common on mobile) can't open Wikipedia by accident.
 function renderFeatureInfo(title: string, wikiHref: string, sub: string, rows: [string, string][]): void {
-  if (selectedLayer || selectedContinent) deselect(); // drop any country/region selection
+  if (app.selectedLayer || app.selectedContinent) deselect(); // drop any country/region selection
   const titleLink = '<a href="' + wikiHref + '" target="_blank" rel="noopener">' + escapeHtml(title) + ' <span class="ext">↗</span></a>';
   const dl = rows.length ? "<dl>" + rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("") + "</dl>" : "";
   countryInfoEl.classList.remove("collapsed");
@@ -380,19 +282,19 @@ function attachLabelClick(tt: L.Tooltip, onClick: () => void): void {
   el.style.cursor = "pointer";
   L.DomEvent.on(el, "click", (ev) => {
     L.DomEvent.stop(ev);
-    suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0);
+    app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0);
     onClick();
   });
 }
 
 // Bottom panel shows the selected COUNTRY, or the selected CONTINENT, or nothing.
 function updateInfoPanel(): void {
-  if (mode === "quiz") { countryInfoEl.hidden = true; return; }
-  if (selectedLayer) { renderCountryInfo(); return; }
-  if (selectedContinent) { renderContinentInfo(selectedContinent); return; }
+  if (app.mode === "quiz") { countryInfoEl.hidden = true; return; }
+  if (app.selectedLayer) { renderCountryInfo(); return; }
+  if (app.selectedContinent) { renderContinentInfo(app.selectedContinent); return; }
   countryInfoEl.hidden = true;
-  currentInfoCode = null;
-  currentInfoContinent = null;
+  app.currentInfoCode = null;
+  app.currentInfoContinent = null;
 }
 
 function isNarrow(): boolean { return window.matchMedia("(max-width: 700px)").matches; }
@@ -412,28 +314,28 @@ function defaultPanelLayout(isNew: boolean): void {
 }
 
 function renderCountryInfo(): void {
-  currentInfoContinent = null;
-  const props = ((selectedLayer as any).feature && (selectedLayer as any).feature.properties) || {};
-  const entry = entryForLayer(selectedLayer);
+  app.currentInfoContinent = null;
+  const props = ((app.selectedLayer as any).feature && (app.selectedLayer as any).feature.properties) || {};
+  const entry = entryForLayer(app.selectedLayer);
   const code: string | null = props.ADM0_A3 || props.adm0_a3 || null;
-  const isNew = code !== currentInfoCode;
-  currentInfoCode = code;
-  const conn = selectedLayer ? computeConnectors(selectedLayer) : null;
+  const isNew = code !== app.currentInfoCode;
+  app.currentInfoCode = code;
+  const conn = app.selectedLayer ? computeConnectors(app.selectedLayer) : null;
   const territories = conn ? conn.items.map((i) => i.name).sort((a, b) => a.localeCompare(b)) : [];
-  renderInfo(props, entry, (countryData && code) ? countryData[code] || null : null, territories);
+  renderInfo(props, entry, (app.countryData && code) ? app.countryData[code] || null : null, territories);
   defaultPanelLayout(isNew);
 
   // Lazy-load area/currency/languages the first time, then re-render.
-  if (!countryData) {
+  if (!app.countryData) {
     loadCountryData().then((map) => {
-      if (currentInfoCode === code && selectedLayer) renderInfo(props, entry, code ? map[code] || null : null, territories);
+      if (app.currentInfoCode === code && app.selectedLayer) renderInfo(props, entry, code ? map[code] || null : null, territories);
     }).catch(() => { /* extra fields optional */ });
   }
 }
 
 function renderContinentInfo(name: string): void {
-  currentInfoCode = null;
-  if (name !== currentInfoContinent && isNarrow()) {
+  app.currentInfoCode = null;
+  if (name !== app.currentInfoContinent && isNarrow()) {
     // Continent panel has no collapse toggle — just clear any drag offset so it
     // sits as a proper full-width bottom sheet (and isn't a leftover strip).
     countryInfoEl.classList.remove("collapsed");
@@ -441,7 +343,7 @@ function renderContinentInfo(name: string): void {
     countryInfoEl.style.top = "";
     countryInfoEl.style.bottom = "";
   }
-  currentInfoContinent = name;
+  app.currentInfoContinent = name;
   const members = countries.filter((e) => groupOf(e) === name && !e.isLandmass);
   let pop = 0, gdp = 0, area = 0, topName = "", topPop = -1;
   members.forEach((e) => {
@@ -449,23 +351,23 @@ function renderContinentInfo(name: string): void {
     if (p.POP_EST) pop += p.POP_EST;
     if (p.GDP_MD) gdp += p.GDP_MD;
     if (p.POP_EST > topPop) { topPop = p.POP_EST; topName = e.name; }
-    if (countryData && e.iso && countryData[e.iso] && countryData[e.iso].area) area += countryData[e.iso].area as number;
+    if (app.countryData && e.iso && app.countryData[e.iso] && app.countryData[e.iso].area) area += app.countryData[e.iso].area as number;
   });
   const rows: [string, string][] = [["Countries", String(members.length)]];
   if (pop) rows.push(["Population", fmtInt(pop)]);
-  if (countryData && area) rows.push(["Area", fmtInt(area) + " km²"]);
+  if (app.countryData && area) rows.push(["Area", fmtInt(area) + " km²"]);
   if (gdp) rows.push(["GDP", "$" + fmtInt(gdp) + " M"]);
   if (topName) rows.push(["Most populous", escapeHtml(topName)]);
   const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
   // Link geographic names to Wikipedia; World Bank names ("Latin America &
   // Caribbean" etc.) aren't article titles, so show them as plain text.
-  const linkable = name !== "Other" && groupScheme !== "wbRegion";
+  const linkable = name !== "Other" && app.groupScheme !== "wbRegion";
   const titleLink = linkable
     ? '<a href="' + wikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + ' <span class="ext">↗</span></a>'
     : escapeHtml(name);
   countryInfoEl.innerHTML =
     '<div class="ci-head"><div><div class="ci-title">' + titleLink + "</div>" +
-    '<div class="ci-sub">' + SCHEME_LABEL[groupScheme] + "</div></div>" +
+    '<div class="ci-sub">' + SCHEME_LABEL[app.groupScheme] + "</div></div>" +
     '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' +
     "<dl>" + dl + "</dl>";
   countryInfoEl.hidden = false;
@@ -473,76 +375,76 @@ function renderContinentInfo(name: string): void {
   if (close) close.addEventListener("click", deselect);
 
   // Area needs the country dataset; lazy-load then re-render if still showing.
-  if (!countryData) {
+  if (!app.countryData) {
     loadCountryData().then(() => {
-      if (currentInfoContinent === name && selectedContinent === name) renderContinentInfo(name);
+      if (app.currentInfoContinent === name && app.selectedContinent === name) renderContinentInfo(name);
     }).catch(() => { /* area optional */ });
   }
 }
 
 function styleForLayer(e: CountryEntry): L.PathOptions | null {
-  if (mode === "quiz") {
-    if (quizAnswered) {
-      if (quizType === "continent") {
+  if (app.mode === "quiz") {
+    if (app.quizAnswered) {
+      if (app.quizType === "continent") {
         const cont = e.continent || "Other";
-        if (quizContCorrect && cont === quizContCorrect) return quizCorrectStyle; // correct continent (green)
-        if (quizContWrong && cont === quizContWrong) return quizWrongStyle;       // guessed continent (red)
+        if (app.quizContCorrect && cont === app.quizContCorrect) return quizCorrectStyle; // correct continent (green)
+        if (app.quizContWrong && cont === app.quizContWrong) return quizWrongStyle;       // guessed continent (red)
         return baseStyle; // answered → no per-country hover in continent quiz
-      } else if (quizType === "neighbour") {
-        if (e === quizTarget) return selectedStyle;          // the anchor country (orange)
-        if (quizNeighbourSet.has(e)) return quizCorrectStyle; // its neighbours (green)
-        if (nbSelected.has(e)) return quizWrongStyle;        // a wrong pick (red)
+      } else if (app.quizType === "neighbour") {
+        if (e === app.quizTarget) return selectedStyle;          // the anchor country (orange)
+        if (app.quizNeighbourSet.has(e)) return quizCorrectStyle; // its neighbours (green)
+        if (app.nbSelected.has(e)) return quizWrongStyle;        // a wrong pick (red)
         return baseStyle; // answered → no per-country hover
-      } else if (quizType === "peakcountry") {
-        if (quizPeak && e.iso && quizPeak.iso.includes(e.iso)) return quizCorrectStyle; // the peak's country (green)
-        if (quizGuess && e === quizGuess) return quizWrongStyle;                          // wrong pick (red)
+      } else if (app.quizType === "peakcountry") {
+        if (app.quizPeak && e.iso && app.quizPeak.iso.includes(e.iso)) return quizCorrectStyle; // the peak's country (green)
+        if (app.quizGuess && e === app.quizGuess) return quizWrongStyle;                          // wrong pick (red)
         return baseStyle;
-      } else if (quizType === "peakname") {
+      } else if (app.quizType === "peakname") {
         return baseStyle; // answer shown on the marker, not the countries
       } else {
-        if (e === quizTarget) return quizCorrectStyle;                       // the right answer (green)
-        if (quizGuess && e === quizGuess && quizGuess !== quizTarget) return quizWrongStyle; // wrong guess (red)
+        if (e === app.quizTarget) return quizCorrectStyle;                       // the right answer (green)
+        if (app.quizGuess && e === app.quizGuess && app.quizGuess !== app.quizTarget) return quizWrongStyle; // wrong guess (red)
       }
-    } else if (quizType === "continent") {
+    } else if (app.quizType === "continent") {
       // Tint each continent so the clickable regions are obvious; hovering any
       // country deepens the shade of its WHOLE continent.
       const st = CONTINENT_QUIZ_STYLES[e.continent || "Other"];
       if (st) {
-        const hot = hoveredContinent && (e.continent || "Other") === hoveredContinent;
+        const hot = app.hoveredContinent && (e.continent || "Other") === app.hoveredContinent;
         return hot ? { ...st, fillOpacity: 0.82, weight: 1.5 } : st;
       }
-    } else if (quizType === "neighbour" && nbSelected.has(e)) {
+    } else if (app.quizType === "neighbour" && app.nbSelected.has(e)) {
       return relatedStyle; // your current picks (before checking)
-    } else if (quizType === "spot" && e === quizTarget) {
+    } else if (app.quizType === "spot" && e === app.quizTarget) {
       return selectedStyle; // the country to name (orange highlight + pin)
     }
-    if (e.layer === hoveredLayer) return hoverStyle;
+    if (e.layer === app.hoveredLayer) return hoverStyle;
     return baseStyle;
   }
   // Hidden in isolate mode: continent context wins (hide non-members); else the
   // single-country context (hide everything but it and its realm siblings).
-  if (isolate && selectedContinent) {
-    if (groupOf(e) !== selectedContinent) return null;
-  } else if (isolate && selectedLayer && e.layer !== selectedLayer && !sameRealm(e)) {
+  if (app.isolate && app.selectedContinent) {
+    if (groupOf(e) !== app.selectedContinent) return null;
+  } else if (app.isolate && app.selectedLayer && e.layer !== app.selectedLayer && !sameRealm(e)) {
     return null;
   }
-  if (e.layer === selectedLayer) return selectedStyle;                                   // selected country (orange)
+  if (e.layer === app.selectedLayer) return selectedStyle;                                   // selected country (orange)
   // Regions tab: tint every country by its region (distinct hue), like the
   // continent quiz. The selected region and the hovered region get a deeper fill.
-  if (activeTab === "continents") {
-    const hue = regionHue[groupOf(e)];
+  if (app.activeTab === "continents") {
+    const hue = app.regionHue[groupOf(e)];
     if (hue != null) {
-      const sel = selectedContinent === groupOf(e);
-      const hot = !sel && hoveredContinent === groupOf(e);
+      const sel = app.selectedContinent === groupOf(e);
+      const hot = !sel && app.hoveredContinent === groupOf(e);
       return {
         color: "hsl(" + hue + ", 55%, 38%)", weight: sel ? 1.8 : hot ? 1.3 : 1, opacity: 1,
         fillColor: "hsl(" + hue + ", 60%, 62%)", fillOpacity: sel ? 0.72 : hot ? 0.6 : 0.45,
       };
     }
   }
-  if (selectedContinent && groupOf(e) === selectedContinent) return continentStyle; // region member (green)
+  if (app.selectedContinent && groupOf(e) === app.selectedContinent) return continentStyle; // region member (green)
   if (sameRealm(e)) return relatedStyle;
-  if (e.layer === hoveredLayer) return hoverStyle;
+  if (e.layer === app.hoveredLayer) return hoverStyle;
   return baseStyle;
 }
 
@@ -614,8 +516,8 @@ function computeConnectors(layer: L.Polygon): { home: LatLng; items: Connector[]
 
 function refreshConnectors(): void {
   connectorLayer.clearLayers();
-  if (!selectedLayer) return; // lines show on selection, isolate or not
-  const c = computeConnectors(selectedLayer);
+  if (!app.selectedLayer) return; // lines show on selection, isolate or not
+  const c = computeConnectors(app.selectedLayer);
   if (!c) return;
   c.items.forEach((it) => {
     L.polyline([c.home, it.tip], {
@@ -679,13 +581,13 @@ function buildPeakMarkers(): void {
     m.bindTooltip(escapeHtml(p.name), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
     const open = () => renderFeatureInfo(p.name, wikiUrl(p.wiki || p.name), "Mountain peak",
       [["Elevation", fmtInt(p.elevation) + " m"], ["Country", peakCountryNames(p)], ["Region", escapeHtml(p.region)]]);
-    m.on("click", (e) => { L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+    m.on("click", (e) => { L.DomEvent.stop(e); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
     m.on("tooltipopen", (e: any) => attachLabelClick(e.tooltip, open));
     peakMarkers.push(m);
   });
 }
 function refreshPeaks(): void {
-  const on = showPeaks && mode === "explore";
+  const on = app.showPeaks && app.mode === "explore";
   if (on) buildPeakMarkers();
   peakMarkers.forEach((m) => {
     if (on && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
@@ -727,7 +629,7 @@ function loadRivers(): void {
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
         const km = lineLengthKm(f.geometry);
         const open = () => renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []);
-        layer.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+        layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
     });
@@ -736,7 +638,7 @@ function loadRivers(): void {
   }).catch(() => { riversLoading = false; });
 }
 function refreshRivers(): void {
-  const on = showRivers && mode === "explore";
+  const on = app.showRivers && app.mode === "explore";
   if (on && !riverGeo) { loadRivers(); return; }
   if (!riverGeo) return;
   if (on && !riverLayer.hasLayer(riverGeo)) riverLayer.addLayer(riverGeo);
@@ -776,7 +678,7 @@ function loadLakes(): void {
           if (km2 > 1) rows = [["Area", "≈ " + fmtInt(km2) + " km²"]];
         } catch { /* no area */ }
         const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", rows);
-        layer.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+        layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       },
     });
@@ -785,7 +687,7 @@ function loadLakes(): void {
   }).catch(() => { lakesLoading = false; });
 }
 function refreshLakes(): void {
-  const on = showLakes && mode === "explore";
+  const on = app.showLakes && app.mode === "explore";
   if (on && !lakeGeo) { loadLakes(); return; }
   if (!lakeGeo) return;
   if (on && !lakeLayer.hasLayer(lakeGeo)) lakeLayer.addLayer(lakeGeo);
@@ -834,7 +736,7 @@ function loadCities(): void {
   }).catch(() => { citiesLoading = false; });
 }
 function updateCities(): void {
-  if (!(showCities && mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
+  if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }
   cityLayer.clearLayers();
   cityLabelLayer.clearLayers();
@@ -859,7 +761,7 @@ function updateCities(): void {
       renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
     };
     L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
-      L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open();
+      L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open();
     });
     const tt = L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: false, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
       .setLatLng([d.lat, d.lng])
@@ -916,29 +818,30 @@ function refreshAll(): void {
   markActiveContinent();
   updateRegionLabels();
 }
+hooks.refreshAll = refreshAll; // modules trigger full refreshes via this hook
 
 /** Single-country selection; toggle=true (map click) deselects the same country.
  *  A selected continent is kept, so picking a country inside it keeps the
  *  continent highlighted (green) with the country shown selected (orange). */
 function selectLayer(layer: L.Polygon, toggle: boolean): void {
-  selectedLayer = toggle && selectedLayer === layer ? null : layer;
-  if (selectedLayer) selectedLayer.bringToFront();
+  app.selectedLayer = toggle && app.selectedLayer === layer ? null : layer;
+  if (app.selectedLayer) app.selectedLayer.bringToFront();
   refreshAll();
 }
 function deselect(): void {
-  if (selectedLayer || selectedContinent) { selectedLayer = null; selectedContinent = null; refreshAll(); }
+  if (app.selectedLayer || app.selectedContinent) { app.selectedLayer = null; app.selectedContinent = null; refreshAll(); }
 }
 
 // Select a whole continent: highlight all member countries and show aggregate
 // info. Clicking the active continent again clears it. (Mutually exclusive with
 // single-country selection.)
 function selectContinent(name: string): void {
-  selectedLayer = null;
-  selectedContinent = selectedContinent === name ? null : name;
-  if (selectedContinent) {
+  app.selectedLayer = null;
+  app.selectedContinent = app.selectedContinent === name ? null : name;
+  if (app.selectedContinent) {
     let b: L.LatLngBounds | null = null;
     countries.forEach((e) => {
-      if (groupOf(e) !== selectedContinent) return;
+      if (groupOf(e) !== app.selectedContinent) return;
       try {
         const lb = e.layer.getBounds();
         b = b ? b.extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
@@ -957,14 +860,12 @@ function focusCountry(entry: CountryEntry): void {
 // ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
-const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
-let activeTab: "countries" | "continents" = "countries";
 let listExpanded = true; // the Countries/Continents list section is foldable
 
 // Single source of truth for what the list section shows, given the active tab
 // and whether the section is expanded. Collapsing hides the filter row + lists.
 function updateListVisibility(): void {
-  const countries$ = activeTab === "countries";
+  const countries$ = app.activeTab === "countries";
   (document.getElementById("country-list") as HTMLElement).hidden = !listExpanded || !countries$;
   (document.getElementById("continent-list") as HTMLElement).hidden = !listExpanded || countries$;
   (document.querySelector(".filter-sort") as HTMLElement).style.display = listExpanded ? "" : "none";
@@ -975,8 +876,6 @@ function updateListVisibility(): void {
   if (sec) sec.classList.toggle("collapsed", !listExpanded);
 }
 function setListExpanded(on: boolean): void { listExpanded = on; updateListVisibility(); }
-let expandedContinent: string | null = null; // which continent's countries are shown in the Continents tab
-let sortBy: "name" | "population" | "area" = "name";
 
 // Compact value with 2 decimals + magnitude suffix, e.g. 1.41B, 5.43M, 323.80K.
 function formatCompact(n: number): string {
@@ -987,22 +886,15 @@ function formatCompact(n: number): string {
 }
 // The value shown in parentheses for the current sort (empty when sorting by name).
 function metricLabel(value: number): string {
-  if (sortBy === "population") return " (" + formatCompact(value) + ")";
-  if (sortBy === "area") return " (" + formatCompact(value) + " km²)";
+  if (app.sortBy === "population") return " (" + formatCompact(value) + ")";
+  if (app.sortBy === "area") return " (" + formatCompact(value) + " km²)";
   return "";
 }
 
-function popOf(e: CountryEntry): number {
-  const p = ((e.layer as any).feature && (e.layer as any).feature.properties) || {};
-  return p.POP_EST || 0;
-}
-function areaOf(e: CountryEntry): number {
-  return (countryData && e.iso && countryData[e.iso] && countryData[e.iso].area) || 0;
-}
 // Comparator for the current sort: population/area descending, else A–Z.
 function cmpCountries(a: CountryEntry, b: CountryEntry): number {
-  if (sortBy === "population") return popOf(b) - popOf(a) || a.name.localeCompare(b.name);
-  if (sortBy === "area") return areaOf(b) - areaOf(a) || a.name.localeCompare(b.name);
+  if (app.sortBy === "population") return popOf(b) - popOf(a) || a.name.localeCompare(b.name);
+  if (app.sortBy === "area") return areaOf(b) - areaOf(a) || a.name.localeCompare(b.name);
   return a.name.localeCompare(b.name);
 }
 
@@ -1016,10 +908,10 @@ function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   label.title = "Zoom to " + entry.name + " on the map";
   label.style.flex = "1";
   label.addEventListener("click", () => focusCountry(entry));
-  if (sortBy !== "name") {
+  if (app.sortBy !== "name") {
     const m = document.createElement("span");
     m.className = "metric";
-    m.textContent = metricLabel(sortBy === "population" ? popOf(entry) : areaOf(entry));
+    m.textContent = metricLabel(app.sortBy === "population" ? popOf(entry) : areaOf(entry));
     label.appendChild(m);
   }
 
@@ -1033,9 +925,6 @@ function makeCountryLi(entry: CountryEntry): HTMLLIElement {
   li.appendChild(wiki);
   return li;
 }
-
-// Real countries exclude the Antarctica landmass (a continent, not a country).
-function realCountries(): CountryEntry[] { return countries.filter((c) => !c.isLandmass); }
 
 // Filter the flat country list by the search box; update the Countries tab count.
 function applyFilter(): void {
@@ -1056,7 +945,7 @@ function applyFilter(): void {
 // Highlight the active continent header (the one shown on the map).
 function markActiveContinent(): void {
   document.querySelectorAll<HTMLElement>("#continent-list li.cont-head").forEach((h) => {
-    h.classList.toggle("active", h.dataset.group === selectedContinent);
+    h.classList.toggle("active", h.dataset.group === app.selectedContinent);
   });
 }
 
@@ -1074,14 +963,14 @@ function buildContinentList(): void {
     (byCont[g] = byCont[g] || []).push(e);
   });
   const order = Object.keys(counts);
-  if (sortBy === "name") {
+  if (app.sortBy === "name") {
     order.sort((a, b) => {
       const ia = CONTINENT_ORDER.indexOf(a), ib = CONTINENT_ORDER.indexOf(b);
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
     });
   } else {
     // Sort continents by total population / area of their members (descending).
-    const metric = (g: string) => (byCont[g] || []).reduce((s, e) => s + (sortBy === "population" ? popOf(e) : areaOf(e)), 0);
+    const metric = (g: string) => (byCont[g] || []).reduce((s, e) => s + (app.sortBy === "population" ? popOf(e) : areaOf(e)), 0);
     order.sort((a, b) => metric(b) - metric(a) || a.localeCompare(b));
   }
 
@@ -1089,25 +978,25 @@ function buildContinentList(): void {
   cl.innerHTML = "";
   order.forEach((g) => {
     const head = document.createElement("li");
-    head.className = "cont-head" + (expandedContinent === g ? " expanded" : "") +
-      (selectedContinent === g ? " active" : "");
+    head.className = "cont-head" + (app.expandedContinent === g ? " expanded" : "") +
+      (app.selectedContinent === g ? " active" : "");
     head.dataset.group = g;
     head.title = "Show all of " + g + " on the map";
-    const total = sortBy === "name" ? 0
-      : (byCont[g] || []).reduce((s, e) => s + (sortBy === "population" ? popOf(e) : areaOf(e)), 0);
-    const metric = sortBy === "name" ? "" : '<span class="metric">' + metricLabel(total) + "</span>";
-    const hue = regionHue[g];
+    const total = app.sortBy === "name" ? 0
+      : (byCont[g] || []).reduce((s, e) => s + (app.sortBy === "population" ? popOf(e) : areaOf(e)), 0);
+    const metric = app.sortBy === "name" ? "" : '<span class="metric">' + metricLabel(total) + "</span>";
+    const hue = app.regionHue[g];
     const sw = hue != null ? '<span class="cont-swatch" style="background:hsl(' + hue + ',60%,62%)"></span>' : "";
     head.innerHTML = '<span class="cont-name"><span class="caret">▾</span>' + sw + escapeHtml(g) + metric +
       '</span><span class="cnt">' + counts[g] + "</span>";
     head.addEventListener("click", () => {
-      if (expandedContinent === g) { expandedContinent = null; deselect(); }
-      else { expandedContinent = g; selectContinent(g); }
+      if (app.expandedContinent === g) { app.expandedContinent = null; deselect(); }
+      else { app.expandedContinent = g; selectContinent(g); }
       buildContinentList();
     });
     cl.appendChild(head);
 
-    if (expandedContinent === g) {
+    if (app.expandedContinent === g) {
       (byCont[g] || []).slice().sort(cmpCountries).forEach((entry) => {
         const li = makeCountryLi(entry);
         li.classList.add("cont-member");
@@ -1130,11 +1019,11 @@ function buildSidebar(): void {
 }
 
 function setActiveTab(tab: "countries" | "continents"): void {
-  activeTab = tab;
+  app.activeTab = tab;
   // Each tab owns its selection type — clear the other tab's selection so a
   // continent highlight doesn't linger on the Countries tab (and vice versa).
-  if (tab === "countries") { selectedContinent = null; expandedContinent = null; }
-  else { selectedLayer = null; }
+  if (tab === "countries") { app.selectedContinent = null; app.expandedContinent = null; }
+  else { app.selectedLayer = null; }
 
   document.querySelectorAll<HTMLElement>(".sb-tab").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === tab);
@@ -1175,17 +1064,6 @@ function placeCountryLabels(): void {
 // ---------------------------------------------------------------------------
 // Data loading
 // ---------------------------------------------------------------------------
-function fetchJson(urls: string[]): Promise<any> {
-  let i = 0;
-  const attempt = (): Promise<any> => {
-    if (i >= urls.length) return Promise.reject(new Error("All sources failed"));
-    return fetch(urls[i])
-      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .catch(() => { i++; return attempt(); });
-  };
-  return attempt();
-}
-
 function loadCapitals(): void {
   fetchJson(CAPITAL_URLS).then((geo) => {
     let feats = (geo.features || []).filter((f: any) => {
@@ -1238,7 +1116,7 @@ function loadCapitals(): void {
         if (elev) rows.push(["Elevation", fmtInt(elev) + " m"]);
         renderFeatureInfo(capName, cityWikiUrl(capName), cName ? "Capital of " + cName : "Capital", rows);
       };
-      marker.on("click", (ev) => { L.DomEvent.stop(ev); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); open(); });
+      marker.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
       marker.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
       capitalMarkers.push(marker);
     });
@@ -1307,24 +1185,24 @@ function loadBorders(): void {
           // info panel) — no on-map labels, no bringToFront — so it can never
           // cancel a click.
           mouseover: () => {
-            hoveredLayer = layerP;
-            hoveredContinent = mode === "quiz" ? (entry.continent || "Other") : groupOf(entry);
+            app.hoveredLayer = layerP;
+            app.hoveredContinent = app.mode === "quiz" ? (entry.continent || "Other") : groupOf(entry);
             refreshPolygons();
             // The selected country already shows its flag + name on the map and in
             // the fact panel, so skip the redundant hover tooltip for it.
-            if (mode === "explore") { if (layerP === selectedLayer || !showHover) hideHoverInfo(); else showHoverInfo(entry); }
+            if (app.mode === "explore") { if (layerP === app.selectedLayer || !app.showHover) hideHoverInfo(); else showHoverInfo(entry); }
           },
-          mouseout: () => { if (hoveredLayer === layerP) { hoveredLayer = null; hoveredContinent = null; } refreshPolygons(); if (mode === "explore") hideHoverInfo(); },
+          mouseout: () => { if (app.hoveredLayer === layerP) { app.hoveredLayer = null; app.hoveredContinent = null; } refreshPolygons(); if (app.mode === "explore") hideHoverInfo(); },
           click: (e) => {
             L.DomEvent.stop(e);
-            suppressMapClick = true;
-            setTimeout(() => { suppressMapClick = false; }, 0);
-            if (mode === "quiz") {
-              if (quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
-              else if (quizType === "neighbour") { if (nbMode === "map" && !entry.isLandmass && entry !== quizTarget) toggleNbPick(entry); }
-              else if (quizType === "peakcountry") { if (!entry.isLandmass) handlePeakCountryGuess(entry); }
-              else if (quizType === "peakname") { /* answered via the choice buttons */ }
-              else { if (locMode === "map") handleGuess(entry); }
+            app.suppressMapClick = true;
+            setTimeout(() => { app.suppressMapClick = false; }, 0);
+            if (app.mode === "quiz") {
+              if (app.quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
+              else if (app.quizType === "neighbour") { if (app.nbMode === "map" && !entry.isLandmass && entry !== app.quizTarget) toggleNbPick(entry); }
+              else if (app.quizType === "peakcountry") { if (!entry.isLandmass) handlePeakCountryGuess(entry); }
+              else if (app.quizType === "peakname") { /* answered via the choice buttons */ }
+              else { if (app.locMode === "map") handleGuess(entry); }
               return;
             }
             // The Antarctica landmass selects its region group, not a "country".
@@ -1375,97 +1253,89 @@ const quizNextBtn = document.getElementById("quiz-next") as HTMLButtonElement;
 const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
 
 function renderQuizPrompt(): void {
-  if (quizType === "peakname") {
+  if (app.quizType === "peakname") {
     quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>Which mountain?</span>';
     return;
   }
-  if (quizType === "peakcountry") {
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>' + escapeHtml(quizPeak ? quizPeak.name : "") + "</span>";
+  if (app.quizType === "peakcountry") {
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>' + escapeHtml(app.quizPeak ? app.quizPeak.name : "") + "</span>";
     return;
   }
-  if (!quizTarget) { quizPromptEl.innerHTML = ""; return; }
-  if (quizType === "flag") {
+  if (!app.quizTarget) { quizPromptEl.innerHTML = ""; return; }
+  if (app.quizType === "flag") {
     // Flag quiz: show only the flag (no name) — identify it and click it.
-    quizPromptEl.innerHTML = quizTarget.iso2
-      ? '<img class="quiz-bigflag" src="https://flagcdn.com/96x72/' + quizTarget.iso2 + '.png" alt="Flag">'
+    quizPromptEl.innerHTML = app.quizTarget.iso2
+      ? '<img class="quiz-bigflag" src="https://flagcdn.com/96x72/' + app.quizTarget.iso2 + '.png" alt="Flag">'
       : "(no flag available)";
-  } else if (quizType === "capital") {
+  } else if (app.quizType === "capital") {
     // Capital quiz: show the capital city; click its country.
-    quizPromptEl.innerHTML = quizTarget.capitalName
-      ? '<span class="quiz-cap-tag">capital</span> <span>' + escapeHtml(quizTarget.capitalName) + "</span>"
+    quizPromptEl.innerHTML = app.quizTarget.capitalName
+      ? '<span class="quiz-cap-tag">capital</span> <span>' + escapeHtml(app.quizTarget.capitalName) + "</span>"
       : "(no capital)";
-  } else if (quizType === "continent" || quizType === "neighbour") {
+  } else if (app.quizType === "continent" || app.quizType === "neighbour") {
     // Show the country (flag + name); pick its continent / click a neighbour.
-    const flag = quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + quizTarget.iso2 + '.png" alt="">' : "";
-    quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(quizTarget.name) + "</span>";
-  } else if (quizType === "spot") {
+    const flag = app.quizTarget.iso2 ? '<img src="https://flagcdn.com/40x30/' + app.quizTarget.iso2 + '.png" alt="">' : "";
+    quizPromptEl.innerHTML = flag + "<span>" + escapeHtml(app.quizTarget.name) + "</span>";
+  } else if (app.quizType === "spot") {
     // Spot quiz: the country is highlighted/pinned on the map — naming it is the
     // task, so the prompt must NOT reveal the name.
     quizPromptEl.innerHTML = '<span class="quiz-cap-tag">pinned</span> <span>Which country?</span>';
   } else {
     // Name quiz: just the name (no flag — that would give it away).
-    quizPromptEl.innerHTML = "<span>" + escapeHtml(quizTarget.name) + "</span>";
+    quizPromptEl.innerHTML = "<span>" + escapeHtml(app.quizTarget.name) + "</span>";
   }
 }
 function renderQuizScore(): void {
-  quizScoreEl.textContent = quizTotal ? "Score: " + quizCorrect + " / " + quizTotal : "";
+  quizScoreEl.textContent = app.quizTotal ? "Score: " + app.quizCorrect + " / " + app.quizTotal : "";
 }
-function layerCenter(entry: CountryEntry): LatLng | null {
-  try {
-    const parts = allPolygonParts((entry.layer as any).feature && (entry.layer as any).feature.geometry);
-    if (parts.length) return centerOf(parts[0].rings);
-  } catch { /* ignore */ }
-  return null;
-}
-
 // Neighbouring countries (mledoze `borders`, resolved to entries we have).
 function neighbourEntries(entry: CountryEntry): CountryEntry[] {
-  const codes = (countryData && entry.iso && countryData[entry.iso] && countryData[entry.iso].borders) || [];
+  const codes = (app.countryData && entry.iso && app.countryData[entry.iso] && app.countryData[entry.iso].borders) || [];
   return codes.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
 }
 
 function nextQuestion(): void {
   // The neighbour quiz needs the borders dataset; load it first if necessary.
-  if (quizType === "neighbour" && !countryData) {
+  if (app.quizType === "neighbour" && !app.countryData) {
     loadCountryData().then(() => nextQuestion()).catch(() => { /* ignore */ });
     return;
   }
-  if (quizType === "peakname" || quizType === "peakcountry") { nextPeakQuestion(); return; }
+  if (app.quizType === "peakname" || app.quizType === "peakcountry") { nextPeakQuestion(); return; }
   // Restrict the pool to countries that have what the prompt needs.
-  const pool = quizType === "flag" ? realCountries().filter((c) => c.iso2)
-    : quizType === "capital" ? realCountries().filter((c) => c.capitalName)
-    : quizType === "neighbour" ? realCountries().filter((c) => neighbourEntries(c).length > 0)
+  const pool = app.quizType === "flag" ? realCountries().filter((c) => c.iso2)
+    : app.quizType === "capital" ? realCountries().filter((c) => c.capitalName)
+    : app.quizType === "neighbour" ? realCountries().filter((c) => neighbourEntries(c).length > 0)
     : realCountries();
   if (!pool.length) return;
-  let t = quizTarget;
-  for (let i = 0; i < 20 && (!t || t === quizTarget); i++) t = pool[Math.floor(Math.random() * pool.length)];
-  quizTarget = t;
-  quizGuess = null;
-  quizAnswered = false;
-  quizContCorrect = null;
-  quizContWrong = null;
-  quizNeighbourSet = quizType === "neighbour" && t ? new Set(neighbourEntries(t)) : new Set();
+  let t = app.quizTarget;
+  for (let i = 0; i < 20 && (!t || t === app.quizTarget); i++) t = pool[Math.floor(Math.random() * pool.length)];
+  app.quizTarget = t;
+  app.quizGuess = null;
+  app.quizAnswered = false;
+  app.quizContCorrect = null;
+  app.quizContWrong = null;
+  app.quizNeighbourSet = app.quizType === "neighbour" && t ? new Set(neighbourEntries(t)) : new Set();
   quizLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
-  if (quizType === "continent") {
+  if (app.quizType === "continent") {
     showContinentLabels();
     quizChoicesEl.hidden = true;
     nbBox.hidden = true;
     locBox.hidden = true;
     quizFeedbackEl.textContent = "Click any country in its continent on the map.";
-  } else if (quizType === "neighbour") {
+  } else if (app.quizType === "neighbour") {
     quizChoicesEl.hidden = true;
     locBox.hidden = true;
     quizContLayer.clearLayers();
-    nbSelected = new Set();
+    app.nbSelected = new Set();
     nbInput.value = ""; nbInput.disabled = false;
     nbResults.innerHTML = "";
     renderNbChips();
     nbCheck.disabled = false;
     nbBox.hidden = false;
     applyNbMode();
-  } else if (quizType === "spot") {
+  } else if (app.quizType === "spot") {
     // Spot: highlight + drop a pin on a random country; the user names it by
     // search. Reset to the world view so the pin is always on screen.
     quizChoicesEl.hidden = true;
@@ -1475,9 +1345,9 @@ function nextQuestion(): void {
     locResults.innerHTML = "";
     locBox.hidden = false;
     locModeEl.hidden = true;     // always answered by typing the name
-    locMode = "search";
+    app.locMode = "search";
     applyLocMode();
-    const c = quizTarget ? layerCenter(quizTarget) : null;
+    const c = app.quizTarget ? layerCenter(app.quizTarget) : null;
     map.setView([20, 0], 2);
     if (c) L.circleMarker(c, { radius: 9, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 }).addTo(quizLayer);
     quizFeedbackEl.textContent = "Which country is highlighted? Type its name.";
@@ -1490,10 +1360,10 @@ function nextQuestion(): void {
     locBox.hidden = false;
     // "By name" already gives you the name, so searching for it is pointless —
     // hide the mode picker and force map clicks. Flag/capital keep both options.
-    const nameOnly = quizType === "name";
+    const nameOnly = app.quizType === "name";
     locModeEl.hidden = nameOnly;
     if (nameOnly) {
-      locMode = "map";
+      app.locMode = "map";
       const mapRadio = document.querySelector<HTMLInputElement>('#loc-mode input[value="map"]');
       if (mapRadio) mapRadio.checked = true;
     }
@@ -1513,19 +1383,19 @@ function shuffle<T>(arr: T[]): T[] {
 }
 function drawQuizPeak(withLabel: boolean): void {
   quizLayer.clearLayers();
-  if (!quizPeak) return;
-  const m = L.marker([quizPeak.lat, quizPeak.lng], { icon: peakIcon(map.getZoom(), true), keyboard: false });
+  if (!app.quizPeak) return;
+  const m = L.marker([app.quizPeak.lat, app.quizPeak.lng], { icon: peakIcon(map.getZoom(), true), keyboard: false });
   if (withLabel) {
-    m.bindTooltip('<a href="' + wikiUrl(quizPeak.wiki || quizPeak.name) + '" target="_blank" rel="noopener">' +
-      escapeHtml(quizPeak.name) + "</a>", { permanent: true, direction: "top", interactive: true, className: "map-label" });
+    m.bindTooltip('<a href="' + wikiUrl(app.quizPeak.wiki || app.quizPeak.name) + '" target="_blank" rel="noopener">' +
+      escapeHtml(app.quizPeak.name) + "</a>", { permanent: true, direction: "top", interactive: true, className: "map-label" });
   }
   m.addTo(quizLayer);
 }
 function renderPeakChoices(): void {
-  if (!quizPeak) return;
-  const distract = shuffle(PEAKS.filter((p) => p !== quizPeak)).slice(0, 3);
+  if (!app.quizPeak) return;
+  const distract = shuffle(PEAKS.filter((p) => p !== app.quizPeak)).slice(0, 3);
   quizChoicesEl.innerHTML = "";
-  shuffle([quizPeak, ...distract]).forEach((p) => {
+  shuffle([app.quizPeak, ...distract]).forEach((p) => {
     const b = document.createElement("button");
     b.type = "button"; b.textContent = p.name; b.dataset.peak = p.name;
     b.addEventListener("click", () => handlePeakNameGuess(p.name));
@@ -1533,58 +1403,58 @@ function renderPeakChoices(): void {
   });
 }
 function nextPeakQuestion(): void {
-  const pool = quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
+  const pool = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
   if (!pool.length) return;
-  let p = quizPeak;
-  for (let i = 0; i < 20 && (!p || p === quizPeak); i++) p = pool[Math.floor(Math.random() * pool.length)];
-  quizPeak = p;
-  quizTarget = null; quizGuess = null; quizAnswered = false;
-  quizContCorrect = null; quizContWrong = null; quizNeighbourSet = new Set();
+  let p = app.quizPeak;
+  for (let i = 0; i < 20 && (!p || p === app.quizPeak); i++) p = pool[Math.floor(Math.random() * pool.length)];
+  app.quizPeak = p;
+  app.quizTarget = null; app.quizGuess = null; app.quizAnswered = false;
+  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
   nbBox.hidden = true; locBox.hidden = true;
   quizContLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
-  if (quizType === "peakname") {
+  if (app.quizType === "peakname") {
     renderPeakChoices();
     quizChoicesEl.hidden = false;
     quizFeedbackEl.textContent = "Which mountain is marked? Pick one.";
   } else {
     quizChoicesEl.hidden = true;
-    quizFeedbackEl.textContent = "In which country is " + (quizPeak ? quizPeak.name : "") + "? Click it on the map.";
+    quizFeedbackEl.textContent = "In which country is " + (app.quizPeak ? app.quizPeak.name : "") + "? Click it on the map.";
   }
-  if (quizPeak) map.setView([quizPeak.lat, quizPeak.lng], 4);
+  if (app.quizPeak) map.setView([app.quizPeak.lat, app.quizPeak.lng], 4);
   drawQuizPeak(false);
   quizNextBtn.disabled = true;
   refreshPolygons();
 }
 function handlePeakNameGuess(name: string): void {
-  if (mode !== "quiz" || quizAnswered || !quizPeak) return;
-  quizAnswered = true; quizTotal++;
-  const ok = name === quizPeak.name;
-  if (ok) quizCorrect++;
+  if (app.mode !== "quiz" || app.quizAnswered || !app.quizPeak) return;
+  app.quizAnswered = true; app.quizTotal++;
+  const ok = name === app.quizPeak.name;
+  if (ok) app.quizCorrect++;
   quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
     btn.disabled = true;
     const n = btn.dataset.peak;
-    if (n === quizPeak!.name) btn.classList.add("correct");
+    if (n === app.quizPeak!.name) btn.classList.add("correct");
     else if (n === name && !ok) btn.classList.add("wrong");
   });
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + quizPeak.name +
-    " — " + fmtInt(quizPeak.elevation) + " m, " + peakCountryNames(quizPeak) + ".";
+  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + app.quizPeak.name +
+    " — " + fmtInt(app.quizPeak.elevation) + " m, " + peakCountryNames(app.quizPeak) + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
   drawQuizPeak(true);
 }
 function handlePeakCountryGuess(entry: CountryEntry): void {
-  if (mode !== "quiz" || quizAnswered || !quizPeak || entry.isLandmass) return;
-  quizGuess = entry; quizAnswered = true; quizTotal++;
-  const ok = !!entry.iso && quizPeak.iso.includes(entry.iso);
-  if (ok) quizCorrect++;
-  const names = peakCountryNames(quizPeak);
+  if (app.mode !== "quiz" || app.quizAnswered || !app.quizPeak || entry.isLandmass) return;
+  app.quizGuess = entry; app.quizAnswered = true; app.quizTotal++;
+  const ok = !!entry.iso && app.quizPeak.iso.includes(entry.iso);
+  if (ok) app.quizCorrect++;
+  const names = peakCountryNames(app.quizPeak);
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + quizPeak.name + " is in " + names + "."
-    : "✗ That's " + entry.name + ". " + quizPeak.name + " is in " + names + ".";
+    ? "✓ Correct! " + app.quizPeak.name + " is in " + names + "."
+    : "✗ That's " + entry.name + ". " + app.quizPeak.name + " is in " + names + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
   drawQuizPeak(true);
@@ -1636,13 +1506,13 @@ function groupLabelPos(members: CountryEntry[]): [number, number] | null {
 // quiz). Cleared in the quiz and on the Countries tab.
 function updateRegionLabels(): void {
   regionLabelLayer.clearLayers();
-  if (mode !== "explore" || activeTab !== "continents") return;
+  if (app.mode !== "explore" || app.activeTab !== "continents") return;
   const byGroup: Record<string, CountryEntry[]> = {};
   realCountries().forEach((e) => { const g = groupOf(e); if (g !== "Other") (byGroup[g] = byGroup[g] || []).push(e); });
   Object.keys(byGroup).forEach((g) => {
-    const pos = (groupScheme === "continent" && CONTINENT_LABEL_POS[g]) || groupLabelPos(byGroup[g]);
+    const pos = (app.groupScheme === "continent" && CONTINENT_LABEL_POS[g]) || groupLabelPos(byGroup[g]);
     if (!pos) return;
-    const hue = regionHue[g];
+    const hue = app.regionHue[g];
     const html = hue != null
       ? '<span style="color:hsl(' + hue + ',55%,30%)">' + escapeHtml(g) + "</span>"
       : escapeHtml(g);
@@ -1652,12 +1522,12 @@ function updateRegionLabels(): void {
 }
 
 function answerContinent(name: string): void {
-  if (mode !== "quiz" || quizType !== "continent" || !quizTarget || quizAnswered) return;
-  quizAnswered = true;
-  quizTotal++;
-  const correct = quizTarget.continent || "Other";
+  if (app.mode !== "quiz" || app.quizType !== "continent" || !app.quizTarget || app.quizAnswered) return;
+  app.quizAnswered = true;
+  app.quizTotal++;
+  const correct = app.quizTarget.continent || "Other";
   const ok = name === correct;
-  if (ok) quizCorrect++;
+  if (ok) app.quizCorrect++;
   quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
     btn.disabled = true;
     const c = btn.dataset.continent;
@@ -1666,18 +1536,18 @@ function answerContinent(name: string): void {
   });
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + quizTarget.name + " is in " + correct + "."
-    : "✗ " + quizTarget.name + " is in " + correct + ".";
+    ? "✓ Correct! " + app.quizTarget.name + " is in " + correct + "."
+    : "✗ " + app.quizTarget.name + " is in " + correct + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Colour the correct continent green (and the guessed one red) on the map,
   // and mark where the country itself is.
-  quizContCorrect = correct;
-  quizContWrong = ok ? null : name;
+  app.quizContCorrect = correct;
+  app.quizContWrong = ok ? null : name;
   refreshPolygons();
   quizLayer.clearLayers();
-  const c = layerCenter(quizTarget);
-  if (c) addQuizDot(quizTarget, c, "correct");
+  const c = layerCenter(app.quizTarget);
+  if (c) addQuizDot(app.quizTarget, c, "correct");
 }
 
 // --- Neighbour quiz: pick all bordering countries (search box + map clicks),
@@ -1687,15 +1557,13 @@ const nbInput = document.getElementById("nb-input") as HTMLInputElement;
 const nbResults = document.getElementById("nb-results")!;
 const nbChips = document.getElementById("nb-chips")!;
 const nbCheck = document.getElementById("nb-check") as HTMLButtonElement;
-let nbSelected = new Set<CountryEntry>();
 // Two mutually-exclusive ways to answer the Neighbour round: click the
 // neighbours on the map, or search and pick them by name.
-let nbMode: "map" | "search" = "map";
 function applyNbMode(): void {
-  nbBox.classList.toggle("map-mode", nbMode === "map");
-  if (nbMode === "map") { nbInput.value = ""; renderNbResults(""); }
-  if (mode === "quiz" && quizType === "neighbour" && !quizAnswered) {
-    quizFeedbackEl.textContent = nbMode === "map"
+  nbBox.classList.toggle("map-mode", app.nbMode === "map");
+  if (app.nbMode === "map") { nbInput.value = ""; renderNbResults(""); }
+  if (app.mode === "quiz" && app.quizType === "neighbour" && !app.quizAnswered) {
+    quizFeedbackEl.textContent = app.nbMode === "map"
       ? "Click every country that borders it on the map, then Check."
       : "Search and add every country that borders it, then Check.";
   }
@@ -1707,19 +1575,18 @@ const locBox = document.getElementById("loc-box") as HTMLElement;
 const locModeEl = document.getElementById("loc-mode") as HTMLElement;
 const locInput = document.getElementById("loc-input") as HTMLInputElement;
 const locResults = document.getElementById("loc-results")!;
-let locMode: "map" | "search" = "map";
 
 function applyLocMode(): void {
-  locBox.classList.toggle("map-mode", locMode === "map");
-  if (locMode === "map") { locInput.value = ""; renderLocResults(""); }
-  if (mode === "quiz" && isLocateQuiz() && !quizAnswered) {
-    quizFeedbackEl.textContent = locMode === "map"
+  locBox.classList.toggle("map-mode", app.locMode === "map");
+  if (app.locMode === "map") { locInput.value = ""; renderLocResults(""); }
+  if (app.mode === "quiz" && isLocateQuiz() && !app.quizAnswered) {
+    quizFeedbackEl.textContent = app.locMode === "map"
       ? "Click it on the map."
       : "Find and select the country.";
   }
 }
 function isLocateQuiz(): boolean {
-  return quizType === "name" || quizType === "flag" || quizType === "capital";
+  return app.quizType === "name" || app.quizType === "flag" || app.quizType === "capital";
 }
 function renderLocResults(query: string): void {
   const q = query.trim().toLowerCase();
@@ -1732,7 +1599,7 @@ function renderLocResults(query: string): void {
       const li = document.createElement("li");
       const flag = c.iso2 ? '<img src="https://flagcdn.com/20x15/' + c.iso2 + '.png" alt="">' : "";
       li.innerHTML = flag + "<span>" + escapeHtml(c.name) + "</span>";
-      li.addEventListener("click", () => { if (!quizAnswered) { locInput.value = ""; locResults.innerHTML = ""; handleGuess(c); } });
+      li.addEventListener("click", () => { if (!app.quizAnswered) { locInput.value = ""; locResults.innerHTML = ""; handleGuess(c); } });
       locResults.appendChild(li);
     });
 }
@@ -1740,9 +1607,9 @@ function renderLocResults(query: string): void {
 function renderNbResults(query: string): void {
   const q = query.trim().toLowerCase();
   nbResults.innerHTML = "";
-  if (!q || !quizTarget) return;
+  if (!q || !app.quizTarget) return;
   realCountries()
-    .filter((c) => c !== quizTarget && !nbSelected.has(c) && c.name.toLowerCase().indexOf(q) !== -1)
+    .filter((c) => c !== app.quizTarget && !app.nbSelected.has(c) && c.name.toLowerCase().indexOf(q) !== -1)
     .slice(0, 8)
     .forEach((c) => {
       const li = document.createElement("li");
@@ -1754,42 +1621,42 @@ function renderNbResults(query: string): void {
 }
 function renderNbChips(): void {
   nbChips.innerHTML = "";
-  nbSelected.forEach((c) => {
+  app.nbSelected.forEach((c) => {
     const chip = document.createElement("span");
     chip.className = "chip";
     chip.textContent = c.name + " ";
     const x = document.createElement("button");
     x.type = "button"; x.textContent = "×"; x.title = "Remove";
-    x.addEventListener("click", () => { nbSelected.delete(c); renderNbChips(); refreshPolygons(); });
+    x.addEventListener("click", () => { app.nbSelected.delete(c); renderNbChips(); refreshPolygons(); });
     chip.appendChild(x);
     nbChips.appendChild(chip);
   });
 }
 function addNbPick(c: CountryEntry): void {
-  if (quizAnswered) return;
-  nbSelected.add(c);
+  if (app.quizAnswered) return;
+  app.nbSelected.add(c);
   nbInput.value = "";
   renderNbResults("");
   renderNbChips();
   refreshPolygons();
 }
 function toggleNbPick(c: CountryEntry): void {
-  if (quizAnswered) return;
-  if (nbSelected.has(c)) nbSelected.delete(c); else nbSelected.add(c);
+  if (app.quizAnswered) return;
+  if (app.nbSelected.has(c)) app.nbSelected.delete(c); else app.nbSelected.add(c);
   renderNbChips();
   refreshPolygons();
 }
 function nbCheckAnswers(): void {
-  if (mode !== "quiz" || quizType !== "neighbour" || !quizTarget || quizAnswered) return;
-  quizAnswered = true;
-  quizTotal++;
-  const missed = Array.from(quizNeighbourSet).filter((n) => !nbSelected.has(n));
-  const wrong = Array.from(nbSelected).filter((p) => !quizNeighbourSet.has(p));
+  if (app.mode !== "quiz" || app.quizType !== "neighbour" || !app.quizTarget || app.quizAnswered) return;
+  app.quizAnswered = true;
+  app.quizTotal++;
+  const missed = Array.from(app.quizNeighbourSet).filter((n) => !app.nbSelected.has(n));
+  const wrong = Array.from(app.nbSelected).filter((p) => !app.quizNeighbourSet.has(p));
   const ok = missed.length === 0 && wrong.length === 0;
-  if (ok) quizCorrect++;
-  const total = quizNeighbourSet.size;
+  if (ok) app.quizCorrect++;
+  const total = app.quizNeighbourSet.size;
   let msg = (ok ? "✓ " : "✗ ") + "Found " + (total - missed.length) + " of " + total +
-    " neighbours of " + quizTarget.name + ".";
+    " neighbours of " + app.quizTarget.name + ".";
   if (wrong.length) msg += " Wrong: " + wrong.map((w) => w.name).join(", ") + ".";
   if (missed.length) msg += " Missed: " + missed.map((m) => m.name).join(", ") + ".";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
@@ -1801,34 +1668,34 @@ function nbCheckAnswers(): void {
   refreshPolygons();
   // Reveal on the map: anchor (blue), all neighbours (green), wrong picks (red).
   quizLayer.clearLayers();
-  const tc = layerCenter(quizTarget);
-  if (tc) addQuizDot(quizTarget, tc, "target");
-  quizNeighbourSet.forEach((n) => { const c = layerCenter(n); if (c) addQuizDot(n, c, "correct"); });
+  const tc = layerCenter(app.quizTarget);
+  if (tc) addQuizDot(app.quizTarget, tc, "target");
+  app.quizNeighbourSet.forEach((n) => { const c = layerCenter(n); if (c) addQuizDot(n, c, "correct"); });
   wrong.forEach((w) => { const c = layerCenter(w); if (c) addQuizDot(w, c, "wrong"); });
   try {
-    let b = quizTarget.layer.getBounds();
-    quizNeighbourSet.forEach((n) => { try { b = b.extend(n.layer.getBounds()); } catch { /* ignore */ } });
+    let b = app.quizTarget.layer.getBounds();
+    app.quizNeighbourSet.forEach((n) => { try { b = b.extend(n.layer.getBounds()); } catch { /* ignore */ } });
     map.fitBounds(b, { maxZoom: 6, padding: [50, 50] });
   } catch { /* ignore */ }
 }
 
 function handleGuess(entry: CountryEntry): void {
-  if (mode !== "quiz" || !quizTarget || quizAnswered || entry.isLandmass) return;
-  quizGuess = entry;
-  quizAnswered = true;
-  quizTotal++;
-  const ok = entry === quizTarget;
+  if (app.mode !== "quiz" || !app.quizTarget || app.quizAnswered || entry.isLandmass) return;
+  app.quizGuess = entry;
+  app.quizAnswered = true;
+  app.quizTotal++;
+  const ok = entry === app.quizTarget;
   quizLayer.clearLayers();
-  const tCenter = layerCenter(quizTarget);
+  const tCenter = layerCenter(app.quizTarget);
   if (ok) {
-    quizCorrect++;
+    app.quizCorrect++;
     quizFeedbackEl.className = "correct";
-    quizFeedbackEl.textContent = "✓ Correct! It's " + quizTarget.name + ".";
-    if (tCenter) addQuizDot(quizTarget, tCenter, "correct"); // labelled green dot
+    quizFeedbackEl.textContent = "✓ Correct! It's " + app.quizTarget.name + ".";
+    if (tCenter) addQuizDot(app.quizTarget, tCenter, "correct"); // labelled green dot
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
-      '. <a href="#" class="quiz-zoom">' + escapeHtml(quizTarget.name) + "</a> is the right one.";
+      '. <a href="#" class="quiz-zoom">' + escapeHtml(app.quizTarget.name) + "</a> is the right one.";
     const z = quizFeedbackEl.querySelector(".quiz-zoom");
     if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
     // Draw a line from the guess to the correct country (both labelled) so the
@@ -1836,7 +1703,7 @@ function handleGuess(entry: CountryEntry): void {
     const gCenter = layerCenter(entry);
     if (gCenter && tCenter) {
       L.polyline([gCenter, tCenter], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
-      addQuizDot(quizTarget, tCenter, "correct");  // green: the right answer
+      addQuizDot(app.quizTarget, tCenter, "correct");  // green: the right answer
       addQuizDot(entry, gCenter, "wrong");         // red: your guess
     }
   }
@@ -1871,11 +1738,11 @@ function addQuizDot(entry: CountryEntry, latlng: LatLng, kind: DotKind): void {
 }
 
 function zoomToTarget(maxZoom: number): void {
-  if (!quizTarget) return;
-  try { map.fitBounds(quizTarget.layer.getBounds(), { maxZoom, padding: [50, 50] }); } catch { /* ignore */ }
+  if (!app.quizTarget) return;
+  try { map.fitBounds(app.quizTarget.layer.getBounds(), { maxZoom, padding: [50, 50] }); } catch { /* ignore */ }
 }
 function setMode(m: "explore" | "quiz"): void {
-  mode = m;
+  app.mode = m;
   document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => b.classList.toggle("active", b.dataset.mode === m));
   (document.getElementById("explore-panel") as HTMLElement).hidden = m !== "explore";
   (document.getElementById("quiz-panel") as HTMLElement).hidden = m !== "quiz";
@@ -1884,8 +1751,8 @@ function setMode(m: "explore" | "quiz"): void {
     quizLayer.clearLayers();
     quizContLayer.clearLayers();
   } else {
-    selectedLayer = null; selectedContinent = null; expandedContinent = null;
-    if (!quizStarted) { quizStarted = true; quizCorrect = 0; quizTotal = 0; nextQuestion(); }
+    app.selectedLayer = null; app.selectedContinent = null; app.expandedContinent = null;
+    if (!app.quizStarted) { app.quizStarted = true; app.quizCorrect = 0; app.quizTotal = 0; nextQuestion(); }
     renderQuizScore();
   }
   refreshAll();
@@ -1897,33 +1764,33 @@ function setMode(m: "explore" | "quiz"): void {
 document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
   b.addEventListener("click", () => setMode(b.dataset.mode as "explore" | "quiz"));
 });
-quizNextBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
-quizSkipBtn.addEventListener("click", () => { if (mode === "quiz") nextQuestion(); });
+quizNextBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
+quizSkipBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
 nbInput.addEventListener("input", () => renderNbResults(nbInput.value));
 nbCheck.addEventListener("click", nbCheckAnswers);
 document.querySelectorAll<HTMLInputElement>('#nb-mode input[name="nbmode"]').forEach((r) => {
   r.addEventListener("change", () => {
     if (!r.checked) return;
-    nbMode = r.value === "search" ? "search" : "map";
+    app.nbMode = r.value === "search" ? "search" : "map";
     applyNbMode();
-    if (nbMode === "search") nbInput.focus();
+    if (app.nbMode === "search") nbInput.focus();
   });
 });
 locInput.addEventListener("input", () => renderLocResults(locInput.value));
 document.querySelectorAll<HTMLInputElement>('#loc-mode input[name="locmode"]').forEach((r) => {
   r.addEventListener("change", () => {
     if (!r.checked) return;
-    locMode = r.value === "search" ? "search" : "map";
+    app.locMode = r.value === "search" ? "search" : "map";
     applyLocMode();
-    if (locMode === "search" && !quizAnswered) locInput.focus();
+    if (app.locMode === "search" && !app.quizAnswered) locInput.focus();
   });
 });
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
-    quizType = b.dataset.qtype as QuizType;
+    app.quizType = b.dataset.qtype as QuizType;
     // Scope the active state to the button's own row (Country vs Mountains).
     b.parentElement!.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => x.classList.toggle("active", x === b));
-    if (mode === "quiz") nextQuestion();
+    if (app.mode === "quiz") nextQuestion();
   });
 });
 // Top-level quiz category: "Country" (sub-types By name/flag/capital/Neighbour) or
@@ -1935,43 +1802,43 @@ function setQuizCat(cat: "country" | "continent" | "mountains"): void {
   quizTypeEl.hidden = cat !== "country";
   mtnTypeEl.hidden = cat !== "mountains";
   if (cat === "continent") {
-    quizType = "continent";
+    app.quizType = "continent";
   } else if (cat === "mountains") {
     const active = document.querySelector<HTMLElement>("#mtn-type .qt-btn.active");
-    quizType = (active && (active.dataset.qtype as QuizType)) || "peakname";
+    app.quizType = (active && (active.dataset.qtype as QuizType)) || "peakname";
   } else {
     const active = document.querySelector<HTMLElement>("#quiz-type .qt-btn.active");
-    quizType = (active && (active.dataset.qtype as QuizType)) || "name";
+    app.quizType = (active && (active.dataset.qtype as QuizType)) || "name";
   }
-  if (mode === "quiz") nextQuestion();
+  if (app.mode === "quiz") nextQuestion();
 }
 document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => {
   b.addEventListener("click", () => setQuizCat(b.dataset.cat as "country" | "continent" | "mountains"));
 });
 
 const capToggle = document.getElementById("show-capitals") as HTMLInputElement;
-capToggle.addEventListener("change", () => { showCapitals = capToggle.checked; refreshCapitals(); });
+capToggle.addEventListener("change", () => { app.showCapitals = capToggle.checked; refreshCapitals(); });
 
 const flagToggle = document.getElementById("show-flags") as HTMLInputElement;
-flagToggle.addEventListener("change", () => { showFlags = flagToggle.checked; refreshFlags(); });
+flagToggle.addEventListener("change", () => { app.showFlags = flagToggle.checked; refreshFlags(); });
 
 const hoverToggle = document.getElementById("show-hover") as HTMLInputElement;
-hoverToggle.addEventListener("change", () => { showHover = hoverToggle.checked; if (!showHover) hideHoverInfo(); });
+hoverToggle.addEventListener("change", () => { app.showHover = hoverToggle.checked; if (!app.showHover) hideHoverInfo(); });
 
 const mtnToggle = document.getElementById("show-mountains") as HTMLInputElement;
-mtnToggle.addEventListener("change", () => { showPeaks = mtnToggle.checked; refreshPeaks(); });
+mtnToggle.addEventListener("change", () => { app.showPeaks = mtnToggle.checked; refreshPeaks(); });
 
 const rivToggle = document.getElementById("show-rivers") as HTMLInputElement;
-rivToggle.addEventListener("change", () => { showRivers = rivToggle.checked; refreshRivers(); });
+rivToggle.addEventListener("change", () => { app.showRivers = rivToggle.checked; refreshRivers(); });
 
 const lakeToggle = document.getElementById("show-lakes") as HTMLInputElement;
-lakeToggle.addEventListener("change", () => { showLakes = lakeToggle.checked; refreshLakes(); });
+lakeToggle.addEventListener("change", () => { app.showLakes = lakeToggle.checked; refreshLakes(); });
 
 const cityToggle = document.getElementById("show-cities") as HTMLInputElement;
-cityToggle.addEventListener("change", () => { showCities = cityToggle.checked; refreshCities(); });
+cityToggle.addEventListener("change", () => { app.showCities = cityToggle.checked; refreshCities(); });
 
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
-nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; refreshCountryLabels(); });
+nameToggle.addEventListener("change", () => { app.showNames = nameToggle.checked; refreshCountryLabels(); });
 
 
 document.querySelectorAll<HTMLElement>(".sb-tab").forEach((btn) => {
@@ -2003,24 +1870,24 @@ searchClear.addEventListener("click", () => {
 
 const sortSelect = document.getElementById("sort") as HTMLSelectElement;
 sortSelect.addEventListener("change", () => {
-  sortBy = sortSelect.value as "name" | "population" | "area";
+  app.sortBy = sortSelect.value as "name" | "population" | "area";
   // Area needs the country dataset; load it first if sorting by area.
-  if (sortBy === "area" && !countryData) loadCountryData().then(buildSidebar).catch(buildSidebar);
+  if (app.sortBy === "area" && !app.countryData) loadCountryData().then(buildSidebar).catch(buildSidebar);
   else buildSidebar();
 });
 
 const schemeSelect = document.getElementById("scheme") as HTMLSelectElement;
 schemeSelect.addEventListener("change", () => {
-  groupScheme = schemeSelect.value as GroupScheme;
+  app.groupScheme = schemeSelect.value as GroupScheme;
   // Group names differ per scheme, so any current region selection is stale.
-  selectedContinent = null;
-  expandedContinent = null;
+  app.selectedContinent = null;
+  app.expandedContinent = null;
   buildContinentList();
   refreshAll();
 });
 
 map.on("click", () => {        // background click clears selection / closes panels
-  if (suppressMapClick) return; // ignore the click that came from a feature
+  if (app.suppressMapClick) return; // ignore the click that came from a feature
   deselect();
   countryInfoEl.hidden = true;  // also close a feature detail box
 });

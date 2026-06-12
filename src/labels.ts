@@ -106,6 +106,5 @@ export function updatePeakLabels(): void {
   if (!mapEl) return;
   const on = map.getZoom() >= 4;
   mapEl.classList.toggle("peak-labels-on", on);
-  mapEl.classList.toggle("river-labels-on", on);
-  // (Lakes are revealed per-lake by their own zoom threshold, not gated here.)
+  // (Rivers and lakes are revealed per-feature by their own zoom threshold.)
 }

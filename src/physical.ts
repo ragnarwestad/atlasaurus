@@ -60,19 +60,33 @@ export function refreshPeaks(): void {
 //     Natural Earth, loaded lazily the first time the toggle is switched on. ---
 let riverGeo: L.GeoJSON | null = null;
 let riversLoading = false;
+// Each named river (all its segments) appears from this zoom, by mapped length
+// rank, so the long ones show early and the short ones don't all flood in at once.
+const riverEntries: { layer: L.Path; mz: number }[] = [];
 function loadRivers(): void {
   if (riverGeo || riversLoading) return;
   riversLoading = true;
   fetchJson(RIVER_URLS).then((geo) => {
-    riverGeo = L.geoJSON(geo, {
-      filter: (f: any) => String((f.properties || {}).featurecla || "").toLowerCase().indexOf("lake") === -1,
+    const riverName = (f: any) => (f.properties || {}).name || (f.properties || {}).name_en;
+    const isRiver = (f: any) => String((f.properties || {}).featurecla || "").toLowerCase().indexOf("lake") === -1;
+    // Named rivers only (drops the unnamed minor segments). Sum each river's mapped
+    // length across its segments, then rank-spread a zoom threshold across 2→max.
+    const feats = ((geo.features || []) as any[]).filter((f) => isRiver(f) && riverName(f));
+    const lenByName: Record<string, number> = {};
+    feats.forEach((f) => { lenByName[riverName(f)] = (lenByName[riverName(f)] || 0) + lineLengthKm(f.geometry); });
+    const names = Object.keys(lenByName).sort((a, b) => lenByName[b] - lenByName[a]);
+    const n = Math.max(1, names.length - 1);
+    const minZ = map.getMinZoom() || 2, span = (map.getMaxZoom() || 8) - minZ;
+    const mzByName: Record<string, number> = {};
+    names.forEach((nm, i) => { mzByName[nm] = minZ + Math.floor((i * span) / n); });
+    riverGeo = L.geoJSON({ type: "FeatureCollection", features: feats } as any, {
       style: () => ({ color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
-        const name = (f.properties || {}).name || (f.properties || {}).name_en;
-        if (!name) return;
+        const name = riverName(f);
+        riverEntries.push({ layer: layer as L.Path, mz: mzByName[name] ?? (map.getMaxZoom() || 8) });
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
-        const km = lineLengthKm(f.geometry);
+        const km = lenByName[name]; // whole named river's mapped length
         const open = () => renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []);
         layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
@@ -82,13 +96,23 @@ function loadRivers(): void {
     refreshRivers();
   }).catch(() => { riversLoading = false; });
 }
+// Show only the rivers whose length-rank threshold the current zoom has reached.
+function updateRiverVisibility(): void {
+  if (!riverGeo) return;
+  const z = map.getZoom();
+  riverEntries.forEach((e) => {
+    const show = z >= e.mz;
+    if (show && !riverGeo!.hasLayer(e.layer)) riverGeo!.addLayer(e.layer);
+    else if (!show && riverGeo!.hasLayer(e.layer)) riverGeo!.removeLayer(e.layer);
+  });
+}
 export function refreshRivers(): void {
   const on = app.showRivers && app.mode === "explore";
   if (on && !riverGeo) { loadRivers(); return; }
   if (!riverGeo) return;
   if (on && !riverLayer.hasLayer(riverGeo)) riverLayer.addLayer(riverGeo);
   else if (!on && riverLayer.hasLayer(riverGeo)) riverLayer.removeLayer(riverGeo);
-  updatePeakLabels();
+  if (on) updateRiverVisibility();
 }
 
 // --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---

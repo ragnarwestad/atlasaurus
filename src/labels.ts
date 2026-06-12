@@ -5,7 +5,7 @@ import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
 import { app, countries, realCountries } from "./state";
-import { countryVisible, inToggleScope, isRevealed } from "./countries";
+import { countryVisible, inToggleScope, isRevealed, selectLayer } from "./countries";
 
 // Each country gets a fixed "show its name from this zoom" threshold, spread by
 // land area across the zoom range (biggest at min zoom, smallest at max). This
@@ -90,7 +90,14 @@ export function placeCountryLabels(): void {
 
     if (entry.iso2) {
       entry.flagMarker = L.marker(center, {
-        interactive: false, keyboard: false, icon: flagIcon(entry.iso2, map.getZoom()),
+        interactive: true, keyboard: false, icon: flagIcon(entry.iso2, map.getZoom()),
+      });
+      // Clicking a flag selects/opens its country, same as clicking the polygon.
+      entry.flagMarker.on("click", (e) => {
+        L.DomEvent.stop(e);
+        app.suppressMapClick = true;
+        setTimeout(() => { app.suppressMapClick = false; }, 0);
+        if (app.mode === "explore") selectLayer(entry.layer, true);
       });
     }
     entry.labelPlaced = true;

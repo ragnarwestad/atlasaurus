@@ -30,6 +30,13 @@ export const RIVER_URLS = [
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_rivers_lake_centerlines.geojson",
 ];
 
+// Cities (Explore "Cities" layer) — 10m populated places: a rich set (~7k) that we
+// reveal progressively by each place's min_zoom/scalerank as the user zooms in.
+export const CITY_URLS = [
+  "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_10m_populated_places_simple.geojson",
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson",
+];
+
 // Lakes — 10m for proper coverage (the 50m set is curated and drops some large
 // lakes, e.g. Norway's Mjøsa). We filter to *named* lakes at load so the map
 // isn't swamped by the thousands of tiny unnamed ones. Loaded lazily.

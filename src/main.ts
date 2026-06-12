@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
 import {
-  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS, RIVER_URLS, LAKE_URLS,
+  BORDER_URLS, CAPITAL_URLS, SUBUNIT_URLS, RIVER_URLS, LAKE_URLS, CITY_URLS,
   baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
   quizCorrectStyle, quizWrongStyle,
   CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
@@ -55,7 +55,8 @@ const flagLayer = L.layerGroup().addTo(map);       // flag images
 const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
 const riverLayer = L.layerGroup().addTo(map);      // major river centerlines
 const lakeLayer = L.layerGroup().addTo(map);       // major lakes
-const cityLayer = L.layerGroup().addTo(map);       // major non-capital cities
+const cityLayer = L.layerGroup().addTo(map);       // cities (revealed by zoom)
+const cityCanvas = L.canvas({ padding: 0.5 });     // fast renderer for the many city dots
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
@@ -81,7 +82,6 @@ let showRivers = false;
 let showLakes = false;
 let showCities = false;
 let isolate = false;
-let placesGeo: any = null; // cached populated-places geojson (shared by capitals + cities)
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
 // standard continents. Non-continent schemes read straight from the Natural
@@ -728,12 +728,22 @@ function refreshLakes(): void {
   updatePeakLabels();
 }
 
-// --- Cities (Explore "Cities" layer) — the whole 50m populated-places set the
-//     Capitals layer already fetches. That file is itself a curated list of the
-//     ~major cities worldwide (by Natural Earth's scalerank), so no extra filter
-//     is needed — we just show every place in it (capitals included). ---
-const cityMarkers: L.CircleMarker[] = [];
+// --- Cities (Explore "Cities" layer) — the 10m populated-places set, revealed
+//     progressively by each place's min_zoom: only cities that "belong" at the
+//     current map zoom are shown, so more towns appear as you zoom in. ---
+const CITY_ZOOM_BIAS = 1; // show cities a level earlier than their nominal min_zoom
+type CityMarker = L.CircleMarker & { _mz: number };
+const cityMarkers: CityMarker[] = [];
 let citiesBuilt = false;
+let citiesLoading = false;
+// The zoom at/above which a place should appear: prefer NE's min_zoom, fall back
+// to scalerank, then to a population-based guess.
+function placeMinZoom(p: any): number {
+  if (p.min_zoom != null) return +p.min_zoom;
+  if (p.scalerank != null) return +p.scalerank;
+  const pop = +(p.pop_max || 0);
+  return pop > 5e6 ? 1 : pop > 1e6 ? 3 : pop > 2e5 ? 5 : 7;
+}
 function buildCityMarkers(geo: any): void {
   if (citiesBuilt) return;
   ((geo.features || []) as any[]).forEach((f) => {
@@ -741,7 +751,10 @@ function buildCityMarkers(geo: any): void {
     const c = f.geometry && f.geometry.coordinates;
     const name = p.name || p.nameascii;
     if (!c || !name) return;
-    const m = L.circleMarker([c[1], c[0]], { radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 });
+    const m = L.circleMarker([c[1], c[0]], {
+      renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1,
+    }) as CityMarker;
+    m._mz = placeMinZoom(p);
     m.bindTooltip('<a href="' + cityWikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
       { permanent: true, interactive: true, direction: "right", offset: [5, 0], className: "map-label city-label" });
     cityMarkers.push(m);
@@ -750,15 +763,19 @@ function buildCityMarkers(geo: any): void {
 }
 function loadCities(): void {
   if (citiesBuilt) { refreshCities(); return; }
-  if (placesGeo) { buildCityMarkers(placesGeo); refreshCities(); return; }
-  fetchJson(CAPITAL_URLS).then((geo) => { placesGeo = geo; buildCityMarkers(geo); refreshCities(); }).catch(() => { /* optional */ });
+  if (citiesLoading) return;
+  citiesLoading = true;
+  fetchJson(CITY_URLS).then((geo) => { citiesLoading = false; buildCityMarkers(geo); refreshCities(); })
+    .catch(() => { citiesLoading = false; });
 }
 function refreshCities(): void {
   const on = showCities && mode === "explore";
   if (on && !citiesBuilt) { loadCities(); return; }
+  const z = map.getZoom() + CITY_ZOOM_BIAS;
   cityMarkers.forEach((m) => {
-    if (on && !cityLayer.hasLayer(m)) cityLayer.addLayer(m);
-    else if (!on && cityLayer.hasLayer(m)) cityLayer.removeLayer(m);
+    const vis = on && z >= m._mz;
+    if (vis && !cityLayer.hasLayer(m)) cityLayer.addLayer(m);
+    else if (!vis && cityLayer.hasLayer(m)) cityLayer.removeLayer(m);
   });
   updatePeakLabels();
 }
@@ -1077,7 +1094,6 @@ function fetchJson(urls: string[]): Promise<any> {
 
 function loadCapitals(): void {
   fetchJson(CAPITAL_URLS).then((geo) => {
-    placesGeo = geo; // reuse for the Cities layer
     let feats = (geo.features || []).filter((f: any) => {
       const fc = ((f.properties && f.properties.featurecla) || "").toLowerCase();
       return fc === "admin-0 capital"; // national capitals only
@@ -1900,6 +1916,7 @@ map.on("click", () => {        // background click clears selection
 });
 map.on("zoomend", updateFlagSizes);
 map.on("zoomend", updatePeakSizes);
+map.on("zoomend", refreshCities);
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;

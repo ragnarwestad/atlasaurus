@@ -737,10 +737,8 @@ function buildCityMarkers(geo: any): void {
   if (citiesBuilt) return;
   ((geo.features || []) as any[]).forEach((f) => {
     const p = f.properties || {};
-    const fc = String(p.featurecla || "").toLowerCase();
     const pop = +(p.pop_max || p.pop_min || 0);
-    if (fc.indexOf("admin-0 capital") !== -1) return; // capitals have their own layer
-    if (pop < CITY_MIN_POP) return;                    // keep it to the big cities
+    if (pop < CITY_MIN_POP) return; // keep it to the big cities (capitals included)
     const c = f.geometry && f.geometry.coordinates;
     const name = p.name || p.nameascii;
     if (!c || !name) return;

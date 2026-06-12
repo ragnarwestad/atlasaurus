@@ -231,7 +231,9 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #feature-lists { flex: 0 0 auto; }
 #feature-lists[hidden] { display: none; }
 .feat-sec { border-top: 1px solid #e6ebf0; }
-.feat-head-row { padding: 11px 14px; }
+/* Whole header row is clickable: the button fills the row and carries the padding. */
+.feat-head-row { padding: 0; }
+.feat-head-row .sb-fold { width: 100%; padding: 11px 14px; }
 .feat-sec.collapsed .sb-fold .fold-caret { transform: rotate(-90deg); }
 .feat-sec.collapsed .feat-body { display: none; }
 .feat-search-wrap { display: flex; padding: 0 14px 10px; }

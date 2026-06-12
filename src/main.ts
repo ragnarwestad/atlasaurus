@@ -612,14 +612,19 @@ function updateFlagSizes(): void {
 // Mountain peaks (Explore "Show mountains" layer + quiz markers)
 // ---------------------------------------------------------------------------
 function peakIcon(zoom: number, highlight = false): L.DivIcon {
-  const s = Math.round(Math.min(14 + (zoom - 2) * 4, 30)); // grows when zoomed in
-  const cls = "peak-icon" + (highlight ? " peak-hi" : "");
+  const w = Math.round(Math.min(22 + (zoom - 2) * 5, 46)); // grows when zoomed in
+  const h = Math.round(w * 22 / 28);
+  const body = highlight ? "#e8740c" : "#74879b";
+  const edge = highlight ? "#8a3b00" : "#3a4654";
+  const svg =
+    '<svg width="' + w + '" height="' + h + '" viewBox="0 0 28 22">' +
+    '<path d="M1 21 L10.5 3 L16 13 L19.5 7.5 L27 21 Z" fill="' + body + '" stroke="' + edge + '" stroke-width="1.3" stroke-linejoin="round"/>' +
+    '<path d="M10.5 3 L13.2 8 L10.5 9.6 L8 8 Z" fill="#fff"/>' +
+    '<path d="M19.5 7.5 L21.6 11 L19.5 12 L17.6 11 Z" fill="#fff"/>' +
+    "</svg>";
   return L.divIcon({
-    className: cls,
-    html: '<span class="peak-tri" style="border-bottom-width:' + s + 'px;border-left-width:' + Math.round(s * 0.6) +
-      'px;border-right-width:' + Math.round(s * 0.6) + 'px"></span>',
-    iconSize: [Math.round(s * 1.2), s],
-    iconAnchor: [Math.round(s * 0.6), s],
+    className: "peak-icon" + (highlight ? " peak-hi" : ""),
+    html: svg, iconSize: [w, h], iconAnchor: [Math.round(w / 2), h],
   });
 }
 const peakMarkers: L.Marker[] = [];
@@ -627,7 +632,9 @@ function buildPeakMarkers(): void {
   if (peakMarkers.length) return;
   const z = map.getZoom();
   PEAKS.forEach((p) => {
-    const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false, title: p.name });
+    const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
+    const label = '<a href="' + wikiUrl(p.wiki || p.name) + '" target="_blank" rel="noopener">' + escapeHtml(p.name) + "</a>";
+    m.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], interactive: true, className: "map-label peak-label" });
     m.on("click", (e) => { L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); if (mode === "explore") showPeakInfo(p); });
     peakMarkers.push(m);
   });
@@ -639,10 +646,18 @@ function refreshPeaks(): void {
     if (on && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
     else if (!on && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
   });
+  updatePeakLabels();
+}
+// Peak names get crowded when zoomed out (the Himalaya cluster especially), so
+// hide the labels below a zoom threshold — the icons still mark every peak.
+function updatePeakLabels(): void {
+  const mapEl = document.getElementById("map");
+  if (mapEl) mapEl.classList.toggle("peak-labels-on", map.getZoom() >= 4);
 }
 function updatePeakSizes(): void {
   const z = map.getZoom();
   peakMarkers.forEach((m) => m.setIcon(peakIcon(z)));
+  updatePeakLabels();
 }
 function peakCountryNames(p: Peak): string {
   if (!p.iso.length) return "Antarctica";

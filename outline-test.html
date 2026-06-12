@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>City outline lookup test</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; color: #222; }
+  h1 { font-size: 18px; }
+  .controls { margin: 12px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=number] { width: 90px; padding: 4px 6px; }
+  button { padding: 6px 14px; cursor: pointer; }
+  #summary { margin: 10px 0; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #e1e7ec; padding: 4px 8px; text-align: left; }
+  th { background: #f7f9fb; position: sticky; top: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.ok { background: #eefaf0; }
+  tr.warn { background: #fff7e6; }
+  tr.bad { background: #fdeceb; }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .ok .pill { background: #1b7a3d; color: #fff; }
+  .warn .pill { background: #b5760a; color: #fff; }
+  .bad .pill { background: #b3261e; color: #fff; }
+  .muted { color: #889; }
+  #progress { margin: 8px 0; color: #667; }
+</style>
+</head>
+<body>
+<h1>City outline lookup test</h1>
+<p class="muted">Runs the app's exact Nominatim resolution logic over the most-populous cities (plus known tricky ones) and verifies each returns a city-sized boundary polygon that contains the city point. Paced at ~1 request/second per Nominatim's usage policy, so larger counts take a while.</p>
+<div class="controls">
+  <label>Cities to test: <input id="count" type="number" value="200" min="10" max="2000" /></label>
+  <button id="run">Run test</button>
+  <span id="progress"></span>
+</div>
+<div id="summary"></div>
+<table>
+  <thead><tr>
+    <th>#</th><th>City</th><th>Country</th><th>Verdict</th><th>Source</th><th class="num">Span (km)</th><th>Contains pt</th><th>Geom</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script type="module">
+// ---- Resolution logic — kept identical to src/places.ts showCityOutline ----
+const MAX_CITY_KM = 120;
+const NE_CITIES = "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_10m_populated_places_simple.geojson";
+
+// Tricky cases to always include even if they fall outside the top-N by population.
+const ALWAYS = [
+  "New York","Tokyo","Copenhagen","London","Paris","Singapore","Mexico City","São Paulo",
+  "Moscow","Beijing","Sydney","Cairo","Istanbul","Berlin","Oslo","Stockholm","Helsinki",
+  "Reykjavík","Washington, D.C.","Los Angeles","Hong Kong","Vatican City","Monaco","San Marino",
+  "Brasília","Canberra","Wellington","Ottawa","Sorø","Hillerød","Aarhus","Odense",
+];
+
+function geomOf(obj) {
+  const g = obj && obj.geojson;
+  return g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
+}
+function geomExtent(geom) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const walk = (a) => {
+    if (typeof a[0] === "number") {
+      if (a[0] < minX) minX = a[0]; if (a[0] > maxX) maxX = a[0];
+      if (a[1] < minY) minY = a[1]; if (a[1] > maxY) maxY = a[1];
+    } else for (const c of a) walk(c);
+  };
+  if (geom && geom.coordinates) walk(geom.coordinates);
+  const midLat = (minY + maxY) / 2;
+  const w = (maxX - minX) * 111 * Math.cos(midLat * Math.PI / 180), h = (maxY - minY) * 111;
+  return Math.sqrt(w * w + h * h);
+}
+function pointInRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function geomContains(lng, lat, geom) {
+  const polys = geom.type === "MultiPolygon" ? geom.coordinates : [geom.coordinates];
+  return polys.some((rings) => rings.length > 0 && pointInRing(lng, lat, rings[0]) && !rings.slice(1).some((h) => pointInRing(lng, lat, h)));
+}
+
+// ~1 req/sec gate (shared across all Nominatim calls).
+let lastCall = 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function gate() {
+  const wait = Math.max(0, 1100 - (Date.now() - lastCall));
+  if (wait) await sleep(wait);
+  lastCall = Date.now();
+}
+async function reverseFull(lat, lng, zoom) {
+  await gate();
+  return fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&polygon_geojson=1&zoom=${zoom}&lat=${lat}&lon=${lng}`, { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+}
+async function searchPick(q, lat, lng) {
+  await gate();
+  return fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&dedupe=0&limit=10&q=${encodeURIComponent(q)}`, { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : [])).then((arr) => {
+      for (const res of Array.isArray(arr) ? arr : []) {
+        const g = geomOf(res);
+        if (g && geomExtent(g) <= MAX_CITY_KM && geomContains(lng, lat, g)) return g;
+      }
+      return null;
+    }).catch(() => null);
+}
+async function resolve(lat, lng, name, adm0) {
+  const r = await reverseFull(lat, lng, 10);
+  const direct = geomOf(r);
+  if (direct && geomExtent(direct) <= MAX_CITY_KM) return { geom: direct, source: "reverse" };
+  if (r && r.address) {
+    const a = r.address;
+    const country = adm0 || a.country || "";
+    const cands = [["municipality", a.municipality], ["city", a.city], ["town", a.town], ["county", a.county]]
+      .filter(([, v], i, arr) => v && arr.findIndex(([, w]) => w === v) === i);
+    for (const [label, nm] of cands) {
+      const g = await searchPick(nm + (country ? ", " + country : ""), lat, lng);
+      if (g) return { geom: g, source: "addr:" + label };
+    }
+  }
+  const g = await searchPick(name + (adm0 ? ", " + adm0 : ""), lat, lng);
+  return g ? { geom: g, source: "name-search" } : { geom: null, source: "none" };
+}
+
+// ---- Load cities, run, report ----
+async function loadCities() {
+  const geo = await fetch(NE_CITIES).then((r) => r.json());
+  const seen = new Set();
+  const out = [];
+  for (const f of geo.features || []) {
+    const p = f.properties || {}, c = f.geometry && f.geometry.coordinates;
+    const name = p.name || p.nameascii;
+    if (!c || !name) continue;
+    const adm0 = p.adm0name || p.adm0_name || "";
+    const k = (name + "|" + adm0).toLowerCase();
+    if (seen.has(k)) continue; seen.add(k);
+    out.push({ name, adm0, lat: c[1], lng: c[0], pop: +(p.pop_max || p.pop_min || 0) });
+  }
+  return out;
+}
+
+const rowsEl = document.getElementById("rows");
+const summaryEl = document.getElementById("summary");
+const progressEl = document.getElementById("progress");
+
+document.getElementById("run").addEventListener("click", async () => {
+  document.getElementById("run").disabled = true;
+  rowsEl.innerHTML = ""; summaryEl.textContent = ""; progressEl.textContent = "Loading city data…";
+  const all = await loadCities();
+  const byName = new Map(all.map((c) => [c.name, c]));
+  const n = Math.max(10, Math.min(2000, +document.getElementById("count").value || 200));
+  const top = all.slice().sort((a, b) => b.pop - a.pop).slice(0, n);
+  const set = new Map(top.map((c) => [c.name + "|" + c.adm0, c]));
+  for (const nm of ALWAYS) { const c = byName.get(nm); if (c) set.set(c.name + "|" + c.adm0, c); }
+  const cities = [...set.values()];
+
+  let ok = 0, warn = 0, bad = 0, i = 0;
+  for (const c of cities) {
+    i++;
+    progressEl.textContent = `Testing ${i}/${cities.length}: ${c.name}…`;
+    let res;
+    try { res = await resolve(c.lat, c.lng, c.name, c.adm0); } catch { res = { geom: null, source: "error" }; }
+    const span = res.geom ? Math.round(geomExtent(res.geom)) : null;
+    const contains = res.geom ? geomContains(c.lng, c.lat, res.geom) : false;
+    let cls, verdict;
+    if (!res.geom) { cls = "bad"; verdict = "NO OUTLINE"; bad++; }
+    else if (!contains) { cls = "bad"; verdict = "NOT CONTAINING"; bad++; }
+    else if (span > 80) { cls = "warn"; verdict = "LARGE"; warn++; }
+    else { cls = "ok"; verdict = "OK"; ok++; }
+    const tr = document.createElement("tr");
+    tr.className = cls;
+    tr.innerHTML = `<td class="num">${i}</td><td>${c.name}</td><td>${c.adm0}</td>`
+      + `<td><span class="pill">${verdict}</span></td><td>${res.source}</td>`
+      + `<td class="num">${span ?? "–"}</td><td>${res.geom ? (contains ? "yes" : "NO") : "–"}</td>`
+      + `<td>${res.geom ? res.geom.type : "–"}</td>`;
+    rowsEl.appendChild(tr);
+    summaryEl.textContent = `OK ${ok} · large ${warn} · problems ${bad} · of ${i} tested`;
+  }
+  progressEl.textContent = `Done — ${cities.length} cities tested.`;
+  document.getElementById("run").disabled = false;
+});
+</script>
+</body>
+</html>

@@ -184,6 +184,15 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .flag-icon, .flag-icon img { pointer-events: none; }
 .flag-icon { background: none !important; border: none !important; }
 .flag-icon img { display: block; box-shadow: 0 0 2px rgba(0,0,0,.55); border-radius: 2px; }
+.peak-icon { background: none !important; border: none !important; cursor: pointer; }
+.peak-tri {
+  display: block; width: 0; height: 0;
+  border-left-style: solid; border-right-style: solid; border-bottom-style: solid;
+  border-left-color: transparent; border-right-color: transparent;
+  border-bottom-color: #8a5a2b;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.5));
+}
+.peak-icon.peak-hi .peak-tri { border-bottom-color: #e8740c; }
 
 #country-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
 #country-list li {

@@ -10,6 +10,7 @@ import {
 } from "./config";
 import { allPolygonParts, centerOf, type LatLng } from "./geo";
 import { wikiUrl, cityWikiUrl, escapeHtml } from "./wiki";
+import { PEAKS, type Peak } from "./peaks";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,7 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png
 const capitalLayer = L.layerGroup().addTo(map);    // capital dots + name labels
 const connectorLayer = L.layerGroup().addTo(map);  // satellite/sovereignty lines
 const flagLayer = L.layerGroup().addTo(map);       // flag images
+const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
@@ -71,6 +73,7 @@ let hoveredContinent: string | null = null;
 let showNames = false;
 let showCapitals = false;
 let showFlags = false;
+let showPeaks = false;
 let isolate = false;
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
@@ -598,6 +601,65 @@ function updateFlagSizes(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Mountain peaks (Explore "Show mountains" layer + quiz markers)
+// ---------------------------------------------------------------------------
+function peakIcon(zoom: number, highlight = false): L.DivIcon {
+  const s = Math.round(Math.min(14 + (zoom - 2) * 4, 30)); // grows when zoomed in
+  const cls = "peak-icon" + (highlight ? " peak-hi" : "");
+  return L.divIcon({
+    className: cls,
+    html: '<span class="peak-tri" style="border-bottom-width:' + s + 'px;border-left-width:' + Math.round(s * 0.6) +
+      'px;border-right-width:' + Math.round(s * 0.6) + 'px"></span>',
+    iconSize: [Math.round(s * 1.2), s],
+    iconAnchor: [Math.round(s * 0.6), s],
+  });
+}
+const peakMarkers: L.Marker[] = [];
+function buildPeakMarkers(): void {
+  if (peakMarkers.length) return;
+  const z = map.getZoom();
+  PEAKS.forEach((p) => {
+    const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false, title: p.name });
+    m.on("click", (e) => { L.DomEvent.stop(e); suppressMapClick = true; setTimeout(() => { suppressMapClick = false; }, 0); if (mode === "explore") showPeakInfo(p); });
+    peakMarkers.push(m);
+  });
+}
+function refreshPeaks(): void {
+  const on = showPeaks && mode === "explore";
+  if (on) buildPeakMarkers();
+  peakMarkers.forEach((m) => {
+    if (on && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
+    else if (!on && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
+  });
+}
+function updatePeakSizes(): void {
+  const z = map.getZoom();
+  peakMarkers.forEach((m) => m.setIcon(peakIcon(z)));
+}
+function peakCountryNames(p: Peak): string {
+  if (!p.iso.length) return "Antarctica";
+  return p.iso.map((c) => (byIso[c] ? byIso[c].name : c)).join(" / ");
+}
+function showPeakInfo(p: Peak): void {
+  const wikiHref = wikiUrl(p.wiki || p.name);
+  const rows: [string, string][] = [
+    ["Elevation", fmtInt(p.elevation) + " m"],
+    ["Country", peakCountryNames(p)],
+    ["Region", escapeHtml(p.region)],
+  ];
+  const dl = rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
+  const titleLink = '<a href="' + wikiHref + '" target="_blank" rel="noopener">' + escapeHtml(p.name) + ' <span class="ext">↗</span></a>';
+  countryInfoEl.innerHTML =
+    '<div class="ci-head"><div><div class="ci-title">' + titleLink + "</div>" +
+    '<div class="ci-sub">Mountain peak</div></div>' +
+    '<button class="ci-close" title="Close" aria-label="Close">×</button></div>' +
+    "<dl>" + dl + "</dl>";
+  countryInfoEl.hidden = false;
+  const close = countryInfoEl.querySelector(".ci-close");
+  if (close) close.addEventListener("click", () => { countryInfoEl.hidden = true; });
+}
+
+// ---------------------------------------------------------------------------
 // Refresh pipeline + selection
 // ---------------------------------------------------------------------------
 function refreshAll(): void {
@@ -606,6 +668,7 @@ function refreshAll(): void {
   refreshCountryLabels();
   refreshCapitals();
   refreshFlags();
+  refreshPeaks();
   updateInfoPanel();
   markActiveContinent();
   updateRegionLabels();
@@ -1533,6 +1596,9 @@ capToggle.addEventListener("change", () => { showCapitals = capToggle.checked; r
 const flagToggle = document.getElementById("show-flags") as HTMLInputElement;
 flagToggle.addEventListener("change", () => { showFlags = flagToggle.checked; refreshFlags(); });
 
+const mtnToggle = document.getElementById("show-mountains") as HTMLInputElement;
+mtnToggle.addEventListener("change", () => { showPeaks = mtnToggle.checked; refreshPeaks(); });
+
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; refreshCountryLabels(); });
 
@@ -1589,6 +1655,7 @@ map.on("click", () => {        // background click clears selection
   deselect();
 });
 map.on("zoomend", updateFlagSizes);
+map.on("zoomend", updatePeakSizes);
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;

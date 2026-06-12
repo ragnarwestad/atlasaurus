@@ -168,7 +168,7 @@ function cityOpen(d: CityRec): void {
 // --- City outline: the administrative boundary from OpenStreetMap, resolved by
 //     cityBoundary.ts and drawn here when a city is selected. ---
 const cityOutlineStyle = { color: "#8a3b00", weight: 2, opacity: 0.95, fillColor: "#e8740c", fillOpacity: 0.18 };
-const outlineCache = new Map<string, any>(); // city key → boundary geometry (or null = none)
+const outlineCache = new Map<string, any>(); // city key → boundary geometry (successes only)
 let outlineReqId = 0; // guards against a slow request painting over a newer selection
 
 function drawOutlineGeom(geom: any): void {
@@ -184,7 +184,9 @@ async function showCityOutline(lat: number, lng: number, name: string, adm0: str
   const reqId = ++outlineReqId;
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
   const { geom } = await resolveCityBoundary(lat, lng, name, adm0);
-  outlineCache.set(key, geom || null);
+  // Only cache real geometries: "no result" can be a transient error (network, 429
+  // throttle), and caching it would stick "no outline" on the city until reload.
+  if (geom) outlineCache.set(key, geom);
   if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection
 }
 function updateCities(): void {

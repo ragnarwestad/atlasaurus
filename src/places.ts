@@ -1,7 +1,7 @@
 // Populated places: national capitals (Natural Earth admin-0 capitals) and the
 // Cities layer (10m populated places, canvas dots + a few DOM name labels).
 import L from "leaflet";
-import { CAPITAL_URLS, CITY_URLS, URBAN_URLS } from "./config";
+import { CAPITAL_URLS, CITY_URLS } from "./config";
 import { cityWikiUrl, escapeHtml } from "./wiki";
 import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas, cityOutlineLayer } from "./map";
 import {
@@ -160,65 +160,37 @@ function cityOpen(d: CityRec): void {
   if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
   if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
   renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows); // clears the previous outline via hooks.clearCityOutline
-  showCityOutline(d.lat, d.lng, d.pop);
+  showCityOutline(d);
 }
 
-// --- City outline: the Natural Earth urban-area polygon that contains the city's
-//     point, loaded lazily the first time a city is selected. ---
-type UrbanFeat = { bbox: [number, number, number, number]; geom: any };
-let urbanFeats: UrbanFeat[] = [];
-let urbanLoaded = false, urbanLoading = false;
-let pendingOutline: { lat: number; lng: number; pop: number } | null = null;
+// --- City outline: the administrative boundary from OpenStreetMap (Nominatim),
+//     fetched on demand when a city is selected. One clean polygon per city. ---
 const cityOutlineStyle = { color: "#8a3b00", weight: 2, opacity: 0.95, fillColor: "#e8740c", fillOpacity: 0.18 };
+const outlineCache = new Map<string, any>(); // city key → boundary geometry (or null = none)
+let outlineReqId = 0; // guards against a slow request painting over a newer selection
 
-function geomBbox(geom: any): [number, number, number, number] | null {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  const walk = (a: any) => {
-    if (typeof a[0] === "number") {
-      if (a[0] < minX) minX = a[0]; if (a[0] > maxX) maxX = a[0];
-      if (a[1] < minY) minY = a[1]; if (a[1] > maxY) maxY = a[1];
-    } else for (const c of a) walk(c);
-  };
-  if (geom && geom.coordinates) walk(geom.coordinates);
-  return isFinite(minX) ? [minX, minY, maxX, maxY] : null;
-}
-// Shortest distance (km) from a point to an axis-aligned lon/lat bbox (0 if
-// inside), with a cos-latitude correction so it's roughly metric at any latitude.
-function bboxDistKm(lat: number, lng: number, b: [number, number, number, number]): number {
-  const dLng = Math.max(b[0] - lng, 0, lng - b[2]);
-  const dLat = Math.max(b[1] - lat, 0, lat - b[3]);
-  const kx = dLng * 111 * Math.cos(lat * Math.PI / 180);
-  const ky = dLat * 111;
-  return Math.sqrt(kx * kx + ky * ky);
-}
-// NE urban areas are fragmented (a metro = many separate polygons), so drawing
-// only the polygon under the city point misses most of it (e.g. Manhattan). Draw
-// every urban polygon within a population-scaled radius to capture the whole
-// built-up cluster.
-function drawCityOutline(lat: number, lng: number, pop: number): void {
+function drawOutlineGeom(geom: any): void {
   cityOutlineLayer.clearLayers();
-  const rKm = Math.min(45, Math.max(6, Math.sqrt(Math.max(pop, 0)) / 45));
-  const feats = urbanFeats
-    .filter((f) => bboxDistKm(lat, lng, f.bbox) <= rKm)
-    .map((f) => ({ type: "Feature", geometry: f.geom }));
-  if (feats.length) {
-    L.geoJSON({ type: "FeatureCollection", features: feats } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
-  }
+  if (!geom) return;
+  L.geoJSON({ type: "Feature", geometry: geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
 }
-export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); pendingOutline = null; }
-function showCityOutline(lat: number, lng: number, pop: number): void {
-  if (urbanLoaded) { drawCityOutline(lat, lng, pop); return; }
-  pendingOutline = { lat, lng, pop };
-  if (urbanLoading) return;
-  urbanLoading = true;
-  fetchJson(URBAN_URLS).then((geo) => {
-    urbanFeats = (((geo.features || []) as any[]).map((f) => {
-      const bb = geomBbox(f.geometry);
-      return bb ? { bbox: bb, geom: f.geometry } : null;
-    }).filter(Boolean)) as UrbanFeat[];
-    urbanLoaded = true; urbanLoading = false;
-    if (pendingOutline) { drawCityOutline(pendingOutline.lat, pendingOutline.lng, pendingOutline.pop); pendingOutline = null; }
-  }).catch(() => { urbanLoading = false; });
+export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
+function showCityOutline(d: CityRec): void {
+  cityOutlineLayer.clearLayers();
+  const key = (d.name + "|" + d.adm0).toLowerCase();
+  const reqId = ++outlineReqId;
+  if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
+  const params = new URLSearchParams({ format: "jsonv2", polygon_geojson: "1", limit: "1", city: d.name });
+  if (d.adm0) params.set("country", d.adm0);
+  fetch("https://nominatim.openstreetmap.org/search?" + params.toString(), { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : []))
+    .then((arr) => {
+      const g = Array.isArray(arr) && arr[0] && arr[0].geojson;
+      const geom = g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
+      outlineCache.set(key, geom);
+      if (reqId === outlineReqId) drawOutlineGeom(geom); // only if this is still the current selection
+    })
+    .catch(() => { /* leave just the dot */ });
 }
 function updateCities(): void {
   if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }

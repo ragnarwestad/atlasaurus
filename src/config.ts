@@ -45,14 +45,6 @@ export const LAKE_URLS = [
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes.geojson",
 ];
 
-// Urban-area footprints (10m) — built-up extents, used to draw the outline of a
-// selected city (point-in-polygon match against the city's coordinates). Loaded
-// lazily the first time a city is selected.
-export const URBAN_URLS = [
-  "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_10m_urban_areas.geojson",
-  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_urban_areas.geojson",
-];
-
 // --- English Wikipedia title overrides for dataset country names ---
 export const WIKI_OVERRIDES: Record<string, string> = {
   "United States of America": "United States",

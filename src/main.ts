@@ -55,6 +55,7 @@ const flagLayer = L.layerGroup().addTo(map);       // flag images
 const peakLayer = L.layerGroup().addTo(map);       // mountain-peak markers
 const riverLayer = L.layerGroup().addTo(map);      // major river centerlines
 const lakeLayer = L.layerGroup().addTo(map);       // major lakes
+const cityLayer = L.layerGroup().addTo(map);       // major non-capital cities
 const quizLayer = L.layerGroup().addTo(map);       // quiz: guess→answer line + dots
 const quizContLayer = L.layerGroup().addTo(map);   // quiz: continent name labels
 const regionLabelLayer = L.layerGroup().addTo(map); // explore: region name labels (Regions tab)
@@ -78,7 +79,9 @@ let showFlags = false;
 let showPeaks = false;
 let showRivers = false;
 let showLakes = false;
+let showCities = false;
 let isolate = false;
+let placesGeo: any = null; // cached populated-places geojson (shared by capitals + cities)
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
 // standard continents. Non-continent schemes read straight from the Natural
@@ -724,6 +727,44 @@ function refreshLakes(): void {
   else if (!on && lakeLayer.hasLayer(lakeGeo)) lakeLayer.removeLayer(lakeGeo);
   updatePeakLabels();
 }
+
+// --- Cities (Explore "Cities" layer) — large non-capital cities, reusing the
+//     populated-places data the Capitals layer already fetches. ---
+const CITY_MIN_POP = 1_000_000;
+const cityMarkers: L.CircleMarker[] = [];
+let citiesBuilt = false;
+function buildCityMarkers(geo: any): void {
+  if (citiesBuilt) return;
+  ((geo.features || []) as any[]).forEach((f) => {
+    const p = f.properties || {};
+    const fc = String(p.featurecla || "").toLowerCase();
+    const pop = +(p.pop_max || p.pop_min || 0);
+    if (fc.indexOf("admin-0 capital") !== -1) return; // capitals have their own layer
+    if (pop < CITY_MIN_POP) return;                    // keep it to the big cities
+    const c = f.geometry && f.geometry.coordinates;
+    const name = p.name || p.nameascii;
+    if (!c || !name) return;
+    const m = L.circleMarker([c[1], c[0]], { radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 });
+    m.bindTooltip('<a href="' + cityWikiUrl(name) + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>",
+      { permanent: true, interactive: true, direction: "right", offset: [5, 0], className: "map-label city-label" });
+    cityMarkers.push(m);
+  });
+  citiesBuilt = true;
+}
+function loadCities(): void {
+  if (citiesBuilt) { refreshCities(); return; }
+  if (placesGeo) { buildCityMarkers(placesGeo); refreshCities(); return; }
+  fetchJson(CAPITAL_URLS).then((geo) => { placesGeo = geo; buildCityMarkers(geo); refreshCities(); }).catch(() => { /* optional */ });
+}
+function refreshCities(): void {
+  const on = showCities && mode === "explore";
+  if (on && !citiesBuilt) { loadCities(); return; }
+  cityMarkers.forEach((m) => {
+    if (on && !cityLayer.hasLayer(m)) cityLayer.addLayer(m);
+    else if (!on && cityLayer.hasLayer(m)) cityLayer.removeLayer(m);
+  });
+  updatePeakLabels();
+}
 // Peak/river names get crowded when zoomed out, so hide the labels below a zoom
 // threshold — the icons and lines still show every feature.
 function updatePeakLabels(): void {
@@ -733,6 +774,7 @@ function updatePeakLabels(): void {
   mapEl.classList.toggle("peak-labels-on", on);
   mapEl.classList.toggle("river-labels-on", on);
   mapEl.classList.toggle("lake-labels-on", on);
+  mapEl.classList.toggle("city-labels-on", on);
 }
 function updatePeakSizes(): void {
   const z = map.getZoom();
@@ -760,6 +802,7 @@ function refreshAll(): void {
   refreshPeaks();
   refreshRivers();
   refreshLakes();
+  refreshCities();
   updateInfoPanel();
   markActiveContinent();
   updateRegionLabels();
@@ -1037,6 +1080,7 @@ function fetchJson(urls: string[]): Promise<any> {
 
 function loadCapitals(): void {
   fetchJson(CAPITAL_URLS).then((geo) => {
+    placesGeo = geo; // reuse for the Cities layer
     let feats = (geo.features || []).filter((f: any) => {
       const fc = ((f.properties && f.properties.featurecla) || "").toLowerCase();
       return fc === "admin-0 capital"; // national capitals only
@@ -1800,6 +1844,9 @@ rivToggle.addEventListener("change", () => { showRivers = rivToggle.checked; ref
 
 const lakeToggle = document.getElementById("show-lakes") as HTMLInputElement;
 lakeToggle.addEventListener("change", () => { showLakes = lakeToggle.checked; refreshLakes(); });
+
+const cityToggle = document.getElementById("show-cities") as HTMLInputElement;
+cityToggle.addEventListener("change", () => { showCities = cityToggle.checked; refreshCities(); });
 
 const nameToggle = document.getElementById("show-names") as HTMLInputElement;
 nameToggle.addEventListener("change", () => { showNames = nameToggle.checked; refreshCountryLabels(); });

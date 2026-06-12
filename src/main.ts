@@ -613,8 +613,10 @@ function updateFlagSizes(): void {
 // ---------------------------------------------------------------------------
 // Mountain peaks (Explore "Show mountains" layer + quiz markers)
 // ---------------------------------------------------------------------------
+function peakSize(zoom: number): number { return Math.round(Math.min(22 + (zoom - 2) * 5, 46)); } // grows when zoomed in
+function peakLabelOffset(zoom: number): L.PointExpression { return [Math.round(peakSize(zoom) / 2) + 5, 0]; }
 function peakIcon(zoom: number, highlight = false): L.DivIcon {
-  const w = Math.round(Math.min(22 + (zoom - 2) * 5, 46)); // grows when zoomed in
+  const w = peakSize(zoom);
   const h = Math.round(w * 22 / 28);
   const body = highlight ? "#e8740c" : "#74879b";
   const edge = highlight ? "#8a3b00" : "#3a4654";
@@ -637,7 +639,7 @@ function buildPeakMarkers(): void {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
     const label = '<a href="' + wikiUrl(p.wiki || p.name) + '" target="_blank" rel="noopener">' + escapeHtml(p.name) +
       '</a> <span class="peak-elev">(' + fmtInt(p.elevation) + " m)</span>";
-    m.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], interactive: true, className: "map-label peak-label" });
+    m.bindTooltip(label, { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: true, className: "map-label peak-label" });
     m.on("click", (e) => L.DomEvent.stop(e)); // don't let the icon clear the selection
     peakMarkers.push(m);
   });
@@ -693,7 +695,12 @@ function updatePeakLabels(): void {
 }
 function updatePeakSizes(): void {
   const z = map.getZoom();
-  peakMarkers.forEach((m) => m.setIcon(peakIcon(z)));
+  const off = peakLabelOffset(z);
+  peakMarkers.forEach((m) => {
+    m.setIcon(peakIcon(z));
+    const tt = m.getTooltip();
+    if (tt) { tt.options.offset = L.point(off); tt.update(); } // keep the label clear of the (resized) icon
+  });
   updatePeakLabels();
 }
 function peakCountryNames(p: Peak): string {

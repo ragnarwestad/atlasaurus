@@ -752,7 +752,7 @@ function refreshLakes(): void {
 //     labels only for the top few. (Thousands of permanent labels = big lag.) ---
 const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
 const CITY_MAX = 70;       // ceiling on cities rendered per view (each gets a dot AND a label)
-interface CityRec { lat: number; lng: number; name: string; mz: number; }
+interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; }
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
 let citiesLoading = false;
@@ -773,7 +773,8 @@ function loadCities(): void {
       const c = f.geometry && f.geometry.coordinates;
       const name = p.name || p.nameascii;
       if (!c || !name) return null;
-      return { lat: c[1], lng: c[0], name, mz: placeMinZoom(p) } as CityRec;
+      const cap = String(p.featurecla || "").toLowerCase().indexOf("admin-0 capital") !== -1;
+      return { lat: c[1], lng: c[0], name, mz: placeMinZoom(p), cap } as CityRec;
     }).filter(Boolean)) as CityRec[];
     cityDataLoaded = true; citiesLoading = false;
     updateCities();
@@ -791,8 +792,13 @@ function updateCities(): void {
   const b = map.getBounds().pad(0.15);
   const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz).slice(0, cap);
   vis.forEach((d) => {
-    L.circleMarker([d.lat, d.lng], { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 }).addTo(cityLayer);
-    L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: true, className: "map-label city-label" })
+    // Capitals get the red ring (matching the Capitals layer) so they stay easy to
+    // tell apart even when both layers are on, regardless of draw order.
+    const style = d.cap
+      ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
+      : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
+    L.circleMarker([d.lat, d.lng], style).addTo(cityLayer);
+    L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: true, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
       .setLatLng([d.lat, d.lng])
       .setContent('<a href="' + cityWikiUrl(d.name) + '" target="_blank" rel="noopener">' + escapeHtml(d.name) + "</a>")
       .addTo(cityLabelLayer);

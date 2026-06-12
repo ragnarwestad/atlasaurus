@@ -6,9 +6,26 @@ import { allPolygonParts, lineLengthKm } from "./geo";
 import { wikiUrl, escapeHtml } from "./wiki";
 import { PEAKS, type Peak } from "./peaks";
 import { map, peakLayer, riverLayer, lakeLayer, featureCanvas } from "./map";
-import { app, byIso, fmtInt, fetchJson } from "./state";
+import { app, hooks, byIso, fmtInt, fetchJson } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { updatePeakLabels } from "./labels";
+
+// A searchable entry in the sidebar feature lists (Lakes/Mountains/Rivers).
+// `focus()` zooms to the feature and opens its detail box — same idea as clicking
+// a country in the country list.
+export interface PhysFeature { name: string; wiki: string; focus: () => void; }
+export const peakList: PhysFeature[] = [];
+export const riverList: PhysFeature[] = [];
+export const lakeList: PhysFeature[] = [];
+
+// Load every physical dataset up front so the sidebar lists are always populated
+// (rivers/lakes are otherwise fetched lazily only when their toggle is switched on).
+export function loadPhysicalData(): void {
+  buildPeakList();
+  hooks.rebuildFeatureLists();
+  if (!riverGeo) loadRivers();
+  if (!lakeGeo) loadLakes();
+}
 
 // ---------------------------------------------------------------------------
 // Mountain peaks (Explore "Show mountains" layer + quiz markers)
@@ -31,6 +48,21 @@ export function peakIcon(zoom: number, highlight = false): L.DivIcon {
     html: svg, iconSize: [w, h], iconAnchor: [Math.round(w / 2), h],
   });
 }
+function peakOpen(p: Peak): void {
+  renderFeatureInfo(p.name, wikiUrl(p.wiki || p.name), "Mountain peak",
+    [["Elevation", fmtInt(p.elevation) + " m"], ["Country", peakCountryNames(p)], ["Region", escapeHtml(p.region)]]);
+}
+// Sidebar list of peaks (static data, available immediately).
+function buildPeakList(): void {
+  if (peakList.length) return;
+  PEAKS.forEach((p) => {
+    peakList.push({
+      name: p.name,
+      wiki: wikiUrl(p.wiki || p.name),
+      focus: () => { map.setView([p.lat, p.lng], Math.max(map.getZoom(), 6)); peakOpen(p); },
+    });
+  });
+}
 const peakMarkers: L.Marker[] = [];
 function buildPeakMarkers(): void {
   if (peakMarkers.length) return;
@@ -38,8 +70,7 @@ function buildPeakMarkers(): void {
   PEAKS.forEach((p) => {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
     m.bindTooltip(escapeHtml(p.name), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
-    const open = () => renderFeatureInfo(p.name, wikiUrl(p.wiki || p.name), "Mountain peak",
-      [["Elevation", fmtInt(p.elevation) + " m"], ["Country", peakCountryNames(p)], ["Region", escapeHtml(p.region)]]);
+    const open = () => peakOpen(p);
     m.on("click", (e) => { L.DomEvent.stop(e); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
     m.on("tooltipopen", (e: any) => attachLabelClick(e.tooltip, open));
     peakMarkers.push(m);
@@ -104,6 +135,10 @@ function loadRivers(): void {
       const natural = minZ + Math.floor(Math.sqrt(i / len) * span);
       mzByName[nm] = natural >= 5 ? natural - 1 : natural;
     });
+    // Per-name accumulation for the sidebar list: one entry per river, zooming to
+    // the union of all its segments.
+    const boundsByName: Record<string, L.LatLngBounds> = {};
+    const openByName: Record<string, () => void> = {};
     riverGeo = L.geoJSON({ type: "FeatureCollection", features: feats } as any, {
       style: () => ({ renderer: featureCanvas, color: "#3d83c4", weight: 1.5, opacity: 0.85 }),
       onEachFeature: (f: any, layer: L.Layer) => {
@@ -116,10 +151,18 @@ function loadRivers(): void {
         const open = () => renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []);
         layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
+        const lb = (layer as L.Polyline).getBounds();
+        boundsByName[name] = boundsByName[name] ? boundsByName[name].extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
+        openByName[name] = open;
       },
+    });
+    Object.keys(openByName).forEach((nm) => {
+      const b = boundsByName[nm];
+      riverList.push({ name: nm, wiki: wikiUrl(nm), focus: () => { try { map.fitBounds(b, { maxZoom: 7, padding: [40, 40] }); } catch {} openByName[nm](); } });
     });
     riverGeo.clearLayers(); // detach; we add/remove the individual lines via riverLayer below
     riversLoading = false;
+    hooks.rebuildFeatureLists();
     refreshRivers();
   }).catch(() => { riversLoading = false; });
 }
@@ -197,11 +240,14 @@ function loadLakes(): void {
         const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", rows);
         layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
         layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
+        const lb = (layer as L.Polygon).getBounds();
+        lakeList.push({ name, wiki: wikiUrl(name), focus: () => { try { map.fitBounds(lb, { maxZoom: 7, padding: [40, 40] }); } catch {} open(); } });
       },
     });
     pending.forEach((p) => lakeEntries.push({ layer: p.layer, mz: mzByName[p.name] ?? 7 }));
     lakeGeo.clearLayers(); // detach; we add/remove the individual lakes via lakeLayer below
     lakesLoading = false;
+    hooks.rebuildFeatureLists();
     refreshLakes();
   }).catch(() => { lakesLoading = false; });
 }

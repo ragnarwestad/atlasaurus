@@ -8,6 +8,7 @@ import {
 } from "./state";
 import { groupOf, rebuildRegionColors } from "./regions";
 import { selectLayer, selectContinent, deselect } from "./countries";
+import { peakList, riverList, lakeList, type PhysFeature } from "./physical";
 
 export function focusCountry(entry: CountryEntry): void {
   try { map.fitBounds(entry.layer.getBounds(), { maxZoom: 6, padding: [40, 40] }); } catch {}
@@ -22,6 +23,8 @@ export function updateListVisibility(): void {
   const countries$ = app.activeTab === "countries";
   (document.getElementById("country-list") as HTMLElement).hidden = !listExpanded || !countries$;
   (document.getElementById("continent-list") as HTMLElement).hidden = !listExpanded || countries$;
+  // The physical-feature lists (Lakes/Mountains/Rivers) sit under the country list.
+  (document.getElementById("feature-lists") as HTMLElement).hidden = !listExpanded || !countries$;
   (document.querySelector(".filter-sort") as HTMLElement).style.display = listExpanded ? "" : "none";
   (document.querySelector(".search-wrap") as HTMLElement).style.display = countries$ ? "" : "none";
   // The "Group by" scheme picker belongs only to the Regions tab.
@@ -171,6 +174,76 @@ export function buildSidebar(): void {
 
   buildContinentList();
   applyFilter();
+}
+
+// ---------------------------------------------------------------------------
+// Physical-feature lists: Lakes / Mountains / Rivers (collapsible, searchable)
+// ---------------------------------------------------------------------------
+const FEATURE_SECTIONS: { id: string; list: () => PhysFeature[] }[] = [
+  { id: "lakes", list: () => lakeList },
+  { id: "mountains", list: () => peakList },
+  { id: "rivers", list: () => riverList },
+];
+
+function makeFeatureLi(f: PhysFeature): HTMLLIElement {
+  const li = document.createElement("li");
+  li.className = "feat-item";
+  li.dataset.name = f.name.toLowerCase();
+
+  const label = document.createElement("span");
+  label.textContent = f.name;
+  label.title = "Zoom to " + f.name + " on the map";
+  label.style.flex = "1";
+  label.addEventListener("click", () => f.focus());
+
+  const wiki = document.createElement("a");
+  wiki.textContent = "Wiki ↗";
+  wiki.href = f.wiki;
+  wiki.target = "_blank";
+  wiki.rel = "noopener";
+
+  li.appendChild(label);
+  li.appendChild(wiki);
+  return li;
+}
+
+// Apply a section's search box to its list + update its header count.
+function applyFeatureFilter(id: string): void {
+  const ul = document.getElementById("feat-list-" + id);
+  const search = document.getElementById("feat-search-" + id) as HTMLInputElement | null;
+  const countEl = document.getElementById("feat-count-" + id);
+  if (!ul || !search) return;
+  const q = search.value.trim().toLowerCase();
+  const items = ul.querySelectorAll<HTMLElement>("li.feat-item");
+  let shown = 0;
+  items.forEach((li) => {
+    const m = (li.dataset.name || "").indexOf(q) !== -1;
+    if (m) shown++;
+    li.style.display = m ? "" : "none";
+  });
+  if (countEl) countEl.textContent = q ? shown + " / " + items.length : String(items.length);
+}
+
+// (Re)render all three lists from the current data (called once on startup and
+// again when the lazily-fetched river/lake data arrives).
+export function buildFeatureLists(): void {
+  FEATURE_SECTIONS.forEach((sec) => {
+    const ul = document.getElementById("feat-list-" + sec.id);
+    if (!ul) return;
+    ul.innerHTML = "";
+    sec.list().slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((f) => ul.appendChild(makeFeatureLi(f)));
+    applyFeatureFilter(sec.id);
+  });
+}
+
+// Wire the collapse headers + search boxes once (DOM is static scaffolding).
+export function initFeatureLists(): void {
+  FEATURE_SECTIONS.forEach((sec) => {
+    const secEl = document.getElementById("feat-sec-" + sec.id);
+    document.getElementById("feat-head-" + sec.id)?.addEventListener("click", () => secEl?.classList.toggle("expanded"));
+    document.getElementById("feat-search-" + sec.id)?.addEventListener("input", () => applyFeatureFilter(sec.id));
+  });
+  buildFeatureLists();
 }
 
 export function setActiveTab(tab: "countries" | "continents"): void {

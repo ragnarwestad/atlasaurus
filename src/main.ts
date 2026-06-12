@@ -8,13 +8,13 @@ import { map } from "./map";
 import { app, hooks, loadCountryData, type GroupScheme, type QuizType } from "./state";
 import { trackMouse, hideHoverInfo, countryInfoEl, updateInfoPanel, isNarrow } from "./panel";
 import { refreshCountryLabels, refreshFlags, updateFlagSizes } from "./labels";
-import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes, schedulePhysicalUpdate } from "./physical";
+import { refreshPeaks, refreshRivers, refreshLakes, updatePeakSizes, schedulePhysicalUpdate, loadPhysicalData } from "./physical";
 import { refreshCapitals, scheduleCityUpdate, refreshCities } from "./places";
 import { updateRegionLabels } from "./regions";
 import { refreshPolygons, refreshConnectors, deselect, loadBorders } from "./countries";
 import {
   setListExpanded, toggleListExpanded, applyFilter, buildSidebar, buildContinentList,
-  setActiveTab, markActiveContinent,
+  setActiveTab, markActiveContinent, initFeatureLists, buildFeatureLists,
 } from "./sidebar";
 import {
   setMode, nextQuestion, setQuizCat, applyNbMode, applyLocMode, renderNbResults,
@@ -39,6 +39,7 @@ function refreshAll(): void {
   updateRegionLabels();
 }
 hooks.refreshAll = refreshAll; // modules trigger full refreshes via this hook
+hooks.rebuildFeatureLists = buildFeatureLists; // physical.ts repopulates the lists when its data lands
 
 // ---------------------------------------------------------------------------
 // Wire UI + go
@@ -188,4 +189,6 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(
 // Track the cursor so the hover info panel can float next to it.
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(ev.clientX, ev.clientY));
 
+initFeatureLists();   // wire the Lakes/Mountains/Rivers list sections
+loadPhysicalData();   // populate those lists (peaks now; rivers/lakes when fetched)
 loadBorders();

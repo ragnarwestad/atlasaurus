@@ -92,6 +92,7 @@ export const app = {
 // refreshAll coordinator directly (circular dep) — they call hooks.refreshAll().
 export const hooks = {
   refreshAll: () => {},
+  rebuildFeatureLists: () => {},
 };
 
 // ---------------------------------------------------------------------------

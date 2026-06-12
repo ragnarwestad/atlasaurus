@@ -4,34 +4,36 @@ import L from "leaflet";
 import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
-import { app, countries } from "./state";
+import { app, countries, realCountries } from "./state";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
 
-// Like capitals/cities: show only a few country names when zoomed out, more as you
-// zoom in, and only the ones in view — so the world view isn't a wall of ~200
-// labels. Ranked by land AREA (so big countries like Australia/Canada show first,
-// matching how the map looks); the selected country is always shown.
-const NAME_MAX = 70; // ceiling, grows with zoom
+// Each country gets a fixed "show its name from this zoom" threshold, spread by
+// land area across the zoom range (biggest at min zoom, smallest at max). This
+// makes a name's visibility depend only on zoom + being on screen — NOT on which
+// other countries happen to be in view, so panning no longer flickers labels.
+export function assignLabelZooms(): void {
+  const ranked = realCountries().filter((e) => e.labelArea != null)
+    .sort((a, c) => (c.labelArea as number) - (a.labelArea as number));
+  const n = Math.max(1, ranked.length - 1);
+  const span = (map.getMaxZoom() || 8) - (map.getMinZoom() || 2);
+  ranked.forEach((e, i) => { e.labelMinZoom = (map.getMinZoom() || 2) + Math.floor((i * span) / n); });
+}
+
 export function refreshCountryLabels(): void {
   if (app.mode === "quiz") {
     countries.forEach((e) => { const el = e.labelTooltip && e.labelTooltip.getElement(); if (el) el.style.display = "none"; });
     return;
   }
   const z = map.getZoom();
-  const cap = Math.max(8, Math.min(NAME_MAX, Math.round((z - 1) * 20)));
   const b = map.getBounds().pad(0.15);
-  const shown = new Set(
-    countries
-      .filter((e) => e.labelTooltip && countryVisible(e) && app.showNames && inToggleScope(e))
-      .filter((e) => { const ll = e.labelTooltip!.getLatLng(); return !!ll && b.contains(ll); })
-      .sort((a, c) => (c.labelArea || 0) - (a.labelArea || 0))
-      .slice(0, cap),
-  );
-  // The selected/revealed country's name is always shown (even with the toggle off).
-  countries.forEach((e) => { if (e.labelTooltip && countryVisible(e) && isRevealed(e)) shown.add(e); });
   countries.forEach((e) => {
     const el = e.labelTooltip && e.labelTooltip.getElement();
-    if (el) el.style.display = shown.has(e) ? "" : "none";
+    if (!el) return;
+    const ll = e.labelTooltip!.getLatLng();
+    const inView = !!ll && b.contains(ll);
+    const byZoom = app.showNames && inToggleScope(e) && z >= (e.labelMinZoom ?? 0);
+    const show = countryVisible(e) && ((byZoom && inView) || isRevealed(e));
+    el.style.display = show ? "" : "none";
   });
 }
 
@@ -93,6 +95,7 @@ export function placeCountryLabels(): void {
     }
     entry.labelPlaced = true;
   });
+  assignLabelZooms();
   refreshFlags();
 }
 

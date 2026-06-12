@@ -200,19 +200,21 @@ function searchBoundary(qs: string): Promise<any> {
     .then(polyFrom)
     .catch(() => null);
 }
-function showCityOutline(lat: number, lng: number, name: string, adm0: string): void {
+async function showCityOutline(lat: number, lng: number, name: string, adm0: string): Promise<void> {
   cityOutlineLayer.clearLayers();
   const key = (name + "|" + adm0).toLowerCase();
   const reqId = ++outlineReqId;
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
   // Reverse-geocode at the coordinates first (name-independent, fixes Denmark); if
   // that yields no polygon, fall back to a free-form name search.
-  reverseBoundary(lat, lng, 10)
-    .then((geom) => geom || searchBoundary("q=" + encodeURIComponent(name + (adm0 ? ", " + adm0 : ""))))
-    .then((geom) => {
-      outlineCache.set(key, geom || null);
-      if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection
-    });
+  let geom = await reverseBoundary(lat, lng, 10);
+  console.log("[outline]", name, adm0, "@", lat, lng, "| reverse:", geom ? geom.type : "none"); // TEMP diagnostic
+  if (!geom) {
+    geom = await searchBoundary("q=" + encodeURIComponent(name + (adm0 ? ", " + adm0 : "")));
+    console.log("[outline]", name, "| search:", geom ? geom.type : "none"); // TEMP diagnostic
+  }
+  outlineCache.set(key, geom || null);
+  if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection
 }
 function updateCities(): void {
   if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }

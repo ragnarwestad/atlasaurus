@@ -175,22 +175,35 @@ function drawOutlineGeom(geom: any): void {
   L.geoJSON({ type: "Feature", geometry: geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
 }
 export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
+
+// First result that actually carries an areal boundary (Nominatim often ranks the
+// city *node* — a Point — above the boundary relation, so we scan past it).
+function pickPolygon(arr: any): any {
+  if (!Array.isArray(arr)) return null;
+  const hit = arr.find((x) => x.geojson && (x.geojson.type === "Polygon" || x.geojson.type === "MultiPolygon"));
+  return hit ? hit.geojson : null;
+}
+function nominatim(qs: string): Promise<any> {
+  return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=10&" + qs, { headers: { Accept: "application/json" } })
+    .then((r) => (r.ok ? r.json() : []))
+    .then(pickPolygon)
+    .catch(() => null);
+}
 function showCityOutline(d: CityRec): void {
   cityOutlineLayer.clearLayers();
   const key = (d.name + "|" + d.adm0).toLowerCase();
   const reqId = ++outlineReqId;
   if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
-  const params = new URLSearchParams({ format: "jsonv2", polygon_geojson: "1", limit: "1", city: d.name });
-  if (d.adm0) params.set("country", d.adm0);
-  fetch("https://nominatim.openstreetmap.org/search?" + params.toString(), { headers: { Accept: "application/json" } })
-    .then((r) => (r.ok ? r.json() : []))
-    .then((arr) => {
-      const g = Array.isArray(arr) && arr[0] && arr[0].geojson;
-      const geom = g && (g.type === "Polygon" || g.type === "MultiPolygon") ? g : null;
-      outlineCache.set(key, geom);
-      if (reqId === outlineReqId) drawOutlineGeom(geom); // only if this is still the current selection
-    })
-    .catch(() => { /* leave just the dot */ });
+  const structured = "city=" + encodeURIComponent(d.name) + (d.adm0 ? "&country=" + encodeURIComponent(d.adm0) : "");
+  const freeform = "q=" + encodeURIComponent(d.name + (d.adm0 ? ", " + d.adm0 : ""));
+  // Structured query first; if it yields no boundary, retry free-form (more likely
+  // to surface the administrative relation, e.g. for Copenhagen).
+  nominatim(structured)
+    .then((geom) => geom || nominatim(freeform))
+    .then((geom) => {
+      outlineCache.set(key, geom || null);
+      if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection
+    });
 }
 function updateCities(): void {
   if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }

@@ -3,25 +3,42 @@
 // territory connector lines.
 import L from "leaflet";
 import {
-  BORDER_URLS, SUBUNIT_URLS,
-  baseStyle, hoverStyle, selectedStyle, relatedStyle, continentStyle, hiddenStyle,
-  quizCorrectStyle, quizWrongStyle,
-  CONNECTOR_MIN_AREA, CONNECTOR_MAX_LINES, SUBUNIT_MATCH_MAX_D2,
+  baseStyle,
+  BORDER_URLS,
+  CONNECTOR_MAX_LINES,
+  CONNECTOR_MIN_AREA,
+  continentStyle,
+  hiddenStyle,
+  hoverStyle,
+  quizCorrectStyle,
+  quizWrongStyle,
+  relatedStyle,
+  selectedStyle,
+  SUBUNIT_MATCH_MAX_D2,
+  SUBUNIT_URLS,
 } from "./config";
-import { allPolygonParts, centerOf, type LatLng } from "./geo";
-import { wikiUrl, escapeHtml } from "./wiki";
-import { map, connectorLayer } from "./map";
+import {allPolygonParts, centerOf, type LatLng} from "./geo";
+import {escapeHtml, wikiUrl} from "./wiki";
+import {connectorLayer, map} from "./map";
 import {
-  app, hooks, countries, byIso, subunitsByIso, territoriesBySov,
-  CONTINENT_ORDER, fetchJson, loadCountryData,
-  type CountryEntry, type Subunit,
+  app,
+  byIso,
+  CONTINENT_ORDER,
+  countries,
+  type CountryEntry,
+  fetchJson,
+  hooks,
+  loadCountryData,
+  type Subunit,
+  subunitsByIso,
+  territoriesBySov,
 } from "./state";
-import { showHoverInfo, hideHoverInfo } from "./panel";
-import { refreshCountryLabels, placeCountryLabels } from "./labels";
-import { loadCapitals } from "./places";
-import { groupOf, CONTINENT_QUIZ_STYLES } from "./regions";
-import { buildSidebar, setActiveTab } from "./sidebar";
-import { answerContinent, toggleNbPick, handlePeakCountryGuess, handleGuess } from "./quiz";
+import {hideHoverInfo, showHoverInfo} from "./panel";
+import {placeCountryLabels, refreshCountryLabels} from "./labels";
+import {loadCapitals} from "./places";
+import {CONTINENT_QUIZ_STYLES, groupOf} from "./regions";
+import {buildSidebar, setActiveTab} from "./sidebar";
+import {answerContinent, handleGuess, handlePeakCountryGuess, toggleNbPick} from "./quiz";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)
@@ -272,7 +289,7 @@ function loadSubunits(): void {
 
 export function loadBorders(): void {
   fetchJson(BORDER_URLS).then((geo) => {
-    const layer = L.geoJSON(geo, {
+    (map as any).borderLayer = L.geoJSON(geo, {
       // Keep sovereign states (+ disputed/indeterminate). Drop dependencies and
       // leases (e.g. Ashmore and Cartier Islands, French Polynesia, Puerto Rico),
       // and Antarctica (a treaty-governed continent, not a country), but record
@@ -286,9 +303,10 @@ export function loadBorders(): void {
             const prt = allPolygonParts(feature.geometry);
             if (prt.length && prt[0].rings[0] && prt[0].rings[0].length >= 3) {
               const c = centerOf(prt[0].rings);
-              (territoriesBySov[sov] = territoriesBySov[sov] || []).push({ name: nm, adm0, lat: c[0], lng: c[1] });
+              (territoriesBySov[sov] = territoriesBySov[sov] || []).push({name: nm, adm0, lat: c[0], lng: c[1]});
             }
-          } catch { /* skip */ }
+          } catch { /* skip */
+          }
         }
         const t = p.TYPE || "";
         // Antarctica (ATA) is kept as a continent landmass (handled specially in
@@ -307,7 +325,7 @@ export function loadBorders(): void {
         if (/seven seas/i.test(continent)) continent = "Other"; // open-ocean islands
         const isLandmass = iso === "ATA";                       // Antarctica: continent, not a country
         if (isLandmass) continent = "Antarctica";
-        const entry: CountryEntry = { name, layer: layerP, iso, iso2, continent, isLandmass };
+        const entry: CountryEntry = {name, layer: layerP, iso, iso2, continent, isLandmass};
         countries.push(entry);
         if (iso) byIso[iso] = entry;
         layerP.on({
@@ -320,19 +338,35 @@ export function loadBorders(): void {
             refreshPolygons();
             // The selected country already shows its flag + name on the map and in
             // the fact panel, so skip the redundant hover tooltip for it.
-            if (app.mode === "explore") { if (layerP === app.selectedLayer || !app.showHover) hideHoverInfo(); else showHoverInfo(entry); }
+            if (app.mode === "explore") {
+              if (layerP === app.selectedLayer || !app.showHover) hideHoverInfo(); else showHoverInfo(entry);
+            }
           },
-          mouseout: () => { if (app.hoveredLayer === layerP) { app.hoveredLayer = null; app.hoveredContinent = null; } refreshPolygons(); if (app.mode === "explore") hideHoverInfo(); },
+          mouseout: () => {
+            if (app.hoveredLayer === layerP) {
+              app.hoveredLayer = null;
+              app.hoveredContinent = null;
+            }
+            refreshPolygons();
+            if (app.mode === "explore") hideHoverInfo();
+          },
           click: (e) => {
             L.DomEvent.stop(e);
             app.suppressMapClick = true;
-            setTimeout(() => { app.suppressMapClick = false; }, 0);
+            setTimeout(() => {
+              app.suppressMapClick = false;
+            }, 0);
             if (app.mode === "quiz") {
-              if (app.quizType === "continent") { if (!entry.isLandmass) answerContinent(entry.continent || "Other"); }
-              else if (app.quizType === "neighbour") { if (app.nbMode === "map" && !entry.isLandmass && entry !== app.quizTarget) toggleNbPick(entry); }
-              else if (app.quizType === "peakcountry") { if (!entry.isLandmass) handlePeakCountryGuess(entry); }
-              else if (app.quizType === "peakname") { /* answered via the choice buttons */ }
-              else { if (app.locMode === "map") handleGuess(entry); }
+              if (app.quizType === "continent") {
+                if (!entry.isLandmass) answerContinent(entry.continent || "Other");
+              } else if (app.quizType === "neighbour") {
+                if (app.nbMode === "map" && !entry.isLandmass && entry !== app.quizTarget) toggleNbPick(entry);
+              } else if (app.quizType === "peakcountry") {
+                if (!entry.isLandmass) handlePeakCountryGuess(entry);
+              } else if (app.quizType === "peakname") { /* answered via the choice buttons */
+              } else {
+                if (app.locMode === "map") handleGuess(entry);
+              }
               return;
             }
             // The Antarctica landmass selects its region group, not a "country".
@@ -341,8 +375,6 @@ export function loadBorders(): void {
         });
       },
     }).addTo(map);
-
-    (map as any).borderLayer = layer;
     buildSidebar();
     setActiveTab("countries");
     placeCountryLabels();

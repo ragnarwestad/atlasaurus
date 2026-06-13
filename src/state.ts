@@ -69,7 +69,7 @@ export const app = {
   groupScheme: "continent" as GroupScheme,
   regionHue: {} as Record<string, number>,
   // Quiz
-  mode: "explore" as "explore" | "quiz",
+  mode: "explore" as "explore" | "practice" | "quiz",
   quizType: "name" as QuizType,
   quizPeak: null as Peak | null,
   quizCity: null as CityRec | null,       // cities quiz: the target city to locate
@@ -121,9 +121,11 @@ export const territoriesBySov: Record<string, Territory[]> = {};
 // ---------------------------------------------------------------------------
 export function fmtInt(n: number): string { return Math.round(n).toLocaleString("en-US"); }
 
-// Explore guess-mode label: the real name once revealed, else an anonymous
-// "<Type> ?" placeholder the user can guess and click to confirm.
+// Feature name label. Explore (browse) always shows the real name. Practice is
+// the guess mode: an anonymous "<Type> ?" placeholder until revealed (by toggle
+// or by clicking the feature).
 export function featureLabel(typeWord: string, name: string, revealed: boolean): string {
+  if (app.mode === "explore") return name;
   return revealed ? name : typeWord + " ?";
 }
 

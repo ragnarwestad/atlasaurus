@@ -45,8 +45,33 @@ hooks.rebuildFeatureLists = buildFeatureLists; // physical.ts repopulates the li
 // ---------------------------------------------------------------------------
 // Wire UI + go
 // ---------------------------------------------------------------------------
+// Map a toggle id (with a "" or "pr-" prefix) to the app flag it drives. Used to
+// mirror the active panel's checkboxes into the shared render flags on mode entry
+// (Explore and Practice keep separate checkbox sets, hence separate state).
+const TOGGLE_MAP: [string, "showNames" | "showCities" | "showCapitals" | "showFlags" | "showLakes" | "showPeaks" | "showRivers" | "showHover"][] = [
+  ["show-names", "showNames"], ["show-cities", "showCities"], ["show-capitals", "showCapitals"],
+  ["show-flags", "showFlags"], ["show-lakes", "showLakes"], ["show-mountains", "showPeaks"],
+  ["show-rivers", "showRivers"], ["show-hover", "showHover"],
+];
+function mirrorToggles(prefix: string): void {
+  for (const [id, prop] of TOGGLE_MAP) {
+    const el = document.getElementById(prefix + id) as HTMLInputElement | null;
+    app[prop] = !!el?.checked;
+  }
+}
+// Explore and Practice both live "inside" the two top tabs; Quiz tab remembers
+// which sub-tab (Practice / Challenge) was last used.
+let lastQuizSub: "practice" | "quiz" = "practice";
+function enterMode(m: "explore" | "practice" | "quiz"): void {
+  if (m === "explore") mirrorToggles("");        // sync render flags from the active panel…
+  else if (m === "practice") mirrorToggles("pr-"); // …before setMode runs the refresh
+  setMode(m);
+}
 document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
-  b.addEventListener("click", () => setMode(b.dataset.mode as "explore" | "quiz"));
+  b.addEventListener("click", () => enterMode(b.dataset.mode === "explore" ? "explore" : lastQuizSub));
+});
+document.querySelectorAll<HTMLElement>(".quiz-subtab").forEach((b) => {
+  b.addEventListener("click", () => { lastQuizSub = b.dataset.sub === "challenge" ? "quiz" : "practice"; enterMode(lastQuizSub); });
 });
 quizNextBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
 quizSkipBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
@@ -110,6 +135,22 @@ nameToggle.addEventListener("change", () => { app.showNames = nameToggle.checked
 const regionToggle = document.getElementById("show-regions") as HTMLInputElement;
 regionToggle.addEventListener("change", () => { setSectionEnabled("regions", regionToggle.checked); setActiveTab(regionToggle.checked ? "continents" : "countries"); });
 
+// Practice (guess) reveal toggles — its own checkbox set, separate from Explore's.
+// No feature lists here, so (unlike Explore) they don't call setSectionEnabled.
+const PRACTICE_TOGGLES: [string, "showNames" | "showCities" | "showCapitals" | "showFlags" | "showLakes" | "showPeaks" | "showRivers" | "showHover", () => void][] = [
+  ["pr-show-names", "showNames", refreshCountryLabels],
+  ["pr-show-cities", "showCities", refreshCities],
+  ["pr-show-capitals", "showCapitals", refreshCapitals],
+  ["pr-show-flags", "showFlags", refreshFlags],
+  ["pr-show-lakes", "showLakes", refreshLakes],
+  ["pr-show-mountains", "showPeaks", refreshPeaks],
+  ["pr-show-rivers", "showRivers", refreshRivers],
+  ["pr-show-hover", "showHover", () => { if (!app.showHover) hideHoverInfo(); }],
+];
+PRACTICE_TOGGLES.forEach(([id, prop, refresh]) => {
+  const el = document.getElementById(id) as HTMLInputElement | null;
+  el?.addEventListener("change", () => { app[prop] = el.checked; refresh(); savePracticeToggles(); });
+});
 
 let mapExpanded = true;
 function setMapExpanded(on: boolean): void {
@@ -189,7 +230,7 @@ function setHelpTab(name: string): void {
 }
 helpTabs.forEach((t) => { t.addEventListener("click", () => setHelpTab(t.dataset.helpTab || "explore")); });
 // Open on whichever section matches the sidebar's current mode.
-const openHelp = () => { setHelpTab(app.mode === "quiz" ? "quiz" : "explore"); helpModal.hidden = false; };
+const openHelp = () => { setHelpTab(app.mode === "explore" ? "explore" : "quiz"); helpModal.hidden = false; };
 const closeHelp = () => { helpModal.hidden = true; };
 document.querySelectorAll<HTMLElement>(".help-btn").forEach((b) => { b.addEventListener("click", openHelp); });
 helpModal.addEventListener("click", (e) => {
@@ -202,32 +243,39 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(ev.clientX, ev.clientY));
 
 // ---------------------------------------------------------------------------
-// Persist the Map-options toggles across sessions (localStorage). Restoring
-// dispatches a real "change" event per stored toggle, so the existing handlers
-// (app flag + section enable + refresh) run exactly as on a manual click.
+// Persist the toggle panels across sessions (localStorage). Explore and Practice
+// keep SEPARATE sets. On startup the Explore set is applied immediately (it is
+// the active panel); Practice's saved values are loaded into its checkboxes and
+// take effect when you switch to Practice (mirrorToggles).
 // ---------------------------------------------------------------------------
-const TOGGLE_IDS = [
+const EXPLORE_TOGGLE_IDS = [
   "show-names", "show-cities", "show-regions", "show-lakes", "show-mountains",
   "show-rivers", "show-capitals", "show-flags", "show-hover",
 ];
-const TOGGLES_KEY = "atlasaurus.toggles";
-function saveToggles(): void {
+const PRACTICE_TOGGLE_IDS = [
+  "pr-show-names", "pr-show-cities", "pr-show-lakes", "pr-show-mountains",
+  "pr-show-rivers", "pr-show-capitals", "pr-show-flags", "pr-show-hover",
+];
+const EXPLORE_KEY = "atlasaurus.toggles", PRACTICE_KEY = "atlasaurus.toggles.practice";
+function saveSet(key: string, ids: string[]): void {
   const state: Record<string, boolean> = {};
-  TOGGLE_IDS.forEach((id) => { state[id] = !!(document.getElementById(id) as HTMLInputElement | null)?.checked; });
-  try { localStorage.setItem(TOGGLES_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
+  ids.forEach((id) => { state[id] = !!(document.getElementById(id) as HTMLInputElement | null)?.checked; });
+  try { localStorage.setItem(key, JSON.stringify(state)); } catch { /* storage unavailable */ }
 }
-function restoreToggles(): void {
+function saveToggles(): void { saveSet(EXPLORE_KEY, EXPLORE_TOGGLE_IDS); }
+function savePracticeToggles(): void { saveSet(PRACTICE_KEY, PRACTICE_TOGGLE_IDS); }
+function applyStored(key: string, ids: string[]): void { // set checkboxes from storage (HTML default otherwise)
   let state: Record<string, boolean> = {};
-  try { state = JSON.parse(localStorage.getItem(TOGGLES_KEY) || "{}"); } catch { return; }
-  TOGGLE_IDS.forEach((id) => {
-    const el = document.getElementById(id) as HTMLInputElement | null;
-    if (el && state[id] && !el.checked) { el.checked = true; el.dispatchEvent(new Event("change")); }
-  });
+  try { state = JSON.parse(localStorage.getItem(key) || "{}"); } catch { return; }
+  ids.forEach((id) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el && id in state) el.checked = !!state[id]; });
 }
-TOGGLE_IDS.forEach((id) => document.getElementById(id)?.addEventListener("change", saveToggles));
+EXPLORE_TOGGLE_IDS.forEach((id) => document.getElementById(id)?.addEventListener("change", saveToggles));
 
 initSidebarSections(); // wire the Countries/Regions + Cities/Lakes/Mountains/Rivers fold sections
-restoreToggles();      // re-apply saved Map-options toggles (after the sections exist)
+applyStored(EXPLORE_KEY, EXPLORE_TOGGLE_IDS);
+applyStored(PRACTICE_KEY, PRACTICE_TOGGLE_IDS);
+// Apply the Explore toggles' effects now (Explore is the active panel at startup).
+EXPLORE_TOGGLE_IDS.forEach((id) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el?.checked) el.dispatchEvent(new Event("change")); });
 loadPhysicalData();   // populate those lists (peaks now; rivers/lakes when fetched)
 loadCityData();       // populate the Cities list (independent of the Cities map layer)
 loadBorders();

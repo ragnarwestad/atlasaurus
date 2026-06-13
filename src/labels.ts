@@ -39,7 +39,10 @@ export function refreshCountryLabels(): void {
     const ll = e.labelTooltip!.getLatLng();
     const inView = !!ll && b.contains(ll);
     const byZoom = inToggleScope(e) && z >= (e.labelMinZoom ?? 0); // shown by zoom even when anonymous
-    const show = countryVisible(e) && ((byZoom && inView) || isRevealed(e));
+    // Practice shows the (anonymous) label by zoom; browse only when the names
+    // toggle is on or the country is selected.
+    const nameAllowed = app.mode === "explore" ? (app.showNames || isRevealed(e)) : true;
+    const show = countryVisible(e) && nameAllowed && ((byZoom && inView) || isRevealed(e));
     if (show) e.labelTooltip!.setContent(escapeHtml(featureLabel("Country", e.name, countryRevealed(e))));
     el.style.display = show ? "" : "none";
   });
@@ -105,7 +108,7 @@ export function placeCountryLabels(): void {
         L.DomEvent.stop(e);
         app.suppressMapClick = true;
         setTimeout(() => { app.suppressMapClick = false; }, 0);
-        if (app.mode === "explore") selectLayer(entry.layer, true);
+        if (app.mode !== "quiz") selectLayer(entry.layer, true);
       });
     }
     entry.labelPlaced = true;

@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-// Guess mode for Mountains is offline-deterministic: the peak set is bundled
-// (src/peaks.ts), not fetched from a CDN, so the labels are stable. Peak labels
-// live in the DOM at all zooms (their *display* is zoom-gated by .phys-labels-on),
-// so we can read their text via textContent without zooming/panning.
+// Guess mode lives in Quiz > Practice. The peak set is bundled (src/peaks.ts),
+// not fetched from a CDN, so the labels are stable and offline-deterministic.
+// Peak labels live in the DOM at all zooms (their *display* is zoom-gated by
+// .phys-labels-on), so we can read their text via textContent without zooming.
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
+  await page.waitForSelector("#mode-tabs .mode-tab");
+  await page.click('.mode-tab[data-mode="quiz"]'); // Quiz opens on Practice (the guess map)
   await page.waitForSelector(".peak-label", { state: "attached", timeout: 20_000 });
 });
 
@@ -19,12 +21,12 @@ test("peaks start anonymized as 'Mountain ?'", async ({ page }) => {
 test("the Mountains toggle reveals and re-hides all peak names", async ({ page }) => {
   const labels = page.locator(".peak-label");
 
-  await page.check("#show-mountains");
+  await page.check("#pr-show-mountains");
   const revealed = (await labels.allTextContents()).map((t) => t.trim());
   expect(revealed).toContain("Mount Everest"); // an ≥6000 m peak, shown at world view
   expect(revealed.every((t) => t !== "Mountain ?")).toBe(true);
 
-  await page.uncheck("#show-mountains");
+  await page.uncheck("#pr-show-mountains");
   const reHidden = (await labels.allTextContents()).map((t) => t.trim());
   expect(reHidden.every((t) => t === "Mountain ?")).toBe(true);
 });

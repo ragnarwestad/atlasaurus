@@ -167,9 +167,10 @@ function cityOpen(d: CityRec): void {
 // one was individually clicked; otherwise the label stays "City ?".
 function cityRevealed(name: string): boolean { return app.showCities || app.revealedCities.has(name); }
 function updateCities(): void {
-  // In quiz mode the cities round draws its own marker into the quiz layer
-  // (see quiz.ts), so the Explore Cities layer stays empty.
-  if (app.mode !== "explore") { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
+  // Practice (guess) always shows the dots; Explore (browse) only when the Cities
+  // toggle is on; Quiz hides them (the cities round draws its own marker).
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showCities);
+  if (!on) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }
   cityLayer.clearLayers();
   cityLabelLayer.clearLayers();

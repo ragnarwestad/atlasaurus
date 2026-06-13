@@ -886,22 +886,32 @@ function zoomToTarget(maxZoom: number): void {
   if (!app.quizTarget) return;
   try { map.fitBounds(app.quizTarget.layer.getBounds(), { maxZoom, padding: [50, 50] }); } catch { /* ignore */ }
 }
-export function setMode(m: "explore" | "quiz"): void {
+export function setMode(m: "explore" | "practice" | "quiz"): void {
   app.mode = m;
-  document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => { b.classList.toggle("active", b.dataset.mode === m); });
+  const inQuiz = m === "practice" || m === "quiz"; // both live under the "Quiz" top tab
+  document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === "explore" ? m === "explore" : inQuiz);
+  });
   (document.getElementById("explore-panel") as HTMLElement).hidden = m !== "explore";
-  (document.getElementById("quiz-panel") as HTMLElement).hidden = m !== "quiz";
+  (document.getElementById("quiz-panel") as HTMLElement).hidden = !inQuiz;
+  (document.getElementById("practice-panel") as HTMLElement).hidden = m !== "practice";
+  (document.getElementById("challenge-panel") as HTMLElement).hidden = m !== "quiz";
+  document.querySelectorAll<HTMLElement>(".quiz-subtab").forEach((b) => {
+    b.classList.toggle("active", inQuiz && b.dataset.sub === (m === "quiz" ? "challenge" : "practice"));
+  });
   hideHoverInfo();
-  if (m === "explore") {
-    quizLayer.clearLayers();
-    quizContLayer.clearLayers();
-  } else {
+  if (m === "quiz") {
     app.selectedLayer = null; app.selectedContinent = null; app.expandedContinent = null;
     app.quizStarted = true; // per-category scores persist for the session; reset via the button
     // Resume the open section's quiz, or open Countries the first time round.
     const open = currentQuizSection();
     if (open) setQuizCat(SECTION_CAT[open]); else openQuizSection("countries");
     renderQuizScore();
+  } else {
+    // Explore (browse) and Practice (guess) use the feature layers, not the quiz
+    // layers — clear any leftover quiz reveals.
+    quizLayer.clearLayers();
+    quizContLayer.clearLayers();
   }
   hooks.refreshAll();
 }

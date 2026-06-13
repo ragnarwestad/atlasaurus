@@ -97,7 +97,9 @@ function peakMinZoom(elev: number): number {
   return 7;
 }
 export function refreshPeaks(): void {
-  const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
+  // Practice (guess) always shows the icons; Explore (browse) only when the
+  // toggle is on; Quiz hides them (the quiz draws its own markers).
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showPeaks);
   if (on) buildPeakMarkers();
   const z = map.getZoom();
   peakMarkers.forEach((m) => {
@@ -194,7 +196,7 @@ function loadRivers(): Promise<void> {
 // AND the zoom has reached its threshold. (Direct membership, no nested group, so
 // the result is the same whether triggered by the toggle or by zooming.)
 function updateRiverVisibility(): void {
-  const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showRivers);
   const z = map.getZoom();
   riverEntries.forEach((e) => {
     const show = on && z >= e.mz;
@@ -207,7 +209,7 @@ function updateRiverVisibility(): void {
   });
 }
 export function refreshRivers(): void {
-  if (app.mode === "explore" && !riverGeo) { loadRivers(); return; }
+  if (app.mode !== "quiz" && !riverGeo) { loadRivers(); return; }
   updateRiverVisibility();
 }
 
@@ -282,7 +284,7 @@ function loadLakes(): Promise<void> {
 // Manage each lake directly in lakeLayer: show only when the toggle is on AND the
 // zoom has reached its area threshold (direct membership, no nested group).
 function updateLakeVisibility(): void {
-  const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showLakes);
   const z = map.getZoom();
   lakeEntries.forEach((e) => {
     const show = on && z >= e.mz;
@@ -295,7 +297,7 @@ function updateLakeVisibility(): void {
   });
 }
 export function refreshLakes(): void {
-  if (app.mode === "explore" && !lakeGeo) { loadLakes(); return; }
+  if (app.mode !== "quiz" && !lakeGeo) { loadLakes(); return; }
   updateLakeVisibility();
 }
 

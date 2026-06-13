@@ -421,7 +421,7 @@ export function loadBorders(): void {
       },
     }).addTo(map);
     buildSidebar();
-    setActiveTab("countries");
+    setActiveTab(app.activeTab); // re-apply the current tab (honours a persisted Regions toggle), now that countries exist
     placeCountryLabels();
 
     // Natural Earth already splits North/South America correctly, but leaves some

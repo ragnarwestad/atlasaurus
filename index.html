@@ -28,7 +28,7 @@
         <div class="map-toggles">
           <div class="toggle-grid">
             <label id="name-toggle">
-              <input type="checkbox" id="show-names" /> Countries
+              <input type="checkbox" id="show-names" checked /> Countries
             </label>
             <label id="city-toggle">
               <input type="checkbox" id="show-cities" /> Cities
@@ -158,10 +158,39 @@
     </div>
 
     <div id="quiz-panel" hidden>
-      <!-- One collapsible section per feature, top to bottom (mirrors the Explore
-           list). Opening a section starts that quiz; the shared question UI
-           (#quiz-ui) is moved into the open section's body. Cities/Lakes/Rivers
-           are disabled placeholders until their rounds are built. -->
+      <div id="quiz-subtabs">
+        <button type="button" class="quiz-subtab active" data-sub="practice">Practice</button>
+        <button type="button" class="quiz-subtab" data-sub="challenge">Challenge</button>
+      </div>
+
+      <!-- Practice: self-paced "guess by clicking" map, with its own reveal
+           toggles (separate from Explore's Map options). -->
+      <div id="practice-panel">
+        <section class="sb-group">
+          <h2 class="sb-title">Reveal</h2>
+          <div class="map-toggles">
+            <div class="toggle-grid">
+              <label><input type="checkbox" id="pr-show-names" /> Countries</label>
+              <label><input type="checkbox" id="pr-show-cities" /> Cities</label>
+              <label><input type="checkbox" id="pr-show-lakes" /> Lakes</label>
+              <label><input type="checkbox" id="pr-show-mountains" /> Mountains</label>
+              <label><input type="checkbox" id="pr-show-rivers" /> Rivers</label>
+            </div>
+            <hr class="toggle-sep" />
+            <div class="toggle-grid">
+              <label><input type="checkbox" id="pr-show-capitals" /> Capitals</label>
+              <label><input type="checkbox" id="pr-show-flags" /> Flags</label>
+              <label id="pr-hover-toggle"><input type="checkbox" id="pr-show-hover" /> Hover info</label>
+            </div>
+          </div>
+        </section>
+        <p class="practice-hint">Features show as "Country ?", "City ?" … — click one to reveal its name, or switch a type on above to reveal them all.</p>
+      </div>
+
+      <!-- Challenge: the scored quiz rounds. One collapsible section per feature;
+           opening a section starts that round and the shared question UI
+           (#quiz-ui) moves into its body. -->
+      <div id="challenge-panel" hidden>
       <section class="feat-sec quiz-sec collapsed" id="quiz-sec-countries">
         <div class="sb-title-row feat-head-row">
           <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="countries">
@@ -281,6 +310,7 @@
           <button id="quiz-reset" type="button" title="Reset all category scores">Reset score</button>
         </div>
       </div>
+      </div><!-- #challenge-panel -->
     </div>
   </aside>
   <div id="map"></div>
@@ -294,8 +324,10 @@
       <h2><span class="brand-globe">🌐</span> Atlasaurus</h2>
       <p>An interactive map of every country — borders, capitals, flags and facts —
          grouped into continents, with overseas territories drawn in. The sidebar has
-         two modes at the top: <b>Explore</b> (browse the map) and <b>Quiz</b> (test
-         yourself).</p>
+         two modes at the top: <b>Explore</b> (browse the map freely) and <b>Quiz</b>
+         (test yourself). Quiz has two sub-tabs: <b>Practice</b> — a self-paced map
+         where everything hides as <b>Country ?</b>, <b>City ?</b> … and you click to
+         reveal — and <b>Challenge</b> — scored rounds.</p>
 
       <div class="help-tabs" role="tablist">
         <button type="button" class="help-tab active" data-help-tab="explore" role="tab" aria-selected="true">Explore</button>
@@ -303,27 +335,18 @@
       </div>
 
       <div class="help-panel" data-help-panel="explore" role="tabpanel">
-      <p>Explore is for roaming the world map however you like. It opens in guess
-         mode: every country, city, river, lake and mountain shows anonymously —
-         <b>Country ?</b>, <b>City ?</b>, <b>River ?</b>, <b>Lake ?</b>,
-         <b>Mountain ?</b>. Guess what each one is from its shape or position and
-         click to check — the real name appears and stays revealed. When you'd
-         rather just learn, switch a feature on in <b>Map options</b> to reveal all
-         of its names at once.</p>
-      <p>The sidebar reads top to bottom: <b>Map options</b> first, then a list
-         for each feature you switch on.</p>
+      <p>Explore is for browsing the world map freely — country names show from the
+         start. The sidebar reads top to bottom: <b>Map options</b> first, then a list
+         for each feature.</p>
       <ul>
-        <li><b>Map options</b> — each toggle reveals a whole feature's real names at
-            once (a single click reveals just one). <b>Countries</b>, <b>Cities</b>,
-            <b>Mountains</b>, <b>Rivers</b> and <b>Lakes</b> sit anonymously until then;
-            <b>Regions</b> tints the map by grouping. <b>Capitals</b>, <b>Flags</b> and
-            <b>Hover info</b> overlay the map. Bigger cities and the major named rivers,
-            lakes and peaks come first,
-            with more revealed as you zoom in — zoom in to read the labels.</li>
-        <li><b>Feature lists</b> — switching a feature on in <b>Map options</b> enables its
-            list below (<b>Countries</b> is always on). Every list filters by name, and clicking
-            an entry zooms to it and opens its details — countries, cities, peaks,
-            rivers and lakes all behave the same way. The country list adds <b>Sort</b>
+        <li><b>Map options</b> — switch a feature on to show it on the map with its real
+            names: <b>Countries</b>, <b>Cities</b>, <b>Mountains</b>, <b>Rivers</b>,
+            <b>Lakes</b>. <b>Regions</b> tints the map by grouping. <b>Capitals</b>,
+            <b>Flags</b> and <b>Hover info</b> overlay the map. Bigger cities and the
+            major rivers, lakes and peaks come first, with more as you zoom in.</li>
+        <li><b>Feature lists</b> — switching a feature on enables its list below
+            (<b>Countries</b> is always on). Every list filters by name, and clicking an
+            entry zooms to it and opens its details. The country list adds <b>Sort</b>
             (name, population or area); <b>Regions</b> adds <b>Group by</b> — continents,
             UN regions, UN subregions (Caribbean, Western Europe…) or World Bank regions —
             and clicking a region highlights its countries and shows totals.</li>
@@ -332,18 +355,26 @@
             territories (Alaska, Greenland, Réunion…). Click the ocean to clear.</li>
         <li><b>Map labels</b> are just text — click any feature (country, capital, city,
             peak, river or lake) for a detail box, with its Wikipedia link inside.</li>
-        <li><b>Hover info</b> shows a flag · name · capital tooltip at the cursor. Leave
-            it off to quiz yourself — the hovered country still lights up, so you can
-            guess its name from the shape, then click to check.</li>
+        <li><b>Hover info</b> shows a flag · name · capital tooltip at the cursor.</li>
       </ul>
+      <p>Want to test yourself instead? The <b>Quiz</b> tab's <b>Practice</b> sub-tab
+         hides every name as <b>Country ?</b>, <b>City ?</b> … so you can guess and
+         click to reveal.</p>
       </div>
 
       <div class="help-panel" data-help-panel="quiz" role="tabpanel" hidden>
-      <p>Switch to the <b>Quiz</b> tab (top of the sidebar) for several rounds with a
-         running score. The panel reads top to bottom as collapsible sections — one
-         per feature (<b>Countries</b>, <b>Cities</b>, <b>Regions</b>, <b>Lakes</b>,
-         <b>Mountains</b>, <b>Rivers</b>), just like the Explore list. Open a section
-         to start its quiz; opening another switches to it.</p>
+      <p>The <b>Quiz</b> tab has two sub-tabs:</p>
+      <ul>
+        <li><b>Practice</b> — a self-paced map where every feature hides as
+            <b>Country ?</b>, <b>City ?</b>, <b>Mountain ?</b> … Guess from shape or
+            position and click to reveal the real name (it stays revealed). Or switch a
+            type on under <b>Reveal</b> to show all of its names at once. No score.</li>
+        <li><b>Challenge</b> — scored rounds (below).</li>
+      </ul>
+      <p><b>Challenge</b> reads top to bottom as collapsible sections — one per feature
+         (<b>Countries</b>, <b>Cities</b>, <b>Regions</b>, <b>Lakes</b>, <b>Mountains</b>,
+         <b>Rivers</b>). Open a section to start its round; the score is kept per
+         category, with a <b>Reset score</b> button.</p>
       <p>Inside <b>Countries</b>, pick a mode:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.

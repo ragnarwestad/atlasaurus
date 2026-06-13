@@ -19,6 +19,7 @@ function fakeEntry(over: Partial<CountryEntry> & { props?: any; geometry?: any }
 afterEach(() => {
   countries.length = 0;     // shared module state — reset between tests
   app.countryData = null;
+  app.mode = "explore";     // featureLabel is mode-aware; reset to the default
 });
 
 describe("fmtInt", () => {
@@ -29,12 +30,18 @@ describe("fmtInt", () => {
 });
 
 describe("featureLabel", () => {
-  it("shows the real name once revealed", () => {
+  it("shows the real name once revealed (in the guess modes)", () => {
+    app.mode = "practice";
     expect(featureLabel("Mountain", "Mount Everest", true)).toBe("Mount Everest");
   });
-  it("hides the name behind a '<Type> ?' placeholder when not revealed", () => {
+  it("hides the name behind a '<Type> ?' placeholder when not revealed (practice)", () => {
+    app.mode = "practice";
     expect(featureLabel("Mountain", "Mount Everest", false)).toBe("Mountain ?");
     expect(featureLabel("Lake", "Lake Victoria", false)).toBe("Lake ?");
+  });
+  it("always shows the real name in Explore (browse), revealed or not", () => {
+    app.mode = "explore";
+    expect(featureLabel("Mountain", "Mount Everest", false)).toBe("Mount Everest");
   });
 });
 

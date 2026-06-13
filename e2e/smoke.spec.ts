@@ -27,7 +27,7 @@ test("Map-options toggles persist across a reload", async ({ page }) => {
   await page.waitForSelector("#show-capitals");
   await expect(page.locator("#show-capitals")).toBeChecked();
   await expect(page.locator("#show-flags")).toBeChecked();
-  await expect(page.locator("#show-names")).not.toBeChecked(); // untouched stays off
+  await expect(page.locator("#show-cities")).not.toBeChecked(); // untouched stays off
   // Clean up so the persisted state doesn't leak into other tests.
   await page.uncheck("#show-capitals");
   await page.uncheck("#show-flags");

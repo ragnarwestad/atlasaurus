@@ -6,8 +6,9 @@
 > itself needed **no** changes: every red in earlier runs (including the partial
 > browser-driven run that resolved 17 of 32 before being blocked) was Nominatim
 > **429 throttling**, not a resolution bug — see "Constraints" below for the
-> root cause and the harness fixes. Remaining open: Tokyo policy, and widening
-> the verified subset toward the ~7k cities.
+> root cause and the harness fixes. Tokyo policy is now **settled** (show the dot, no
+> outline — see "Likely fixes / tunables"). Remaining open: widening the verified
+> subset toward the ~7k cities.
 
 ## The problem we're solving
 
@@ -79,7 +80,7 @@ addr:town | addr:county | name-search | none`.
 
 - **Verified manually:** Sorø, Hillerød, Aarhus, Copenhagen (after the address-search
   + capital-path fixes); New York and Tokyo handled by the size/containment filter
-  (Tokyo likely resolves to *no outline* — see below).
+  (Tokyo resolves to *no outline* by design — see below).
 - **Unit-tested (mocked fetch), `src/cityBoundary.test.ts`:** reverse-direct,
   address-municipality fallback (Copenhagen shape), oversized-state rejection (NY
   shape), oversized-only → none (Tokyo shape), non-containing rejection, and the pure
@@ -90,8 +91,8 @@ addr:town | addr:county | name-search | none`.
 - **Live-verified (2026-06-12, `pnpm test:live`):** all 25 cities in the integration
   test pass — containing, city-sized polygons with sane spans (22–49 km where logged).
   No algorithm changes were needed; the earlier reds were all 429 throttling.
-- **Open:** the verified subset is still only ~25 notable cities out of ~7k; Tokyo
-  remains logged-only (`hard`) pending a policy decision.
+- **Open:** the verified subset is still only ~25 notable cities out of ~7k. (Tokyo's
+  policy is now settled — dot only; it stays logged-only (`hard`) as a canary.)
 
 ## The work to finish (the loop for Claude Code)
 
@@ -118,10 +119,20 @@ Run this loop until green:
 - **Address candidate order** (`municipality → city → town → county`). Some countries
   may need a different preference, or an `addresstype`/`admin_level` check instead of
   a flat size cap.
-- **Tokyo-style cities** with no clean city-level relation under the cap: decide
-  whether to accept the special-wards aggregate, a larger cap, or leave them
-  outline-less (current behaviour → just the dot). Tokyo is marked `hard` (logged,
-  not asserted) in the integration test.
+- **Tokyo-style cities** with no clean city-level relation under the cap: **settled
+  (2026-06-13) — show the dot, no outline.** Investigated live: the three options from
+  the original handoff reduce to one workable answer.
+  - *Accept the special-wards aggregate (区部)* — **not possible** via Nominatim:
+    reverse jumps straight from ward (zoom 10 → 杉並区) to prefecture (zoom 9–6 → 東京都,
+    span ~2500 km), never surfacing the 区部 level; name-search for `東京都区部` /
+    `Special wards of Tokyo` returns only fulltext junk (schools, theme parks).
+  - *A larger cap* — rejected: 東京都's bbox is ~2500 km because of the Izu/Ogasawara
+    islands, so no flat cap captures it without also letting real prefectures through.
+  - *Leave outline-less* — **chosen.** Every other pin draws its municipality; Tokyo
+    has no reachable city boundary, so the dot alone is the honest, consistent result.
+    Tokyo stays `hard` (logged, not asserted) in the integration test — kept as a
+    canary: if OSM/Nominatim ever start returning a city-sized boundary for it, the
+    logged span makes that visible and we can revisit.
 - **Reverse `zoom`.** Fixed at 10 ("city"); the zoom→admin-level mapping varies by
   country, so a city might come back a notch too large/small. A small zoom cascade
   (10 → 8) with the size/containment filter could help.

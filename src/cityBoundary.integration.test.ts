@@ -44,8 +44,11 @@ const CITIES: Case[] = [
   { name: "Mexico City", lat: 19.4326, lng: -99.1332, adm0: "Mexico" },
   { name: "São Paulo", lat: -23.5505, lng: -46.6333, adm0: "Brazil" },
   { name: "Cairo", lat: 30.0444, lng: 31.2357, adm0: "Egypt" },
-  // Tokyo's admin structure (metropolis incl. far islands) has no clean city-level
-  // boundary under our size cap — logged, not asserted.
+  // Tokyo: deliberate policy — show the dot, no outline. The metropolis (東京都) is a
+  // prefecture (span ~2500 km incl. the Izu/Ogasawara islands → rejected), its core is
+  // 23 independent special wards with no single "city" boundary, and the special-wards
+  // aggregate (区部) is not reachable via Nominatim (reverse skips it 区→都; name-search
+  // returns only fulltext junk). So `none` is correct, not a gap. Logged, not asserted.
   { name: "Tokyo", lat: 35.6762, lng: 139.6503, adm0: "Japan", hard: true },
 ];
 

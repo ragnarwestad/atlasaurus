@@ -653,12 +653,23 @@ export function applyLocMode(): void {
 function isLocateQuiz(): boolean {
   return app.quizType === "name" || app.quizType === "flag" || app.quizType === "capital";
 }
+// Rank search matches so names that START with the query come before ones that
+// merely contain it, then alphabetically — typing "a" lists Afghanistan… first,
+// not Indonesia (which only contains an "a") in arbitrary load order.
+function byQueryRank(q: string) {
+  return (a: { name: string }, b: { name: string }) => {
+    const ap = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+    const bp = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+    return ap - bp || a.name.localeCompare(b.name);
+  };
+}
 export function renderLocResults(query: string): void {
   const q = query.trim().toLowerCase();
   locResults.innerHTML = "";
   if (!q) return;
   realCountries()
     .filter((c) => c.name.toLowerCase().indexOf(q) !== -1)
+    .sort(byQueryRank(q))
     .slice(0, 8)
     .forEach((c) => {
       const li = document.createElement("li");
@@ -697,14 +708,14 @@ export function renderNameResults(query: string): void {
   nameResults.innerHTML = "";
   if (!q) return;
   if (app.quizType === "peakname") {
-    PEAKS.filter((p) => p.name.toLowerCase().indexOf(q) !== -1).slice(0, 8).forEach((p) => {
+    PEAKS.filter((p) => p.name.toLowerCase().indexOf(q) !== -1).sort(byQueryRank(q)).slice(0, 8).forEach((p) => {
       const li = document.createElement("li");
       li.innerHTML = "<span>" + escapeHtml(p.name) + "</span>";
       li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handlePeakNameGuess(p.name); } });
       nameResults.appendChild(li);
     });
   } else if (app.quizType === "cityname") {
-    cityQuizPool().filter((c) => c.name.toLowerCase().indexOf(q) !== -1).slice(0, 8).forEach((c) => {
+    cityQuizPool().filter((c) => c.name.toLowerCase().indexOf(q) !== -1).sort(byQueryRank(q)).slice(0, 8).forEach((c) => {
       const li = document.createElement("li");
       li.innerHTML = "<span>" + escapeHtml(c.name) + "</span>";
       li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handleCityNameGuess(c.name); } });
@@ -712,7 +723,7 @@ export function renderNameResults(query: string): void {
     });
   } else if (app.quizType === "rivername" || app.quizType === "lakename") {
     const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
-    pool.filter((it) => it.name.toLowerCase().indexOf(q) !== -1).slice(0, 8).forEach((it) => {
+    pool.filter((it) => it.name.toLowerCase().indexOf(q) !== -1).sort(byQueryRank(q)).slice(0, 8).forEach((it) => {
       const li = document.createElement("li");
       li.innerHTML = "<span>" + escapeHtml(it.name) + "</span>";
       li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handleWaterNameGuess(it.name); } });
@@ -727,6 +738,7 @@ export function renderNbResults(query: string): void {
   if (!q || !app.quizTarget) return;
   realCountries()
     .filter((c) => c !== app.quizTarget && !app.nbSelected.has(c) && c.name.toLowerCase().indexOf(q) !== -1)
+    .sort(byQueryRank(q))
     .slice(0, 8)
     .forEach((c) => {
       const li = document.createElement("li");

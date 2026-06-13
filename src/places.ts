@@ -6,7 +6,7 @@ import { cityWikiUrl, escapeHtml } from "./wiki";
 import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
 import {
   app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom, featureLabel,
-  type CountryEntry, type CapitalMarker, type CityRec,
+  quizRevealsCities, type CountryEntry, type CapitalMarker, type CityRec,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
@@ -168,8 +168,11 @@ function cityOpen(d: CityRec): void {
 function cityRevealed(name: string): boolean { return app.showCities || app.revealedCities.has(name); }
 function updateCities(): void {
   // Practice (guess) always shows the dots; Explore (browse) only when the Cities
-  // toggle is on; Quiz hides them (the cities round draws its own marker).
-  const on = app.mode === "practice" || (app.mode === "explore" && app.showCities);
+  // toggle is on; Quiz hides them — except after a Cities-round answer, when we
+  // reveal all real city names so the user can orient (the round's own marker
+  // already labels the target/wrong city, so those are skipped below).
+  const quizReveal = quizRevealsCities();
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showCities) || quizReveal;
   if (!on) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }
   cityLayer.clearLayers();
@@ -179,7 +182,9 @@ function updateCities(): void {
   // Show only a few (biggest) cities when zoomed out, more as you zoom in.
   const cap = Math.max(8, Math.min(CITY_MAX, Math.round((zReal - 1) * 20)));
   const b = map.getBounds().pad(0.15);
-  const vis = cityData.filter((d) => d.mz <= z && b.contains([d.lat, d.lng])).sort((a, c) => a.mz - c.mz).slice(0, cap);
+  const vis = cityData
+    .filter((d) => d.mz <= z && b.contains([d.lat, d.lng]) && !(quizReveal && app.quizDotCities.has(d.name)))
+    .sort((a, c) => a.mz - c.mz).slice(0, cap);
   vis.forEach((d) => {
     // Capitals get the red ring (matching the Capitals layer) so they stay easy to
     // tell apart even when both layers are on, regardless of draw order.
@@ -192,7 +197,7 @@ function updateCities(): void {
     });
     const tt = L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: false, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
       .setLatLng([d.lat, d.lng])
-      .setContent(escapeHtml(featureLabel("City", d.name, cityRevealed(d.name))))
+      .setContent(escapeHtml(featureLabel("City", d.name, quizReveal || cityRevealed(d.name))))
       .addTo(cityLabelLayer);
     attachLabelClick(tt, open);
   });

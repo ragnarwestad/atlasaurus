@@ -4,7 +4,7 @@ import L from "leaflet";
 import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
-import { app, countries, featureLabel, realCountries, type CountryEntry } from "./state";
+import { app, countries, featureLabel, quizRevealsCountries, realCountries, type CountryEntry } from "./state";
 import { countryVisible, inToggleScope, isRevealed, selectLayer } from "./countries";
 
 // A country's name shows when the Countries toggle reveals all names, when it's
@@ -27,7 +27,10 @@ export function assignLabelZooms(): void {
 }
 
 export function refreshCountryLabels(): void {
-  if (app.mode === "quiz") {
+  // After answering a country round we reveal every real name (zoom-gated, in
+  // view) so the user can orient; otherwise the quiz hides the on-map labels.
+  const reveal = quizRevealsCountries();
+  if (app.mode === "quiz" && !reveal) {
     countries.forEach((e) => { const el = e.labelTooltip && e.labelTooltip.getElement(); if (el) el.style.display = "none"; });
     return;
   }
@@ -39,6 +42,13 @@ export function refreshCountryLabels(): void {
     const ll = e.labelTooltip!.getLatLng();
     const inView = !!ll && b.contains(ll);
     const byZoom = inToggleScope(e) && z >= (e.labelMinZoom ?? 0); // shown by zoom even when anonymous
+    if (reveal) {
+      // Skip countries already carrying a reveal dot — their name is shown there.
+      const show = byZoom && inView && !app.quizDotCountries.has(e.name);
+      if (show) e.labelTooltip!.setContent(escapeHtml(e.name));
+      el.style.display = show ? "" : "none";
+      return;
+    }
     // Practice shows the (anonymous) label by zoom; browse only when the names
     // toggle is on or the country is selected.
     const nameAllowed = app.mode === "explore" ? (app.showNames || isRevealed(e)) : true;

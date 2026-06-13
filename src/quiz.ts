@@ -15,7 +15,8 @@ import {
   peakIcon, peakCountryNames, riverQuizPool, lakeQuizPool, riversReady, lakesReady,
   loadRiverData, loadLakeData, type WaterQuizItem,
 } from "./physical";
-import { cityQuizPool, cityDataReady, loadCityData } from "./places";
+import { cityQuizPool, cityDataReady, loadCityData, refreshCities } from "./places";
+import { refreshCountryLabels } from "./labels";
 import { CONTINENT_LABEL_POS } from "./regions";
 import { refreshPolygons, countryAt } from "./countries";
 
@@ -161,6 +162,9 @@ function setupLocateBox(): void {
 }
 
 export function nextQuestion(): void {
+  // A fresh question clears last answer's reveal-dot bookkeeping.
+  app.quizDotCountries.clear();
+  app.quizDotCities.clear();
   // The neighbour quiz needs the borders dataset; load it first if necessary.
   if (app.quizType === "neighbour" && !app.countryData) {
     loadCountryData().then(() => nextQuestion()).catch(() => { /* ignore */ });
@@ -315,6 +319,7 @@ export function handlePeakCountryGuess(entry: CountryEntry): void {
   const correct = app.quizPeak.iso.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
   revealCountryDots(correct, ok ? null : entry);
   refreshPolygons();
+  revealSurroundings();
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +333,7 @@ function drawQuizCity(withLabel: boolean): void {
   if (!c) return;
   const m = L.circleMarker([c.lat, c.lng], { radius: 7, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 });
   if (withLabel) {
+    app.quizDotCities.add(c.name); // labelled here, so skip the plain reveal label
     m.bindTooltip(nameLink(c.name, cityWikiUrl(c.name)),
       { permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-target" });
   }
@@ -377,13 +383,16 @@ function handleCityNameGuess(name: string): void {
   // Green dot on the right city; red dot on the one you picked + a line between.
   quizLayer.clearLayers();
   const tll: LatLng = [target.lat, target.lng];
+  app.quizDotCities.add(target.name);
   markDot(tll, nameLink(target.name, cityWikiUrl(target.name)), "correct");
   const wrong = ok ? null : cityQuizPool().find((c) => c.name === name);
   if (wrong) {
     const wll: LatLng = [wrong.lat, wrong.lng];
+    app.quizDotCities.add(wrong.name);
     markDot(wll, nameLink(wrong.name, cityWikiUrl(wrong.name)), "wrong");
     connectDots(wll, tll);
   }
+  revealSurroundings();
 }
 export function handleCityCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || app.quizType !== "citycountry" || app.quizAnswered || !app.quizCity || entry.isLandmass) return;
@@ -404,6 +413,7 @@ export function handleCityCountryGuess(entry: CountryEntry): void {
   drawQuizCity(true);
   revealCountryDots(where ? [where] : [], ok ? null : entry);
   refreshPolygons();
+  revealSurroundings();
 }
 
 // ---------------------------------------------------------------------------
@@ -551,6 +561,7 @@ export function handleWaterCountryGuess(entry: CountryEntry): void {
   drawWater(quizWaterTarget, "target", true);
   revealCountryDots(quizWaterCountries, ok ? null : entry);
   refreshPolygons();
+  revealSurroundings();
 }
 
 function showContinentLabels(): void {
@@ -809,6 +820,7 @@ export function nbCheckAnswers(): void {
     app.quizNeighbourSet.forEach((n) => { try { b = b.extend(n.layer.getBounds()); } catch { /* ignore */ } });
     map.fitBounds(b, { maxZoom: 6, padding: [50, 50] });
   } catch { /* ignore */ }
+  revealSurroundings();
 }
 
 export function handleGuess(entry: CountryEntry): void {
@@ -838,6 +850,7 @@ export function handleGuess(entry: CountryEntry): void {
   locInput.disabled = true;
   locResults.innerHTML = "";
   refreshPolygons();
+  revealSurroundings();
 }
 
 type DotKind = "correct" | "wrong" | "target";
@@ -867,7 +880,15 @@ function addQuizDot(entry: CountryEntry, latlng: LatLng, kind: DotKind): void {
   const flag = entry.iso2
     ? '<img class="quiz-dot-flag" src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" alt=""> '
     : "";
+  app.quizDotCountries.add(entry.name); // its name is shown here, so skip the plain reveal label
   markDot(latlng, flag + nameLink(entry.name, wikiUrl(entry.name)), kind);
+}
+// After an answer, reveal the surrounding real names so the user can orient. The
+// reveal functions gate on quizRevealsCountries()/quizRevealsCities(), and skip
+// any country/city that already carries a reveal dot.
+function revealSurroundings(): void {
+  refreshCountryLabels();
+  refreshCities();
 }
 // Shared "country answer" reveal (used by By-name and every "which country"
 // round): a green dot on each correct country, a red dot on the wrong pick, and a

@@ -83,6 +83,10 @@ export const app = {
   quizTotal: 0,
   quizContCorrect: null as string | null, // continent quiz: correct continent (green)
   quizContWrong: null as string | null,   // continent quiz: wrongly guessed continent (red)
+  // Names already carried by a reveal dot after an answer — skipped when the
+  // surrounding real names are revealed, so a country/city isn't labelled twice.
+  quizDotCountries: new Set<string>(),
+  quizDotCities: new Set<string>(),
   nbSelected: new Set<CountryEntry>(),    // neighbour quiz: current picks
   nbMode: "map" as "map" | "search",
   locMode: "map" as "map" | "search",
@@ -127,6 +131,20 @@ export function fmtInt(n: number): string { return Math.round(n).toLocaleString(
 export function featureLabel(typeWord: string, name: string, revealed: boolean): string {
   if (app.mode === "explore") return name;
   return revealed ? name : typeWord + " ?";
+}
+
+// After answering a quiz round, the surrounding real names are revealed so the
+// user can orient in the area: all country names for the rounds where you
+// identify a country, all city names for the Cities-section rounds.
+const COUNTRY_REVEAL_TYPES: ReadonlySet<QuizType> = new Set<QuizType>([
+  "name", "flag", "capital", "spot", "neighbour",
+  "peakcountry", "citycountry", "rivercountry", "lakecountry",
+]);
+export function quizRevealsCountries(): boolean {
+  return app.mode === "quiz" && app.quizAnswered && COUNTRY_REVEAL_TYPES.has(app.quizType);
+}
+export function quizRevealsCities(): boolean {
+  return app.mode === "quiz" && app.quizAnswered && (app.quizType === "cityname" || app.quizType === "citycountry");
 }
 
 export function fetchJson(urls: string[]): Promise<any> {

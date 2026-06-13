@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   app, countries, fmtInt, featureLabel, realCountries, entryForLayer, popOf, areaOf,
-  layerCenter, placeMinZoom, type CountryEntry,
+  layerCenter, placeMinZoom, quizRevealsCountries, quizRevealsCities, type CountryEntry,
 } from "./state";
 
 // Minimal fake CountryEntry — only the properties the helpers actually read.
@@ -20,6 +20,8 @@ afterEach(() => {
   countries.length = 0;     // shared module state — reset between tests
   app.countryData = null;
   app.mode = "explore";     // featureLabel is mode-aware; reset to the default
+  app.quizAnswered = false; // quiz-reveal helpers read these
+  app.quizType = "name";
 });
 
 describe("fmtInt", () => {
@@ -42,6 +44,39 @@ describe("featureLabel", () => {
   it("always shows the real name in Explore (browse), revealed or not", () => {
     app.mode = "explore";
     expect(featureLabel("Mountain", "Mount Everest", false)).toBe("Mount Everest");
+  });
+});
+
+describe("quiz reveal predicates", () => {
+  it("reveal nothing until a question is answered", () => {
+    app.mode = "quiz"; app.quizType = "capital"; app.quizAnswered = false;
+    expect(quizRevealsCountries()).toBe(false);
+    expect(quizRevealsCities()).toBe(false);
+  });
+  it("reveal all country names after a country-identifying round", () => {
+    app.mode = "quiz"; app.quizAnswered = true;
+    for (const t of ["name", "flag", "capital", "spot", "neighbour", "peakcountry", "citycountry", "rivercountry", "lakecountry"] as const) {
+      app.quizType = t;
+      expect(quizRevealsCountries()).toBe(true);
+    }
+  });
+  it("reveal all city names only after the Cities-section rounds", () => {
+    app.mode = "quiz"; app.quizAnswered = true;
+    app.quizType = "cityname"; expect(quizRevealsCities()).toBe(true);
+    app.quizType = "citycountry"; expect(quizRevealsCities()).toBe(true);
+    app.quizType = "capital"; expect(quizRevealsCities()).toBe(false);
+  });
+  it("do not reveal for the feature Name-it rounds or the continent round", () => {
+    app.mode = "quiz"; app.quizAnswered = true;
+    for (const t of ["peakname", "rivername", "lakename", "continent"] as const) {
+      app.quizType = t;
+      expect(quizRevealsCountries()).toBe(false);
+    }
+  });
+  it("never reveal outside Quiz mode", () => {
+    app.quizAnswered = true; app.quizType = "capital";
+    app.mode = "explore"; expect(quizRevealsCountries()).toBe(false);
+    app.mode = "practice"; expect(quizRevealsCountries()).toBe(false);
   });
 });
 

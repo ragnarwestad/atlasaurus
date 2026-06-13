@@ -68,7 +68,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #quiz-feedback.correct::before, #quiz-feedback.wrong::before {
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; margin-right: 6px; border-radius: 50%;
-  color: #fff; font-size: 10px; font-weight: 700; vertical-align: -3px;
+  color: #fff; font-size: 10px; font-weight: 700; vertical-align: middle;
 }
 #quiz-feedback.correct::before { content: "✓"; background: #1b7a3d; }
 #quiz-feedback.wrong::before { content: "✗"; background: #b3261e; }

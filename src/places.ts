@@ -6,7 +6,7 @@ import { cityWikiUrl, escapeHtml } from "./wiki";
 import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
 import {
   app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom, featureLabel,
-  type CountryEntry, type CapitalMarker,
+  type CountryEntry, type CapitalMarker, type CityRec,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
@@ -112,14 +112,13 @@ export function loadCapitals(): void {
 //     labels only for the top few. (Thousands of permanent labels = big lag.) ---
 const CITY_ZOOM_BIAS = 1;  // reveal cities a level earlier than their nominal min_zoom
 const CITY_MAX = 70;       // ceiling on cities rendered per view (each gets a dot AND a label)
-interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; pop: number; adm0: string; adm1: string; elev: number; }
 let cityData: CityRec[] = [];
 let cityDataLoaded = false;
-let citiesLoading = false;
-function loadCities(): void {
-  if (cityDataLoaded || citiesLoading) return;
-  citiesLoading = true;
-  fetchJson(CITY_URLS).then((geo) => {
+let cityLoadPromise: Promise<void> | null = null;
+function loadCities(): Promise<void> {
+  if (cityDataLoaded) return Promise.resolve();
+  if (cityLoadPromise) return cityLoadPromise;
+  cityLoadPromise = fetchJson(CITY_URLS).then((geo) => {
     cityData = (((geo.features || []) as any[]).map((f) => {
       const p = f.properties || {};
       const c = f.geometry && f.geometry.coordinates;
@@ -129,12 +128,13 @@ function loadCities(): void {
       return {
         lat: c[1], lng: c[0], name, mz: placeMinZoom(p), cap,
         pop: +(p.pop_max || p.pop_min || 0),
+        iso: p.adm0_a3 || p.sov_a3 || p.iso_a3 || "",
         adm0: p.adm0name || p.adm0_name || "",
         adm1: p.adm1name || p.adm1_name || "",
         elev: +(p.elevation || p.ELEVATION || 0),
       } as CityRec;
     }).filter(Boolean)) as CityRec[];
-    cityDataLoaded = true; citiesLoading = false;
+    cityDataLoaded = true;
     // Build the sidebar Cities list (biggest first) and refresh the lists.
     cityList.length = 0;
     cityData.slice().sort((a, c) => c.pop - a.pop).forEach((d) => {
@@ -146,11 +146,13 @@ function loadCities(): void {
     });
     hooks.rebuildFeatureLists();
     updateCities();
-  }).catch(() => { citiesLoading = false; });
+  }).catch(() => { cityLoadPromise = null; });
+  return cityLoadPromise;
 }
 // Load the city dataset up front so the sidebar Cities list is populated even
 // before the Cities map layer is switched on.
-export function loadCityData(): void { loadCities(); }
+export function loadCityData(): Promise<void> { return loadCities(); }
+export function cityDataReady(): boolean { return cityDataLoaded; }
 // The feature detail box for a city (shared by the map markers and the list).
 function cityOpen(d: CityRec): void {
   const sub = d.cap ? (d.adm0 ? "Capital of " + d.adm0 : "Capital") : (d.adm0 ? "City in " + d.adm0 : "City");
@@ -165,6 +167,8 @@ function cityOpen(d: CityRec): void {
 // one was individually clicked; otherwise the label stays "City ?".
 function cityRevealed(name: string): boolean { return app.showCities || app.revealedCities.has(name); }
 function updateCities(): void {
+  // In quiz mode the cities round draws its own marker into the quiz layer
+  // (see quiz.ts), so the Explore Cities layer stays empty.
   if (app.mode !== "explore") { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }
   cityLayer.clearLayers();
@@ -199,3 +203,14 @@ export function scheduleCityUpdate(): void {
   requestAnimationFrame(() => { cityUpdateScheduled = false; updateCities(); });
 }
 export function refreshCities(): void { updateCities(); }
+
+// Cities quiz pool: the most populous cities, famous enough to be gameable. The
+// quiz (quiz.ts) picks a target from here and pulls distractor names from it.
+const CITY_QUIZ_POOL = 200;
+let cityPoolCache: CityRec[] | null = null;
+export function cityQuizPool(): CityRec[] {
+  if (!cityPoolCache && cityDataLoaded) {
+    cityPoolCache = cityData.slice().sort((a, b) => b.pop - a.pop).slice(0, CITY_QUIZ_POOL);
+  }
+  return cityPoolCache || [];
+}

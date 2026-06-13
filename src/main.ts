@@ -18,7 +18,8 @@ import {
 } from "./sidebar";
 import {
   setMode, nextQuestion, openQuizSection, applyNbMode, applyLocMode, renderNbResults,
-  renderLocResults, nbCheckAnswers, nbInput, nbCheck, locInput, quizNextBtn, quizSkipBtn,
+  renderLocResults, renderNameResults, nbCheckAnswers, nbInput, nbCheck, locInput, nameInput,
+  quizNextBtn, quizSkipBtn,
 } from "./quiz";
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,7 @@ document.querySelectorAll<HTMLInputElement>('#nb-mode input[name="nbmode"]').for
   });
 });
 locInput.addEventListener("input", () => renderLocResults(locInput.value));
+nameInput.addEventListener("input", () => renderNameResults(nameInput.value));
 document.querySelectorAll<HTMLInputElement>('#loc-mode input[name="locmode"]').forEach((r) => {
   r.addEventListener("change", () => {
     if (!r.checked) return;

@@ -27,12 +27,15 @@ export interface CountryEntry {
 export type CapitalMarker = L.CircleMarker & { _entry?: CountryEntry | null };
 export interface Territory { name: string; adm0: string; lat: number; lng: number; }
 export interface Subunit { name: string; lat: number; lng: number; }
+// A populated place from the 10m cities dataset (see places.ts). Shared so the
+// quiz can hold a target city (app.quizCity).
+export interface CityRec { lat: number; lng: number; name: string; mz: number; cap: boolean; pop: number; iso: string; adm0: string; adm1: string; elev: number; }
 export interface RestInfo { area?: number; currencies?: string; languages?: string; continent?: string; borders?: string[]; }
 
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
 // standard continents.
 export type GroupScheme = "continent" | "unRegion" | "subregion" | "wbRegion";
-export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry";
+export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry" | "cityname" | "citycountry";
 
 export const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 
@@ -69,6 +72,7 @@ export const app = {
   mode: "explore" as "explore" | "quiz",
   quizType: "name" as QuizType,
   quizPeak: null as Peak | null,
+  quizCity: null as CityRec | null,       // cities quiz: the target city to locate
   quizStarted: false,
   quizNeighbourSet: new Set<CountryEntry>(),
   quizTarget: null as CountryEntry | null,

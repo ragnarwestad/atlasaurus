@@ -16,8 +16,17 @@ test("Quiz shows six feature sections top to bottom", async ({ page }) => {
   const sections = page.locator("#quiz-panel .quiz-sec");
   await expect(sections).toHaveCount(6);
   await expect(sections.locator(".sb-title")).toHaveText([
-    "Countries", "Cities soon", "Regions", "Lakes soon", "Mountains", "Rivers soon",
+    "Countries", "Cities", "Regions", "Lakes soon", "Mountains", "Rivers soon",
   ]);
+});
+
+test("Cities opens with its Name it / Which country mode row", async ({ page }) => {
+  await page.click('[data-quiz-sec="cities"]');
+  await expect(page.locator("#quiz-sec-cities")).not.toHaveClass(/collapsed/);
+  await expect(page.locator("#quiz-sec-countries")).toHaveClass(/collapsed/);
+  await expect(page.locator("#quiz-sec-cities #quiz-ui")).toBeVisible();
+  await expect(page.locator("#city-type .qt-btn")).toHaveText(["Name it", "Which country"]);
+  await expect(page.locator('#city-type .qt-btn[data-qtype="cityname"]')).toHaveClass(/active/);
 });
 
 test("Countries opens by default with its mode row", async ({ page }) => {
@@ -42,6 +51,24 @@ test("clicking the open section's header collapses it", async ({ page }) => {
   await expect(page.locator("#quiz-sec-countries")).toHaveClass(/collapsed/);
 });
 
+test("Mountains 'Name it' answers via a name search box, not choice buttons", async ({ page }) => {
+  await page.click('[data-quiz-sec="mountains"]');
+  await expect(page.locator("#quiz-sec-mountains #name-box")).toBeVisible();
+  await expect(page.locator("#quiz-sec-mountains #quiz-choices")).toBeHidden();
+  // PEAKS is bundled (no CDN), so the name search works offline.
+  await page.fill("#name-input", "ever");
+  await expect(page.locator("#name-results li").first()).toBeVisible();
+});
+
+test("Mountains 'Which country' has search + map-click both live, no mode toggle", async ({ page }) => {
+  await page.click('[data-quiz-sec="mountains"]');
+  await page.click('#mtn-type .qt-btn[data-qtype="peakcountry"]');
+  await expect(page.locator("#quiz-sec-mountains #loc-box")).toBeVisible();
+  await expect(page.locator("#quiz-sec-mountains #loc-input")).toBeVisible(); // country search always available
+  await expect(page.locator("#quiz-sec-mountains #loc-mode")).toBeHidden();   // no Click-on-map / Select toggle
+  await expect(page.locator("#quiz-sec-mountains #name-box")).toBeHidden();
+});
+
 test("Regions opens and runs (no sub-mode row)", async ({ page }) => {
   await page.click('[data-quiz-sec="regions"]');
   await expect(page.locator("#quiz-sec-regions")).not.toHaveClass(/collapsed/);
@@ -49,8 +76,8 @@ test("Regions opens and runs (no sub-mode row)", async ({ page }) => {
   await expect(page.locator("#quiz-sec-regions #quiz-type")).toHaveCount(0);
 });
 
-test("Cities/Lakes/Rivers are disabled placeholders that stay collapsed", async ({ page }) => {
-  for (const id of ["cities", "lakes", "rivers"]) {
+test("Lakes/Rivers are disabled placeholders that stay collapsed", async ({ page }) => {
+  for (const id of ["lakes", "rivers"]) {
     const sec = page.locator(`#quiz-sec-${id}`);
     await expect(sec).toHaveClass(/disabled/);
     await page.locator(`[data-quiz-sec="${id}"]`).click({ force: true });

@@ -179,14 +179,19 @@
           </div>
         </div>
       </section>
-      <section class="feat-sec quiz-sec collapsed disabled" id="quiz-sec-cities">
+      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-cities">
         <div class="sb-title-row feat-head-row">
           <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="cities">
             <span class="fold-caret"></span>
-            <span class="sb-title">Cities <span class="quiz-soon-tag">soon</span></span>
+            <span class="sb-title">Cities</span>
           </button></h2>
         </div>
-        <div class="feat-body quiz-sec-body"><p class="quiz-soon">Coming soon.</p></div>
+        <div class="feat-body quiz-sec-body">
+          <div id="city-type">
+            <button type="button" class="qt-btn active" data-qtype="cityname">Name it</button>
+            <button type="button" class="qt-btn" data-qtype="citycountry">Which country</button>
+          </div>
+        </div>
       </section>
       <section class="feat-sec quiz-sec collapsed" id="quiz-sec-regions">
         <div class="sb-title-row feat-head-row">
@@ -240,6 +245,10 @@
           </div>
           <input id="loc-input" type="search" aria-label="Type the country" placeholder="Type the country…" autocomplete="off" />
           <ul id="loc-results"></ul>
+        </div>
+        <div id="name-box" hidden>
+          <input id="name-input" type="search" aria-label="Type the name" placeholder="Type the name…" autocomplete="off" />
+          <ul id="name-results"></ul>
         </div>
         <div id="quiz-choices" hidden></div>
         <div id="nb-box" hidden>
@@ -321,8 +330,8 @@
          running score. The panel reads top to bottom as collapsible sections — one
          per feature (<b>Countries</b>, <b>Cities</b>, <b>Regions</b>, <b>Lakes</b>,
          <b>Mountains</b>, <b>Rivers</b>), just like the Explore list. Open a section
-         to start its quiz; opening another switches to it. <b>Cities</b>, <b>Lakes</b>
-         and <b>Rivers</b> are coming soon.</p>
+         to start its quiz; opening another switches to it. <b>Lakes</b> and
+         <b>Rivers</b> are coming soon.</p>
       <p>Inside <b>Countries</b>, pick a mode:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.
@@ -334,11 +343,14 @@
             to answer: <b>Click on map</b> or <b>Select countries</b> (search by name),
             then <b>Check</b>. Found neighbours show green, missed ones and wrong picks are
             marked too.</li>
+        <li><b>Cities</b> — <b>Name it</b>: a city is marked on the map; search and pick its
+            name. <b>Which country</b>: the city is named (not marked); click the country
+            it's in or search and select it.</li>
         <li><b>Regions</b> — a country is named; click any country in its continent on
             the map. The correct continent turns green, a wrong pick red.</li>
-        <li><b>Mountains</b> — a peak is marked on the map. <b>Name it</b> (pick from four
-            options) or <b>Which country</b> (click the country it's in; border peaks accept
-            any of their countries).</li>
+        <li><b>Mountains</b> — <b>Name it</b>: a peak is marked; search and pick its name.
+            <b>Which country</b>: the peak is named (not marked); click the country it's in
+            or search and select it (border peaks accept any of their countries).</li>
         <li>Wrong answers are revealed on the map (correct green, wrong red) with flag and
             name; use <b>Skip</b> or <b>Next →</b> to move on.</li>
       </ul>

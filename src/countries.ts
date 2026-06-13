@@ -38,7 +38,7 @@ import {placeCountryLabels, refreshCountryLabels} from "./labels";
 import {loadCapitals} from "./places";
 import {CONTINENT_QUIZ_STYLES, groupOf} from "./regions";
 import {buildSidebar, setActiveTab} from "./sidebar";
-import {answerContinent, handleGuess, handlePeakCountryGuess, toggleNbPick} from "./quiz";
+import {answerContinent, handleGuess, handlePeakCountryGuess, handleCityCountryGuess, toggleNbPick} from "./quiz";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)
@@ -101,7 +101,11 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         if (app.quizPeak && e.iso && app.quizPeak.iso.includes(e.iso)) return quizCorrectStyle; // the peak's country (green)
         if (app.quizGuess && e === app.quizGuess) return quizWrongStyle;                          // wrong pick (red)
         return baseStyle;
-      } else if (app.quizType === "peakname") {
+      } else if (app.quizType === "citycountry") {
+        if (app.quizCity && e.iso && e.iso === app.quizCity.iso) return quizCorrectStyle; // the city's country (green)
+        if (app.quizGuess && e === app.quizGuess) return quizWrongStyle;                   // wrong pick (red)
+        return baseStyle;
+      } else if (app.quizType === "peakname" || app.quizType === "cityname") {
         return baseStyle; // answer shown on the marker, not the countries
       } else {
         if (e === app.quizTarget) return quizCorrectStyle;                       // the right answer (green)
@@ -367,7 +371,9 @@ export function loadBorders(): void {
                 if (app.nbMode === "map" && !entry.isLandmass && entry !== app.quizTarget) toggleNbPick(entry);
               } else if (app.quizType === "peakcountry") {
                 if (!entry.isLandmass) handlePeakCountryGuess(entry);
-              } else if (app.quizType === "peakname") { /* answered via the choice buttons */
+              } else if (app.quizType === "citycountry") {
+                if (!entry.isLandmass) handleCityCountryGuess(entry);
+              } else if (app.quizType === "peakname" || app.quizType === "cityname") { /* answered via the choice buttons */
               } else {
                 if (app.locMode === "map") handleGuess(entry);
               }

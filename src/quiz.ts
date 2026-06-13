@@ -3,7 +3,7 @@
 // handlers, the reveal dots/lines on the map, and Explore↔Quiz mode switching.
 import L from "leaflet";
 import type { LatLng } from "./geo";
-import { wikiUrl, escapeHtml } from "./wiki";
+import { wikiUrl, cityWikiUrl, escapeHtml } from "./wiki";
 import { PEAKS } from "./peaks";
 import { map, quizLayer, quizContLayer } from "./map";
 import {
@@ -12,6 +12,7 @@ import {
 } from "./state";
 import { hideHoverInfo } from "./panel";
 import { peakIcon, peakCountryNames } from "./physical";
+import { cityQuizPool, cityDataReady, loadCityData } from "./places";
 import { CONTINENT_LABEL_POS } from "./regions";
 import { refreshPolygons } from "./countries";
 
@@ -29,6 +30,16 @@ function renderQuizPrompt(): void {
   }
   if (app.quizType === "peakcountry") {
     quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>' + escapeHtml(app.quizPeak ? app.quizPeak.name : "") + "</span>";
+    return;
+  }
+  if (app.quizType === "cityname") {
+    // "Name it": the city is marked on the map; pick its name (don't reveal it).
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">city</span> <span>Which city?</span>';
+    return;
+  }
+  if (app.quizType === "citycountry") {
+    // "Which country": show the city name; the country is the answer, so hide it.
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">city</span> <span>' + escapeHtml(app.quizCity ? app.quizCity.name : "") + "</span>";
     return;
   }
   if (!app.quizTarget) { quizPromptEl.innerHTML = ""; return; }
@@ -70,6 +81,7 @@ function setupLocateBox(): void {
   quizChoicesEl.hidden = true;
   quizContLayer.clearLayers();
   nbBox.hidden = true;
+  nameBox.hidden = true;
   locInput.value = ""; locInput.disabled = false;
   locResults.innerHTML = "";
   locBox.hidden = false;
@@ -82,6 +94,15 @@ export function nextQuestion(): void {
     return;
   }
   if (app.quizType === "peakname" || app.quizType === "peakcountry") { nextPeakQuestion(); return; }
+  if (app.quizType === "cityname" || app.quizType === "citycountry") {
+    // The cities dataset is fetched lazily; load it first if necessary.
+    if (!cityDataReady()) {
+      loadCityData().then(() => { if (app.mode === "quiz" && (app.quizType === "cityname" || app.quizType === "citycountry")) nextQuestion(); }).catch(() => { /* ignore */ });
+      return;
+    }
+    nextCityQuestion();
+    return;
+  }
   // Restrict the pool to countries that have what the prompt needs.
   const pool = app.quizType === "flag" ? realCountries().filter((c) => c.iso2)
     : app.quizType === "capital" ? realCountries().filter((c) => c.capitalName)
@@ -104,10 +125,12 @@ export function nextQuestion(): void {
     quizChoicesEl.hidden = true;
     nbBox.hidden = true;
     locBox.hidden = true;
+    nameBox.hidden = true;
     quizFeedbackEl.textContent = "Click any country in its continent on the map.";
   } else if (app.quizType === "neighbour") {
     quizChoicesEl.hidden = true;
     locBox.hidden = true;
+    nameBox.hidden = true;
     quizContLayer.clearLayers();
     app.nbSelected = new Set();
     nbInput.value = ""; nbInput.disabled = false;
@@ -147,11 +170,6 @@ export function nextQuestion(): void {
 // ---------------------------------------------------------------------------
 // Mountain-peak quiz (Name it / Which country)
 // ---------------------------------------------------------------------------
-function shuffle<T>(arr: T[]): T[] {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
-}
 function drawQuizPeak(withLabel: boolean): void {
   quizLayer.clearLayers();
   if (!app.quizPeak) return;
@@ -162,17 +180,6 @@ function drawQuizPeak(withLabel: boolean): void {
   }
   m.addTo(quizLayer);
 }
-function renderPeakChoices(): void {
-  if (!app.quizPeak) return;
-  const distract = shuffle(PEAKS.filter((p) => p !== app.quizPeak)).slice(0, 3);
-  quizChoicesEl.innerHTML = "";
-  shuffle([app.quizPeak, ...distract]).forEach((p) => {
-    const b = document.createElement("button");
-    b.type = "button"; b.textContent = p.name; b.dataset.peak = p.name;
-    b.addEventListener("click", () => handlePeakNameGuess(p.name));
-    quizChoicesEl.appendChild(b);
-  });
-}
 function nextPeakQuestion(): void {
   const pool = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
   if (!pool.length) return;
@@ -181,20 +188,22 @@ function nextPeakQuestion(): void {
   app.quizPeak = p;
   app.quizTarget = null; app.quizGuess = null; app.quizAnswered = false;
   app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
-  nbBox.hidden = true; locBox.hidden = true;
+  nbBox.hidden = true; quizChoicesEl.hidden = true;
   quizContLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   if (app.quizType === "peakname") {
-    renderPeakChoices();
-    quizChoicesEl.hidden = false;
-    quizFeedbackEl.textContent = "Which mountain is marked? Pick one.";
+    // Name it: the peak is marked; identify it by searching the name.
+    locBox.hidden = true;
+    setupNameBox();
+    quizFeedbackEl.textContent = "Which mountain is marked? Search and pick it.";
+    if (app.quizPeak) map.setView([app.quizPeak.lat, app.quizPeak.lng], 4);
+    drawQuizPeak(false);
   } else {
-    quizChoicesEl.hidden = true;
-    quizFeedbackEl.textContent = "In which country is " + (app.quizPeak ? app.quizPeak.name : "") + "? Click it on the map.";
+    // Which country: no marker (it would give the answer away) — click the
+    // country on the map or search-and-select it from a neutral world view.
+    setupCountryAnswerBox();
   }
-  if (app.quizPeak) map.setView([app.quizPeak.lat, app.quizPeak.lng], 4);
-  drawQuizPeak(false);
   quizNextBtn.disabled = true;
   refreshPolygons();
 }
@@ -203,12 +212,7 @@ function handlePeakNameGuess(name: string): void {
   app.quizAnswered = true; app.quizTotal++;
   const ok = name === app.quizPeak.name;
   if (ok) app.quizCorrect++;
-  quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
-    btn.disabled = true;
-    const n = btn.dataset.peak;
-    if (n === app.quizPeak!.name) btn.classList.add("correct");
-    else if (n === name && !ok) btn.classList.add("wrong");
-  });
+  nameInput.disabled = true; nameResults.innerHTML = "";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + app.quizPeak.name +
     " — " + fmtInt(app.quizPeak.elevation) + " m, " + peakCountryNames(app.quizPeak) + ".";
@@ -217,7 +221,7 @@ function handlePeakNameGuess(name: string): void {
   drawQuizPeak(true);
 }
 export function handlePeakCountryGuess(entry: CountryEntry): void {
-  if (app.mode !== "quiz" || app.quizAnswered || !app.quizPeak || entry.isLandmass) return;
+  if (app.mode !== "quiz" || app.quizType !== "peakcountry" || app.quizAnswered || !app.quizPeak || entry.isLandmass) return;
   app.quizGuess = entry; app.quizAnswered = true; app.quizTotal++;
   const ok = !!entry.iso && app.quizPeak.iso.includes(entry.iso);
   if (ok) app.quizCorrect++;
@@ -228,7 +232,84 @@ export function handlePeakCountryGuess(entry: CountryEntry): void {
     : "✗ That's " + entry.name + ". " + app.quizPeak.name + " is in " + names + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
-  drawQuizPeak(true);
+  locInput.disabled = true; locResults.innerHTML = "";
+  drawQuizPeak(true);                          // reveal where the peak actually is
+  refreshPolygons();
+}
+
+// ---------------------------------------------------------------------------
+// Cities quiz (mirrors the mountain-peak rounds): "Name it" marks the city and
+// you search its name; "Which country" names the city (no marker) and you click
+// or search its country. Pool comes from places.ts.
+// ---------------------------------------------------------------------------
+function drawQuizCity(withLabel: boolean): void {
+  quizLayer.clearLayers();
+  const c = app.quizCity;
+  if (!c) return;
+  const m = L.circleMarker([c.lat, c.lng], { radius: 7, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 });
+  if (withLabel) {
+    m.bindTooltip('<a href="' + cityWikiUrl(c.name) + '" target="_blank" rel="noopener">' + escapeHtml(c.name) + "</a>",
+      { permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-target" });
+  }
+  m.addTo(quizLayer);
+}
+function nextCityQuestion(): void {
+  // "Which country" needs cities whose country resolves to a map entry.
+  const pool = app.quizType === "citycountry"
+    ? cityQuizPool().filter((c) => c.iso && byIso[c.iso])
+    : cityQuizPool();
+  if (!pool.length) return;
+  let c = app.quizCity;
+  for (let i = 0; i < 20 && (!c || c === app.quizCity); i++) c = pool[Math.floor(Math.random() * pool.length)];
+  app.quizCity = c;
+  app.quizTarget = null; app.quizPeak = null; app.quizGuess = null; app.quizAnswered = false;
+  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
+  nbBox.hidden = true; quizChoicesEl.hidden = true;
+  quizContLayer.clearLayers();
+  renderQuizPrompt();
+  quizFeedbackEl.className = "";
+  if (app.quizType === "cityname") {
+    // Name it: the city is marked; identify it by searching the name.
+    locBox.hidden = true;
+    setupNameBox();
+    quizFeedbackEl.textContent = "Which city is marked? Search and pick it.";
+    if (c) map.setView([c.lat, c.lng], 5);
+    drawQuizCity(false);
+  } else {
+    // Which country: no marker — click the country on the map or search-select it.
+    setupCountryAnswerBox();
+  }
+  quizNextBtn.disabled = true;
+  refreshPolygons();
+}
+function handleCityNameGuess(name: string): void {
+  if (app.mode !== "quiz" || app.quizAnswered || !app.quizCity) return;
+  app.quizAnswered = true; app.quizTotal++;
+  const ok = name === app.quizCity.name;
+  if (ok) app.quizCorrect++;
+  nameInput.disabled = true; nameResults.innerHTML = "";
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + app.quizCity.name +
+    (app.quizCity.adm0 ? ", " + app.quizCity.adm0 : "") + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  drawQuizCity(true);
+}
+export function handleCityCountryGuess(entry: CountryEntry): void {
+  if (app.mode !== "quiz" || app.quizType !== "citycountry" || app.quizAnswered || !app.quizCity || entry.isLandmass) return;
+  app.quizGuess = entry; app.quizAnswered = true; app.quizTotal++;
+  const ok = !!app.quizCity.iso && entry.iso === app.quizCity.iso;
+  if (ok) app.quizCorrect++;
+  const where = byIso[app.quizCity.iso];
+  const countryName = (where && where.name) || app.quizCity.adm0 || "another country";
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = ok
+    ? "✓ Correct! " + app.quizCity.name + " is in " + countryName + "."
+    : "✗ That's " + entry.name + ". " + app.quizCity.name + " is in " + countryName + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  locInput.disabled = true; locResults.innerHTML = "";
+  drawQuizCity(true);                          // reveal where the city actually is
   refreshPolygons();
 }
 
@@ -291,20 +372,49 @@ export function applyNbMode(): void {
   }
 }
 
-// --- Locate quizzes (name / flag / capital): answer by clicking the map or by
-//     searching for the country by name. The two are mutually exclusive. ---
+// --- Locate quizzes (name / flag / capital) AND the "Which country" rounds
+//     (peak / city): answer by clicking the map or by searching a country by
+//     name. The two are mutually exclusive. ---
 const locBox = document.getElementById("loc-box") as HTMLElement;
 const locModeEl = document.getElementById("loc-mode") as HTMLElement;
 export const locInput = document.getElementById("loc-input") as HTMLInputElement;
 const locResults = document.getElementById("loc-results")!;
 
+// Set the locate mode and tick the matching radio.
+function setLocMode(mode: "map" | "search"): void {
+  app.locMode = mode;
+  const radio = document.querySelector<HTMLInputElement>('#loc-mode input[value="' + mode + '"]');
+  if (radio) radio.checked = true;
+}
+// "Which country is X?" — the peak/city country-answer rounds reuse the locate
+// box, but with NO mode toggle: the search box and map-clicking are both live at
+// once (the feature itself is left unmarked so it can't give the answer away).
+function isCountryAnswerQuiz(): boolean {
+  return app.quizType === "peakcountry" || app.quizType === "citycountry";
+}
+function countryAnswerSubject(): string {
+  if (app.quizType === "peakcountry") return app.quizPeak ? app.quizPeak.name : "it";
+  if (app.quizType === "citycountry") return app.quizCity ? app.quizCity.name : "it";
+  return "it";
+}
+function setupCountryAnswerBox(): void {
+  nameBox.hidden = true;
+  quizLayer.clearLayers();
+  setupLocateBox();
+  locModeEl.hidden = true;   // no toggle — search + map-click are both active
+  setLocMode("search");      // show the search input (map-clicks route regardless)
+  map.setView([20, 0], 2);   // neutral world view
+  applyLocMode();
+}
 export function applyLocMode(): void {
   locBox.classList.toggle("map-mode", app.locMode === "map");
   if (app.locMode === "map") { locInput.value = ""; renderLocResults(""); }
-  if (app.mode === "quiz" && isLocateQuiz() && !app.quizAnswered) {
-    quizFeedbackEl.textContent = app.locMode === "map"
-      ? "Click it on the map."
-      : "Find and select the country.";
+  if (app.mode !== "quiz" || app.quizAnswered) return;
+  if (isLocateQuiz()) {
+    quizFeedbackEl.textContent = app.locMode === "map" ? "Click it on the map." : "Find and select the country.";
+  } else if (isCountryAnswerQuiz()) {
+    // Both answer paths are open at once, so the hint mentions both.
+    quizFeedbackEl.textContent = "In which country is " + countryAnswerSubject() + "? Select it, or click it on the map.";
   }
 }
 function isLocateQuiz(): boolean {
@@ -321,9 +431,52 @@ export function renderLocResults(query: string): void {
       const li = document.createElement("li");
       const flag = c.iso2 ? '<img src="https://flagcdn.com/20x15/' + c.iso2 + '.png" alt="">' : "";
       li.innerHTML = flag + "<span>" + escapeHtml(c.name) + "</span>";
-      li.addEventListener("click", () => { if (!app.quizAnswered) { locInput.value = ""; locResults.innerHTML = ""; handleGuess(c); } });
+      li.addEventListener("click", () => {
+        if (app.quizAnswered) return;
+        locInput.value = ""; locResults.innerHTML = "";
+        // Route to the right handler: peak/city "Which country" vs plain locate.
+        if (app.quizType === "peakcountry") handlePeakCountryGuess(c);
+        else if (app.quizType === "citycountry") handleCityCountryGuess(c);
+        else handleGuess(c);
+      });
       locResults.appendChild(li);
     });
+}
+
+// --- "Name it" rounds (peak / city): the feature is marked on the map; search
+//     its name and pick it. (No map-click answer — that was the rejected
+//     click-the-dot approach.) ---
+const nameBox = document.getElementById("name-box") as HTMLElement;
+export const nameInput = document.getElementById("name-input") as HTMLInputElement;
+const nameResults = document.getElementById("name-results")!;
+// Reset + show the feature-name search box (hides the other answer widgets).
+function setupNameBox(): void {
+  quizChoicesEl.hidden = true;
+  nbBox.hidden = true; locBox.hidden = true;
+  quizContLayer.clearLayers();
+  nameInput.value = ""; nameInput.disabled = false;
+  nameResults.innerHTML = "";
+  nameBox.hidden = false;
+}
+export function renderNameResults(query: string): void {
+  const q = query.trim().toLowerCase();
+  nameResults.innerHTML = "";
+  if (!q) return;
+  if (app.quizType === "peakname") {
+    PEAKS.filter((p) => p.name.toLowerCase().indexOf(q) !== -1).slice(0, 8).forEach((p) => {
+      const li = document.createElement("li");
+      li.innerHTML = "<span>" + escapeHtml(p.name) + "</span>";
+      li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handlePeakNameGuess(p.name); } });
+      nameResults.appendChild(li);
+    });
+  } else if (app.quizType === "cityname") {
+    cityQuizPool().filter((c) => c.name.toLowerCase().indexOf(q) !== -1).slice(0, 8).forEach((c) => {
+      const li = document.createElement("li");
+      li.innerHTML = "<span>" + escapeHtml(c.name) + "</span>";
+      li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handleCityNameGuess(c.name); } });
+      nameResults.appendChild(li);
+    });
+  }
 }
 
 export function renderNbResults(query: string): void {
@@ -490,8 +643,8 @@ export function setMode(m: "explore" | "quiz"): void {
 // rows (#quiz-type / #mtn-type); Regions is the continent round (no sub-modes).
 // ---------------------------------------------------------------------------
 const QUIZ_SECTIONS = ["countries", "cities", "regions", "lakes", "mountains", "rivers"];
-const SECTION_CAT: Record<string, "country" | "continent" | "mountains"> = {
-  countries: "country", regions: "continent", mountains: "mountains",
+const SECTION_CAT: Record<string, "country" | "city" | "continent" | "mountains"> = {
+  countries: "country", cities: "city", regions: "continent", mountains: "mountains",
 };
 const quizUiEl = document.getElementById("quiz-ui") as HTMLElement;
 
@@ -522,9 +675,12 @@ export function openQuizSection(id: string): void {
 // Set the active quiz type for a section's category, then ask the first question.
 // "country"/"mountains" read the active button in their mode row; "continent"
 // (Regions) has a single round.
-function setQuizCat(cat: "country" | "continent" | "mountains"): void {
+function setQuizCat(cat: "country" | "city" | "continent" | "mountains"): void {
   if (cat === "continent") {
     app.quizType = "continent";
+  } else if (cat === "city") {
+    const active = document.querySelector<HTMLElement>("#city-type .qt-btn.active");
+    app.quizType = (active && (active.dataset.qtype as QuizType)) || "cityname";
   } else if (cat === "mountains") {
     const active = document.querySelector<HTMLElement>("#mtn-type .qt-btn.active");
     app.quizType = (active && (active.dataset.qtype as QuizType)) || "peakname";

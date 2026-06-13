@@ -114,12 +114,11 @@ export function placeCountryLabels(): void {
   refreshFlags();
 }
 
-// Peak/river names get crowded when zoomed out, so hide the labels below a zoom
-// threshold — the icons and lines still show every feature.
-export function updatePeakLabels(): void {
+// Peak/river/lake names get crowded at world view, so hide all three label types
+// below zoom 3 — the icons, lines and lake shapes still show their biggest
+// features. The user zooms in a touch to read (and guess) the names.
+export function updatePhysLabels(): void {
   const mapEl = document.getElementById("map");
   if (!mapEl) return;
-  const on = map.getZoom() >= 3;
-  mapEl.classList.toggle("peak-labels-on", on);
-  // (Rivers and lakes are revealed per-feature by their own zoom threshold.)
+  mapEl.classList.toggle("phys-labels-on", map.getZoom() >= 3);
 }

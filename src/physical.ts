@@ -8,7 +8,7 @@ import { PEAKS, type Peak } from "./peaks";
 import { map, peakLayer, riverLayer, lakeLayer, featureCanvas } from "./map";
 import { app, hooks, byIso, fmtInt, fetchJson, featureLabel } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
-import { updatePeakLabels } from "./labels";
+import { updatePhysLabels } from "./labels";
 
 // A searchable entry in the sidebar feature lists (Lakes/Mountains/Rivers).
 // `focus()` zooms to the feature and opens its detail box — same idea as clicking
@@ -107,7 +107,7 @@ export function refreshPeaks(): void {
     else if (!show && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
     if (show) m.setTooltipContent(escapeHtml(featureLabel("Mountain", p.name, peakRevealed(p.name))));
   });
-  updatePeakLabels();
+  updatePhysLabels();
 }
 
 
@@ -307,7 +307,7 @@ export function updatePeakSizes(): void {
     const tt = m.getTooltip();
     if (tt) { tt.options.offset = L.point(off); tt.update(); } // keep the label clear of the (resized) icon
   });
-  updatePeakLabels();
+  updatePhysLabels();
 }
 
 export function peakCountryNames(p: Peak): string {

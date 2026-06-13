@@ -222,7 +222,12 @@
          two modes at the top: <b>Explore</b> (browse the map) and <b>Quiz</b> (test
          yourself).</p>
 
-      <h3>Explore</h3>
+      <div class="help-tabs" role="tablist">
+        <button type="button" class="help-tab active" data-help-tab="explore" role="tab" aria-selected="true">Explore</button>
+        <button type="button" class="help-tab" data-help-tab="quiz" role="tab" aria-selected="false">Quiz</button>
+      </div>
+
+      <div class="help-panel" data-help-panel="explore" role="tabpanel">
       <p>Explore is for roaming the world map however you like. It starts almost
          blank — just country borders — so you can test yourself: guess which
          country is which and click it on the map to check. When you'd rather
@@ -254,8 +259,9 @@
             it off to quiz yourself — the hovered country still lights up, so you can
             guess its name from the shape, then click to check.</li>
       </ul>
+      </div>
 
-      <h3>Quiz</h3>
+      <div class="help-panel" data-help-panel="quiz" role="tabpanel" hidden>
       <p>Switch to the <b>Quiz</b> tab (top of the sidebar) for several rounds with a
          running score. Pick what to find — <b>Country</b>, <b>Continent</b> or
          <b>Mountains</b>:</p>
@@ -277,7 +283,9 @@
         <li>Wrong answers are revealed on the map (correct green, wrong red) with flag and
             name; use <b>Skip</b> or <b>Next →</b> to move on.</li>
       </ul>
+      </div>
 
+      <div class="help-credits">
       <h3>Data &amp; credits</h3>
       <p>Borders &amp; facts:
          <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> ·
@@ -287,6 +295,7 @@
          map engine: <a href="https://leafletjs.com/" target="_blank" rel="noopener">Leaflet</a> ·
          tiles: <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a>.</p>
       <p class="help-note">Note: Crimea is shown per the UN-recognized border (Ukraine).</p>
+      </div>
     </div>
   </div>
 

@@ -174,7 +174,19 @@ new ZoomReadout({ position: "topleft" }).addTo(map);
 
 // About / help modal.
 const helpModal = document.getElementById("help-modal") as HTMLElement;
-const openHelp = () => { helpModal.hidden = false; };
+const helpTabs = helpModal.querySelectorAll<HTMLElement>(".help-tab");
+const helpPanels = helpModal.querySelectorAll<HTMLElement>(".help-panel");
+function setHelpTab(name: string): void {
+  helpTabs.forEach((t) => {
+    const on = t.dataset.helpTab === name;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  helpPanels.forEach((p) => { p.hidden = p.dataset.helpPanel !== name; });
+}
+helpTabs.forEach((t) => { t.addEventListener("click", () => setHelpTab(t.dataset.helpTab || "explore")); });
+// Open on whichever section matches the sidebar's current mode.
+const openHelp = () => { setHelpTab(app.mode === "quiz" ? "quiz" : "explore"); helpModal.hidden = false; };
 const closeHelp = () => { helpModal.hidden = true; };
 document.querySelectorAll<HTMLElement>(".help-btn").forEach((b) => { b.addEventListener("click", openHelp); });
 helpModal.addEventListener("click", (e) => {

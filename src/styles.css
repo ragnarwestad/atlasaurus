@@ -316,11 +316,24 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #help-modal[hidden] { display: none; }
 .help-card {
   position: relative; background: #fff; max-width: 560px; width: 100%;
-  max-height: 82vh; overflow: auto; border-radius: 12px;
+  max-height: 82vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 12px;
   box-shadow: 0 8px 40px rgba(0,0,0,.35); padding: 22px 24px;
   font: 14px/1.55 system-ui, sans-serif; color: #23323f;
 }
 .help-card h2 { margin: 0 0 6px; color: #1b3a5c; }
+/* Explore / Quiz tabs inside the help modal — mirror the sidebar mode tabs. */
+.help-tabs { display: flex; gap: 4px; border-bottom: 1px solid #d8d8d8; margin: 14px 0 4px; }
+.help-tab {
+  flex: 1; padding: 8px; font: 700 13px system-ui, sans-serif; cursor: pointer;
+  background: #f3f6f9; border: none; border-bottom: 2px solid transparent; color: #5a6b7a;
+  border-radius: 6px 6px 0 0;
+}
+.help-tab:hover { color: #3878c7; }
+.help-tab.active { background: #fff; color: #1b3a5c; border-bottom-color: #3878c7; }
+/* Each tab panel scrolls on its own; the card frame (header, tabs, credits) stays put. */
+.help-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.help-panel[hidden] { display: none; }
+.help-credits { flex: 0 0 auto; border-top: 1px solid #eee; margin-top: 12px; padding-top: 8px; }
 .help-card h3 { margin: 16px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #5a6b7a; }
 .help-card p { margin: 0 0 8px; }
 .help-card .help-note { margin-top: 10px; font-size: 12px; color: #8a8a8a; }

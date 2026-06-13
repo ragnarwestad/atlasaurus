@@ -114,7 +114,7 @@ export function refreshPeaks(): void {
 // --- Rivers (Explore "Rivers" layer) — major named river centerlines from
 //     Natural Earth, loaded lazily the first time the toggle is switched on. ---
 let riverGeo: L.GeoJSON | null = null;
-let riversLoading = false;
+let riverLoadPromise: Promise<void> | null = null;
 // Each named river (all its segments) appears from this zoom, by mapped length
 // rank, so the long ones show early and the short ones don't all flood in at once.
 const riverEntries: { layer: L.Path; mz: number; name: string }[] = [];
@@ -138,10 +138,10 @@ function pathPointCount(layer: any): number {
   const count = (a: any): number => (Array.isArray(a) ? a.reduce((n, x) => n + count(x), 0) : 1);
   return lls ? count(lls) : 0;
 }
-function loadRivers(): void {
-  if (riverGeo || riversLoading) return;
-  riversLoading = true;
-  fetchJson(RIVER_URLS).then((geo) => {
+function loadRivers(): Promise<void> {
+  if (riverGeo) return Promise.resolve();
+  if (riverLoadPromise) return riverLoadPromise;
+  riverLoadPromise = fetchJson(RIVER_URLS).then((geo) => {
     const riverName = (f: any) => (f.properties || {}).name || (f.properties || {}).name_en;
     const isRiver = (f: any) => String((f.properties || {}).featurecla || "").toLowerCase().indexOf("lake") === -1;
     // Named rivers only (drops the unnamed minor segments). Sum each river's mapped
@@ -185,10 +185,10 @@ function loadRivers(): void {
       riverList.push({ name: nm, wiki: wikiUrl(nm), focus: () => { try { map.fitBounds(b, { maxZoom: 7, padding: [40, 40] }); } catch {} openByName[nm](); } });
     });
     riverGeo.clearLayers(); // detach; we add/remove the individual lines via riverLayer below
-    riversLoading = false;
     hooks.rebuildFeatureLists();
     refreshRivers();
-  }).catch(() => { riversLoading = false; });
+  }).catch(() => { riverLoadPromise = null; });
+  return riverLoadPromise;
 }
 // Manage each river line directly in riverLayer: show it only when the toggle is on
 // AND the zoom has reached its threshold. (Direct membership, no nested group, so
@@ -223,7 +223,7 @@ export function schedulePhysicalUpdate(): void {
 
 // --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---
 let lakeGeo: L.GeoJSON | null = null;
-let lakesLoading = false;
+let lakeLoadPromise: Promise<void> | null = null;
 // Each named lake (all its polygons) appears from this zoom, by computed area, so
 // big lakes show early and the small ones don't all flood in at once.
 const lakeEntries: { layer: L.Path; mz: number; name: string }[] = [];
@@ -236,10 +236,10 @@ function lakeMinZoom(km2: number): number {
   if (km2 >= 150) return 6;
   return 7;
 }
-function loadLakes(): void {
-  if (lakeGeo || lakesLoading) return;
-  lakesLoading = true;
-  fetchJson(LAKE_URLS).then((geo) => {
+function loadLakes(): Promise<void> {
+  if (lakeGeo) return Promise.resolve();
+  if (lakeLoadPromise) return lakeLoadPromise;
+  lakeLoadPromise = fetchJson(LAKE_URLS).then((geo) => {
     const lakeName = (f: any) => (f.properties || {}).name || (f.properties || {}).name_en;
     const areaOf = (f: any) => { try { return allPolygonParts(f.geometry).reduce((s: number, p) => s + Math.abs(p.area), 0); } catch { return 0; } };
     // Named lakes only, and when a name appears on several polygons (NE splits or
@@ -274,10 +274,10 @@ function loadLakes(): void {
     });
     pending.forEach((p) => lakeEntries.push({ layer: p.layer, mz: mzByName[p.name] ?? 7, name: p.name }));
     lakeGeo.clearLayers(); // detach; we add/remove the individual lakes via lakeLayer below
-    lakesLoading = false;
     hooks.rebuildFeatureLists();
     refreshLakes();
-  }).catch(() => { lakesLoading = false; });
+  }).catch(() => { lakeLoadPromise = null; });
+  return lakeLoadPromise;
 }
 // Manage each lake directly in lakeLayer: show only when the toggle is on AND the
 // zoom has reached its area threshold (direct membership, no nested group).
@@ -298,6 +298,44 @@ export function refreshLakes(): void {
   if (app.mode === "explore" && !lakeGeo) { loadLakes(); return; }
   updateLakeVisibility();
 }
+
+// ---------------------------------------------------------------------------
+// Rivers / Lakes quiz ("Name it"): the feature has no country data and is often
+// multi-country, so there is no "Which country" round — only name recognition.
+// The pool is the prominent named features (low zoom threshold = big/famous),
+// each carrying its geometry layers + union bounds so the quiz can highlight it.
+// ---------------------------------------------------------------------------
+export interface WaterQuizItem { name: string; mz: number; bounds: L.LatLngBounds; layers: L.Path[]; }
+function buildWaterPool(entries: { layer: L.Path; mz: number; name: string }[]): WaterQuizItem[] {
+  const byName: Record<string, { layers: L.Path[]; mz: number; bounds: L.LatLngBounds | null }> = {};
+  entries.forEach((e) => {
+    const g = byName[e.name] || (byName[e.name] = { layers: [], mz: e.mz, bounds: null });
+    g.layers.push(e.layer);
+    g.mz = Math.min(g.mz, e.mz);
+    try { const b = (e.layer as any).getBounds(); g.bounds = g.bounds ? g.bounds.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast()); } catch { /* skip */ }
+  });
+  const items = Object.keys(byName)
+    .map((name) => ({ name, mz: byName[name].mz, bounds: byName[name].bounds, layers: byName[name].layers }))
+    .filter((it): it is WaterQuizItem => !!it.bounds);
+  // Prefer the prominent (low-zoom) features for a gameable pool; fall back to all
+  // if there aren't enough. Sorted big-first.
+  const prominent = items.filter((it) => it.mz <= 4);
+  return (prominent.length >= 12 ? prominent : items).sort((a, b) => a.mz - b.mz);
+}
+let riverPoolCache: WaterQuizItem[] | null = null;
+let lakePoolCache: WaterQuizItem[] | null = null;
+export function riverQuizPool(): WaterQuizItem[] {
+  if (!riverPoolCache && riverGeo) riverPoolCache = buildWaterPool(riverEntries);
+  return riverPoolCache || [];
+}
+export function lakeQuizPool(): WaterQuizItem[] {
+  if (!lakePoolCache && lakeGeo) lakePoolCache = buildWaterPool(lakeEntries);
+  return lakePoolCache || [];
+}
+export function riversReady(): boolean { return !!riverGeo; }
+export function lakesReady(): boolean { return !!lakeGeo; }
+export function loadRiverData(): Promise<void> { return loadRivers(); }
+export function loadLakeData(): Promise<void> { return loadLakes(); }
 
 export function updatePeakSizes(): void {
   const z = map.getZoom();

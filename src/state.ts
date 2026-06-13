@@ -35,7 +35,7 @@ export interface RestInfo { area?: number; currencies?: string; languages?: stri
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
 // standard continents.
 export type GroupScheme = "continent" | "unRegion" | "subregion" | "wbRegion";
-export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry" | "cityname" | "citycountry";
+export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry" | "cityname" | "citycountry" | "rivername" | "lakename";
 
 export const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 

@@ -11,7 +11,10 @@ import {
   type CountryEntry, type QuizType,
 } from "./state";
 import { hideHoverInfo } from "./panel";
-import { peakIcon, peakCountryNames } from "./physical";
+import {
+  peakIcon, peakCountryNames, riverQuizPool, lakeQuizPool, riversReady, lakesReady,
+  loadRiverData, loadLakeData, type WaterQuizItem,
+} from "./physical";
 import { cityQuizPool, cityDataReady, loadCityData } from "./places";
 import { CONTINENT_LABEL_POS } from "./regions";
 import { refreshPolygons } from "./countries";
@@ -40,6 +43,14 @@ function renderQuizPrompt(): void {
   if (app.quizType === "citycountry") {
     // "Which country": show the city name; the country is the answer, so hide it.
     quizPromptEl.innerHTML = '<span class="quiz-cap-tag">city</span> <span>' + escapeHtml(app.quizCity ? app.quizCity.name : "") + "</span>";
+    return;
+  }
+  if (app.quizType === "rivername") {
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">river</span> <span>Which river?</span>';
+    return;
+  }
+  if (app.quizType === "lakename") {
+    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">lake</span> <span>Which lake?</span>';
     return;
   }
   if (!app.quizTarget) { quizPromptEl.innerHTML = ""; return; }
@@ -101,6 +112,17 @@ export function nextQuestion(): void {
       return;
     }
     nextCityQuestion();
+    return;
+  }
+  if (app.quizType === "rivername" || app.quizType === "lakename") {
+    // Rivers/lakes are fetched lazily; load first if necessary, then retry.
+    const ready = app.quizType === "rivername" ? riversReady() : lakesReady();
+    if (!ready) {
+      const load = app.quizType === "rivername" ? loadRiverData() : loadLakeData();
+      load.then(() => { if (app.mode === "quiz" && (app.quizType === "rivername" || app.quizType === "lakename")) nextQuestion(); }).catch(() => { /* ignore */ });
+      return;
+    }
+    nextWaterQuestion();
     return;
   }
   // Restrict the pool to countries that have what the prompt needs.
@@ -313,6 +335,62 @@ export function handleCityCountryGuess(entry: CountryEntry): void {
   refreshPolygons();
 }
 
+// ---------------------------------------------------------------------------
+// Rivers / Lakes quiz ("Name it" only — no country data, often multi-country):
+// the feature's geometry is highlighted on the map (no label); search its name.
+// ---------------------------------------------------------------------------
+let quizWaterTarget: WaterQuizItem | null = null;
+function drawWaterHighlight(item: WaterQuizItem, withLabel: boolean): void {
+  quizLayer.clearLayers();
+  const isLake = app.quizType === "lakename";
+  item.layers.forEach((layer) => {
+    const ll = (layer as any).getLatLngs();
+    const shape = isLake
+      ? L.polygon(ll, { color: "#8a3b00", weight: 2, fillColor: "#e8740c", fillOpacity: 0.5 })
+      : L.polyline(ll, { color: "#e8740c", weight: 4, opacity: 0.95 });
+    shape.addTo(quizLayer);
+  });
+  if (withLabel) {
+    L.tooltip({ permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-target" })
+      .setLatLng(item.bounds.getCenter())
+      .setContent('<a href="' + wikiUrl(item.name) + '" target="_blank" rel="noopener">' + escapeHtml(item.name) + "</a>")
+      .addTo(quizLayer);
+  }
+}
+function nextWaterQuestion(): void {
+  const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
+  if (!pool.length) return;
+  let item = quizWaterTarget;
+  for (let i = 0; i < 20 && (!item || item === quizWaterTarget); i++) item = pool[Math.floor(Math.random() * pool.length)];
+  quizWaterTarget = item;
+  app.quizTarget = null; app.quizPeak = null; app.quizCity = null; app.quizGuess = null; app.quizAnswered = false;
+  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
+  renderQuizPrompt();
+  quizFeedbackEl.className = "";
+  setupNameBox();
+  quizFeedbackEl.textContent = app.quizType === "rivername"
+    ? "Which river is highlighted? Search and pick it."
+    : "Which lake is highlighted? Search and pick it.";
+  if (item) {
+    drawWaterHighlight(item, false);
+    try { map.fitBounds(item.bounds, { maxZoom: 7, padding: [40, 40] }); } catch { /* ignore */ }
+  }
+  quizNextBtn.disabled = true;
+  refreshPolygons();
+}
+function handleWaterNameGuess(name: string): void {
+  if (app.mode !== "quiz" || app.quizAnswered || !quizWaterTarget) return;
+  app.quizAnswered = true; app.quizTotal++;
+  const ok = name === quizWaterTarget.name;
+  if (ok) app.quizCorrect++;
+  nameInput.disabled = true; nameResults.innerHTML = "";
+  quizFeedbackEl.className = ok ? "correct" : "wrong";
+  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + quizWaterTarget.name + ".";
+  renderQuizScore();
+  quizNextBtn.disabled = false;
+  drawWaterHighlight(quizWaterTarget, true);   // reveal the name on the map
+}
+
 function showContinentLabels(): void {
   quizContLayer.clearLayers();
   const present = Array.from(new Set(realCountries().map((c) => c.continent || "Other"))).filter((c) => c !== "Other");
@@ -474,6 +552,14 @@ export function renderNameResults(query: string): void {
       const li = document.createElement("li");
       li.innerHTML = "<span>" + escapeHtml(c.name) + "</span>";
       li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handleCityNameGuess(c.name); } });
+      nameResults.appendChild(li);
+    });
+  } else if (app.quizType === "rivername" || app.quizType === "lakename") {
+    const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
+    pool.filter((it) => it.name.toLowerCase().indexOf(q) !== -1).slice(0, 8).forEach((it) => {
+      const li = document.createElement("li");
+      li.innerHTML = "<span>" + escapeHtml(it.name) + "</span>";
+      li.addEventListener("click", () => { if (!app.quizAnswered) { nameInput.value = ""; nameResults.innerHTML = ""; handleWaterNameGuess(it.name); } });
       nameResults.appendChild(li);
     });
   }
@@ -643,8 +729,8 @@ export function setMode(m: "explore" | "quiz"): void {
 // rows (#quiz-type / #mtn-type); Regions is the continent round (no sub-modes).
 // ---------------------------------------------------------------------------
 const QUIZ_SECTIONS = ["countries", "cities", "regions", "lakes", "mountains", "rivers"];
-const SECTION_CAT: Record<string, "country" | "city" | "continent" | "mountains"> = {
-  countries: "country", cities: "city", regions: "continent", mountains: "mountains",
+const SECTION_CAT: Record<string, "country" | "city" | "continent" | "mountains" | "lake" | "river"> = {
+  countries: "country", cities: "city", regions: "continent", mountains: "mountains", lakes: "lake", rivers: "river",
 };
 const quizUiEl = document.getElementById("quiz-ui") as HTMLElement;
 
@@ -675,9 +761,13 @@ export function openQuizSection(id: string): void {
 // Set the active quiz type for a section's category, then ask the first question.
 // "country"/"mountains" read the active button in their mode row; "continent"
 // (Regions) has a single round.
-function setQuizCat(cat: "country" | "city" | "continent" | "mountains"): void {
+function setQuizCat(cat: "country" | "city" | "continent" | "mountains" | "lake" | "river"): void {
   if (cat === "continent") {
     app.quizType = "continent";
+  } else if (cat === "lake") {
+    app.quizType = "lakename";
+  } else if (cat === "river") {
+    app.quizType = "rivername";
   } else if (cat === "city") {
     const active = document.querySelector<HTMLElement>("#city-type .qt-btn.active");
     app.quizType = (active && (active.dataset.qtype as QuizType)) || "cityname";

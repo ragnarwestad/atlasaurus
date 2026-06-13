@@ -32,11 +32,6 @@ body { display: flex; font-family: system-ui, sans-serif; }
    .feat-sec / .sb-fold / .feat-body header chrome). The open section holds the
    shared question UI; disabled sections are greyed "coming soon" placeholders. */
 .quiz-sec-body { padding: 4px 14px 12px; }
-.quiz-soon { margin: 4px 0 0; font-size: 13px; color: #8a97a3; }
-.quiz-soon-tag {
-  font: 700 9px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .05em;
-  color: #9aa6b1; border: 1px solid #d8e0e8; border-radius: 6px; padding: 1px 4px; margin-left: 6px;
-}
 #quiz-type, #mtn-type, #city-type { display: flex; flex-wrap: wrap; gap: 6px; }
 #quiz-type .qt-btn, #mtn-type .qt-btn, #city-type .qt-btn {
   padding: 4px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;

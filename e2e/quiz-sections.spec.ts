@@ -16,7 +16,7 @@ test("Quiz shows six feature sections top to bottom", async ({ page }) => {
   const sections = page.locator("#quiz-panel .quiz-sec");
   await expect(sections).toHaveCount(6);
   await expect(sections.locator(".sb-title")).toHaveText([
-    "Countries", "Cities", "Regions", "Lakes soon", "Mountains", "Rivers soon",
+    "Countries", "Cities", "Regions", "Lakes", "Mountains", "Rivers",
   ]);
 });
 
@@ -76,13 +76,12 @@ test("Regions opens and runs (no sub-mode row)", async ({ page }) => {
   await expect(page.locator("#quiz-sec-regions #quiz-type")).toHaveCount(0);
 });
 
-test("Lakes/Rivers are disabled placeholders that stay collapsed", async ({ page }) => {
+test("Lakes and Rivers run a name-search round (no sub-modes, no country answer)", async ({ page }) => {
   for (const id of ["lakes", "rivers"]) {
-    const sec = page.locator(`#quiz-sec-${id}`);
-    await expect(sec).toHaveClass(/disabled/);
-    await page.locator(`[data-quiz-sec="${id}"]`).click({ force: true });
-    await expect(sec).toHaveClass(/collapsed/);
+    await page.click(`[data-quiz-sec="${id}"]`);
+    await expect(page.locator(`#quiz-sec-${id}`)).not.toHaveClass(/collapsed/);
+    await expect(page.locator(`#quiz-sec-${id} #name-box`)).toBeVisible(); // search the name
+    await expect(page.locator(`#quiz-sec-${id} #loc-box`)).toBeHidden();    // no "which country"
+    await expect(page.locator(`#quiz-sec-${id} #quiz-choices`)).toBeHidden();
   }
-  // Countries stays the active one — the disabled clicks did nothing.
-  await expect(page.locator("#quiz-sec-countries")).not.toHaveClass(/collapsed/);
 });

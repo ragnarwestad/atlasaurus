@@ -78,6 +78,19 @@ test("score shows the active category and the reset button clears it", async ({ 
   await expect(page.locator("#quiz-score")).toHaveText("");
 });
 
+test("quiz scores persist across a reload", async ({ page }) => {
+  await page.click('[data-quiz-sec="mountains"]');
+  await page.fill("#name-input", "ever"); // PEAKS is bundled — works offline
+  await page.locator("#name-results li").first().click();
+  await expect(page.locator("#quiz-score")).toHaveText(/^Mountains: \d \/ 1$/);
+  await page.reload();
+  await page.waitForSelector("#mode-tabs .mode-tab");
+  await page.click('.mode-tab[data-mode="quiz"]');
+  await page.click('[data-quiz-sec="mountains"]');
+  await expect(page.locator("#quiz-score")).toHaveText(/^Mountains: \d \/ 1$/); // restored
+  await page.click("#quiz-reset"); // don't leave a persisted score behind
+});
+
 test("Regions opens and runs (no sub-mode row)", async ({ page }) => {
   await page.click('[data-quiz-sec="regions"]');
   await expect(page.locator("#quiz-sec-regions")).not.toHaveClass(/collapsed/);

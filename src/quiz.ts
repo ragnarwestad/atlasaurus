@@ -108,7 +108,26 @@ export function resetScores(): void {
 }
 function renderQuizScore(): void {
   quizScoreEl.textContent = app.quizTotal ? CAT_LABEL[scoreCat] + ": " + app.quizCorrect + " / " + app.quizTotal : "";
+  saveScores();
 }
+// Persist scores across reloads (localStorage). The active category's running
+// counters live in quizCorrect/quizTotal, so merge them into the saved map.
+const SCORES_KEY = "atlasaurus.scores";
+function saveScores(): void {
+  const all = { ...quizScores, [scoreCat]: { correct: app.quizCorrect, total: app.quizTotal } };
+  try { localStorage.setItem(SCORES_KEY, JSON.stringify(all)); } catch { /* storage unavailable */ }
+}
+function restoreScores(): void {
+  let saved: Record<string, { correct: number; total: number }> = {};
+  try { saved = JSON.parse(localStorage.getItem(SCORES_KEY) || "{}"); } catch { return; }
+  for (const k of Object.keys(saved)) {
+    const s = saved[k];
+    if (s && typeof s.total === "number" && typeof s.correct === "number") quizScores[k] = { correct: s.correct, total: s.total };
+  }
+  const cur = quizScores[scoreCat]; // seed the active category's live counters
+  if (cur) { app.quizCorrect = cur.correct; app.quizTotal = cur.total; }
+}
+restoreScores();
 // Neighbouring countries (mledoze `borders`, resolved to entries we have).
 function neighbourEntries(entry: CountryEntry): CountryEntry[] {
   const codes = (app.countryData && entry.iso && app.countryData[entry.iso] && app.countryData[entry.iso].borders) || [];

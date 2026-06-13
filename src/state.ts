@@ -58,6 +58,10 @@ export const app = {
   // Explore "guess mode": individual features clicked to reveal their real name
   // (the toggle reveals a whole type at once; a click reveals just the one).
   revealedPeaks: new Set<string>(),
+  revealedRivers: new Set<string>(),
+  revealedLakes: new Set<string>(),
+  revealedCities: new Set<string>(),
+  revealedCountries: new Set<string>(),
   // Region grouping (Regions tab) + per-region map tint hues
   groupScheme: "continent" as GroupScheme,
   regionHue: {} as Record<string, number>,

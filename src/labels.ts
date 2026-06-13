@@ -4,8 +4,15 @@ import L from "leaflet";
 import { allPolygonParts, centerOf, type PolyPart } from "./geo";
 import { escapeHtml } from "./wiki";
 import { map, flagLayer } from "./map";
-import { app, countries, realCountries } from "./state";
+import { app, countries, featureLabel, realCountries, type CountryEntry } from "./state";
 import { countryVisible, inToggleScope, isRevealed, selectLayer } from "./countries";
+
+// A country's name shows when the Countries toggle reveals all names, when it's
+// selected/in the selected realm, or when it was individually clicked; otherwise
+// the label stays "Country ?".
+function countryRevealed(e: CountryEntry): boolean {
+  return app.showNames || isRevealed(e) || app.revealedCountries.has(e.name);
+}
 
 // Each country gets a fixed "show its name from this zoom" threshold, spread by
 // land area across the zoom range (biggest at min zoom, smallest at max). This
@@ -31,8 +38,9 @@ export function refreshCountryLabels(): void {
     if (!el) return;
     const ll = e.labelTooltip!.getLatLng();
     const inView = !!ll && b.contains(ll);
-    const byZoom = app.showNames && inToggleScope(e) && z >= (e.labelMinZoom ?? 0);
+    const byZoom = inToggleScope(e) && z >= (e.labelMinZoom ?? 0); // shown by zoom even when anonymous
     const show = countryVisible(e) && ((byZoom && inView) || isRevealed(e));
+    if (show) e.labelTooltip!.setContent(escapeHtml(featureLabel("Country", e.name, countryRevealed(e))));
     el.style.display = show ? "" : "none";
   });
 }
@@ -86,7 +94,7 @@ export function placeCountryLabels(): void {
     entry.labelTooltip = L.tooltip({
       permanent: true, direction: "center", offset: [0, 0],
       className: "map-label country-label", opacity: 1, interactive: false,
-    }).setLatLng(center).setContent(escapeHtml(entry.name)).addTo(map);
+    }).setLatLng(center).setContent(escapeHtml(featureLabel("Country", entry.name, countryRevealed(entry)))).addTo(map);
 
     if (entry.iso2) {
       entry.flagMarker = L.marker(center, {

@@ -104,7 +104,8 @@ let riverGeo: L.GeoJSON | null = null;
 let riversLoading = false;
 // Each named river (all its segments) appears from this zoom, by mapped length
 // rank, so the long ones show early and the short ones don't all flood in at once.
-const riverEntries: { layer: L.Path; mz: number }[] = [];
+const riverEntries: { layer: L.Path; mz: number; name: string }[] = [];
+function riverRevealed(name: string): boolean { return app.showRivers || app.revealedRivers.has(name); }
 // Longitude span of a geometry; a span > 180° means it wraps the antimeridian,
 // which renders as a stray line right across the map — drop those features.
 function lngSpan(geom: any): number {
@@ -155,11 +156,11 @@ function loadRivers(): void {
       onEachFeature: (f: any, layer: L.Layer) => {
         const name = riverName(f);
         if (pathPointCount(layer) < 2) return; // skip empty/degenerate geometry (would throw on tooltip-center)
-        riverEntries.push({ layer: layer as L.Path, mz: mzByName[name] ?? (map.getMaxZoom() || 8) });
-        (layer as L.Path).bindTooltip(escapeHtml(name),
+        riverEntries.push({ layer: layer as L.Path, mz: mzByName[name] ?? (map.getMaxZoom() || 8), name });
+        (layer as L.Path).bindTooltip(escapeHtml(featureLabel("River", name, riverRevealed(name))),
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
         const km = lenByName[name]; // whole named river's mapped length
-        const open = () => renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []);
+        const open = () => { app.revealedRivers.add(name); refreshRivers(); renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []); };
         wireFeatureClick(layer, open);
         const lb = (layer as L.Polyline).getBounds();
         boundsByName[name] = boundsByName[name] ? boundsByName[name].extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
@@ -180,16 +181,20 @@ function loadRivers(): void {
 // AND the zoom has reached its threshold. (Direct membership, no nested group, so
 // the result is the same whether triggered by the toggle or by zooming.)
 function updateRiverVisibility(): void {
-  const on = app.showRivers && app.mode === "explore";
+  const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
   const z = map.getZoom();
   riverEntries.forEach((e) => {
     const show = on && z >= e.mz;
-    if (show && !riverLayer.hasLayer(e.layer)) riverLayer.addLayer(e.layer);
-    else if (!show && riverLayer.hasLayer(e.layer)) riverLayer.removeLayer(e.layer);
+    if (show) {
+      e.layer.setTooltipContent(escapeHtml(featureLabel("River", e.name, riverRevealed(e.name))));
+      if (!riverLayer.hasLayer(e.layer)) riverLayer.addLayer(e.layer);
+    } else if (riverLayer.hasLayer(e.layer)) {
+      riverLayer.removeLayer(e.layer);
+    }
   });
 }
 export function refreshRivers(): void {
-  if (app.showRivers && app.mode === "explore" && !riverGeo) { loadRivers(); return; }
+  if (app.mode === "explore" && !riverGeo) { loadRivers(); return; }
   updateRiverVisibility();
 }
 
@@ -208,7 +213,8 @@ let lakeGeo: L.GeoJSON | null = null;
 let lakesLoading = false;
 // Each named lake (all its polygons) appears from this zoom, by computed area, so
 // big lakes show early and the small ones don't all flood in at once.
-const lakeEntries: { layer: L.Path; mz: number }[] = [];
+const lakeEntries: { layer: L.Path; mz: number; name: string }[] = [];
+function lakeRevealed(name: string): boolean { return app.showLakes || app.revealedLakes.has(name); }
 function lakeMinZoom(km2: number): number {
   if (km2 >= 50000) return 2;
   if (km2 >= 15000) return 3;
@@ -245,15 +251,15 @@ function loadLakes(): void {
         try { km2 = (f.__a || 0) * 12309 * Math.cos((layer as L.Polygon).getBounds().getCenter().lat * Math.PI / 180); } catch { /* 0 */ }
         mzByName[name] = lakeMinZoom(km2);
         const rows: [string, string][] = km2 > 1 ? [["Area", "≈ " + fmtInt(km2) + " km²"]] : [];
-        (layer as L.Path).bindTooltip(escapeHtml(name),
+        (layer as L.Path).bindTooltip(escapeHtml(featureLabel("Lake", name, lakeRevealed(name))),
           { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
-        const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", rows);
+        const open = () => { app.revealedLakes.add(name); refreshLakes(); renderFeatureInfo(name, wikiUrl(name), "Lake", rows); };
         wireFeatureClick(layer, open);
         const lb = (layer as L.Polygon).getBounds();
         lakeList.push({ name, wiki: wikiUrl(name), focus: () => { try { map.fitBounds(lb, { maxZoom: 7, padding: [40, 40] }); } catch {} open(); } });
       },
     });
-    pending.forEach((p) => lakeEntries.push({ layer: p.layer, mz: mzByName[p.name] ?? 7 }));
+    pending.forEach((p) => lakeEntries.push({ layer: p.layer, mz: mzByName[p.name] ?? 7, name: p.name }));
     lakeGeo.clearLayers(); // detach; we add/remove the individual lakes via lakeLayer below
     lakesLoading = false;
     hooks.rebuildFeatureLists();
@@ -263,16 +269,20 @@ function loadLakes(): void {
 // Manage each lake directly in lakeLayer: show only when the toggle is on AND the
 // zoom has reached its area threshold (direct membership, no nested group).
 function updateLakeVisibility(): void {
-  const on = app.showLakes && app.mode === "explore";
+  const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
   const z = map.getZoom();
   lakeEntries.forEach((e) => {
     const show = on && z >= e.mz;
-    if (show && !lakeLayer.hasLayer(e.layer)) lakeLayer.addLayer(e.layer);
-    else if (!show && lakeLayer.hasLayer(e.layer)) lakeLayer.removeLayer(e.layer);
+    if (show) {
+      e.layer.setTooltipContent(escapeHtml(featureLabel("Lake", e.name, lakeRevealed(e.name)))); // no-op on the unlabeled polygons
+      if (!lakeLayer.hasLayer(e.layer)) lakeLayer.addLayer(e.layer);
+    } else if (lakeLayer.hasLayer(e.layer)) {
+      lakeLayer.removeLayer(e.layer);
+    }
   });
 }
 export function refreshLakes(): void {
-  if (app.showLakes && app.mode === "explore" && !lakeGeo) { loadLakes(); return; }
+  if (app.mode === "explore" && !lakeGeo) { loadLakes(); return; }
   updateLakeVisibility();
 }
 

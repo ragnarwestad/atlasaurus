@@ -5,7 +5,7 @@ import { CAPITAL_URLS, CITY_URLS } from "./config";
 import { cityWikiUrl, escapeHtml } from "./wiki";
 import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
 import {
-  app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom,
+  app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom, featureLabel,
   type CountryEntry, type CapitalMarker,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
@@ -161,8 +161,11 @@ function cityOpen(d: CityRec): void {
   renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
 }
 
+// A city's name shows when the Cities toggle reveals the whole type, or when this
+// one was individually clicked; otherwise the label stays "City ?".
+function cityRevealed(name: string): boolean { return app.showCities || app.revealedCities.has(name); }
 function updateCities(): void {
-  if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
+  if (app.mode !== "explore") { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }
   cityLayer.clearLayers();
   cityLabelLayer.clearLayers();
@@ -178,13 +181,13 @@ function updateCities(): void {
     const style = d.cap
       ? { renderer: cityCanvas, radius: 4, color: "#b3261e", weight: 1.5, fillColor: "#fff", fillOpacity: 1 }
       : { renderer: cityCanvas, radius: 3, color: "#444", weight: 1, fillColor: "#fff", fillOpacity: 1 };
-    const open = () => cityOpen(d);
+    const open = () => { app.revealedCities.add(d.name); scheduleCityUpdate(); cityOpen(d); };
     L.circleMarker([d.lat, d.lng], style).addTo(cityLayer).on("click", (ev) => {
       L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open();
     });
     const tt = L.tooltip({ permanent: true, direction: "right", offset: [5, 0], interactive: false, className: "map-label " + (d.cap ? "capital-label" : "city-label") })
       .setLatLng([d.lat, d.lng])
-      .setContent(escapeHtml(d.name))
+      .setContent(escapeHtml(featureLabel("City", d.name, cityRevealed(d.name))))
       .addTo(cityLabelLayer);
     attachLabelClick(tt, open);
   });

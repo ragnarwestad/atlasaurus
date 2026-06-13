@@ -241,7 +241,11 @@ export function refreshConnectors(): void {
  *  continent highlighted (green) with the country shown selected (orange). */
 export function selectLayer(layer: L.Polygon, toggle: boolean): void {
   app.selectedLayer = toggle && app.selectedLayer === layer ? null : layer;
-  if (app.selectedLayer) app.selectedLayer.bringToFront();
+  if (app.selectedLayer) {
+    app.selectedLayer.bringToFront();
+    const e = countries.find((c) => c.layer === app.selectedLayer); // reveal its name for good (guess mode)
+    if (e) app.revealedCountries.add(e.name);
+  }
   hooks.refreshAll();
 }
 export function deselect(): void {

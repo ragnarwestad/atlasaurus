@@ -29,7 +29,7 @@ export const quizResetBtn = document.getElementById("quiz-reset") as HTMLButtonE
 
 function renderQuizPrompt(): void {
   if (app.quizType === "peakname") {
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>Which mountain?</span>';
+    quizPromptEl.innerHTML = "<span>Which mountain?</span>";
     return;
   }
   if (app.quizType === "peakcountry") {
@@ -38,7 +38,7 @@ function renderQuizPrompt(): void {
   }
   if (app.quizType === "cityname") {
     // "Name it": the city is marked on the map; pick its name (don't reveal it).
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">city</span> <span>Which city?</span>';
+    quizPromptEl.innerHTML = "<span>Which city?</span>";
     return;
   }
   if (app.quizType === "citycountry") {
@@ -47,11 +47,11 @@ function renderQuizPrompt(): void {
     return;
   }
   if (app.quizType === "rivername") {
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">river</span> <span>Which river?</span>';
+    quizPromptEl.innerHTML = "<span>Which river?</span>";
     return;
   }
   if (app.quizType === "lakename") {
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">lake</span> <span>Which lake?</span>';
+    quizPromptEl.innerHTML = "<span>Which lake?</span>";
     return;
   }
   if (app.quizType === "rivercountry" || app.quizType === "lakecountry") {

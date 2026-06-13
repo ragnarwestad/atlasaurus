@@ -200,7 +200,33 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(
 // Track the cursor so the hover info panel can float next to it.
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(ev.clientX, ev.clientY));
 
+// ---------------------------------------------------------------------------
+// Persist the Map-options toggles across sessions (localStorage). Restoring
+// dispatches a real "change" event per stored toggle, so the existing handlers
+// (app flag + section enable + refresh) run exactly as on a manual click.
+// ---------------------------------------------------------------------------
+const TOGGLE_IDS = [
+  "show-names", "show-cities", "show-regions", "show-lakes", "show-mountains",
+  "show-rivers", "show-capitals", "show-flags", "show-hover",
+];
+const TOGGLES_KEY = "atlasaurus.toggles";
+function saveToggles(): void {
+  const state: Record<string, boolean> = {};
+  TOGGLE_IDS.forEach((id) => { state[id] = !!(document.getElementById(id) as HTMLInputElement | null)?.checked; });
+  try { localStorage.setItem(TOGGLES_KEY, JSON.stringify(state)); } catch { /* storage unavailable */ }
+}
+function restoreToggles(): void {
+  let state: Record<string, boolean> = {};
+  try { state = JSON.parse(localStorage.getItem(TOGGLES_KEY) || "{}"); } catch { return; }
+  TOGGLE_IDS.forEach((id) => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (el && state[id] && !el.checked) { el.checked = true; el.dispatchEvent(new Event("change")); }
+  });
+}
+TOGGLE_IDS.forEach((id) => document.getElementById(id)?.addEventListener("change", saveToggles));
+
 initSidebarSections(); // wire the Countries/Regions + Cities/Lakes/Mountains/Rivers fold sections
+restoreToggles();      // re-apply saved Map-options toggles (after the sections exist)
 loadPhysicalData();   // populate those lists (peaks now; rivers/lakes when fetched)
 loadCityData();       // populate the Cities list (independent of the Cities map layer)
 loadBorders();

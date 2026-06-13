@@ -61,7 +61,7 @@ function mirrorToggles(prefix: string): void {
 }
 // Explore and Practice both live "inside" the two top tabs; Quiz tab remembers
 // which sub-tab (Practice / Challenge) was last used.
-let lastQuizSub: "practice" | "quiz" = "practice";
+let lastQuizSub: "practice" | "quiz" = "quiz"; // Quiz opens on Challenge by default
 function enterMode(m: "explore" | "practice" | "quiz"): void {
   if (m === "explore") mirrorToggles("");        // sync render flags from the active panel…
   else if (m === "practice") mirrorToggles("pr-"); // …before setMode runs the refresh

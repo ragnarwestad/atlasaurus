@@ -139,9 +139,9 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
     return null;
   }
   if (e.layer === app.selectedLayer) return selectedStyle;                                   // selected country (orange)
-  // Regions tab: tint every country by its region (distinct hue), like the
-  // continent quiz. The selected region and the hovered region get a deeper fill.
-  if (app.activeTab === "continents") {
+  // Regions tint (Explore only) — Practice shares the map but must not inherit
+  // Explore's region grouping.
+  if (app.mode === "explore" && app.activeTab === "continents") {
     const hue = app.regionHue[groupOf(e)];
     if (hue != null) {
       const sel = app.selectedContinent === groupOf(e);

@@ -15,25 +15,25 @@ test("opens in Explore (browse) with its own Map options", async ({ page }) => {
   await expect(page.locator("#explore-panel #show-names")).toBeVisible(); // Explore's own toggles
 });
 
-test("Quiz tab opens Practice by default, with its own Reveal toggles", async ({ page }) => {
+test("Quiz tab opens Challenge by default", async ({ page }) => {
   await page.click('.mode-tab[data-mode="quiz"]');
   await expect(page.locator("#quiz-panel")).toBeVisible();
   await expect(page.locator("#explore-panel")).toBeHidden();
-  await expect(page.locator('.quiz-subtab[data-sub="practice"]')).toHaveClass(/active/);
-  await expect(page.locator("#practice-panel")).toBeVisible();
-  await expect(page.locator("#challenge-panel")).toBeHidden();
-  await expect(page.locator("#practice-panel #pr-show-names")).toBeVisible(); // Practice's own toggles
-});
-
-test("switching Practice <-> Challenge swaps the sub-panel", async ({ page }) => {
-  await page.click('.mode-tab[data-mode="quiz"]');
-  await page.click('.quiz-subtab[data-sub="challenge"]');
+  await expect(page.locator('.quiz-subtab[data-sub="challenge"]')).toHaveClass(/active/);
   await expect(page.locator("#challenge-panel")).toBeVisible();
   await expect(page.locator("#practice-panel")).toBeHidden();
   await expect(page.locator("#challenge-panel .quiz-sec")).toHaveCount(6); // the scored sections
+});
+
+test("switching Challenge <-> Practice swaps the sub-panel", async ({ page }) => {
+  await page.click('.mode-tab[data-mode="quiz"]'); // Challenge by default
   await page.click('.quiz-subtab[data-sub="practice"]');
   await expect(page.locator("#practice-panel")).toBeVisible();
   await expect(page.locator("#challenge-panel")).toBeHidden();
+  await expect(page.locator("#practice-panel #pr-show-names")).toBeVisible(); // Practice's own toggles
+  await page.click('.quiz-subtab[data-sub="challenge"]');
+  await expect(page.locator("#challenge-panel")).toBeVisible();
+  await expect(page.locator("#practice-panel")).toBeHidden();
 });
 
 test("Explore and Practice toggle panels are independent", async ({ page }) => {

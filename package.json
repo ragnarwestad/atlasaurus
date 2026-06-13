@@ -10,7 +10,6 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:live": "RUN_LIVE=1 vitest run src/cityBoundary.integration.test.ts",
     "lint": "biome lint"
   },
   "dependencies": {

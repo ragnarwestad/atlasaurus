@@ -3,14 +3,13 @@
 import L from "leaflet";
 import { CAPITAL_URLS, CITY_URLS } from "./config";
 import { cityWikiUrl, escapeHtml } from "./wiki";
-import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas, cityOutlineLayer } from "./map";
+import { map, capitalLayer, cityLayer, cityLabelLayer, cityCanvas } from "./map";
 import {
   app, hooks, countries, capitalMarkers, popOf, fmtInt, fetchJson, placeMinZoom,
   type CountryEntry, type CapitalMarker,
 } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { countryVisible, inToggleScope, isRevealed } from "./countries";
-import { resolveCityBoundary } from "./cityBoundary";
 import type { PhysFeature } from "./physical";
 
 // Sidebar Cities list (search-driven; sorted by population so the default view is
@@ -98,7 +97,6 @@ export function loadCapitals(): void {
         if (pop) rows.push(["Population", fmtInt(pop)]);
         if (elev) rows.push(["Elevation", fmtInt(elev) + " m"]);
         renderFeatureInfo(capName, cityWikiUrl(capName), cName ? "Capital of " + cName : "Capital", rows);
-        showCityOutline(lat, lng, capName, cName); // capitals get the same boundary outline as other cities
       };
       marker.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
       marker.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
@@ -153,45 +151,16 @@ function loadCities(): void {
 // Load the city dataset up front so the sidebar Cities list is populated even
 // before the Cities map layer is switched on.
 export function loadCityData(): void { loadCities(); }
-// The feature detail box for a city (shared by the map markers and the list),
-// plus the urban-area outline.
+// The feature detail box for a city (shared by the map markers and the list).
 function cityOpen(d: CityRec): void {
   const sub = d.cap ? (d.adm0 ? "Capital of " + d.adm0 : "Capital") : (d.adm0 ? "City in " + d.adm0 : "City");
   const rows: [string, string][] = [];
   if (d.adm1 && d.adm1 !== d.adm0) rows.push(["Region", escapeHtml(d.adm1)]);
   if (d.pop) rows.push(["Population", fmtInt(d.pop)]);
   if (d.elev) rows.push(["Elevation", fmtInt(d.elev) + " m"]);
-  renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows); // clears the previous outline via hooks.clearCityOutline
-  showCityOutline(d.lat, d.lng, d.name, d.adm0);
+  renderFeatureInfo(d.name, cityWikiUrl(d.name), sub, rows);
 }
 
-// --- City outline: the administrative boundary from OpenStreetMap, resolved by
-//     cityBoundary.ts and drawn here when a city is selected. ---
-const cityOutlineStyle = { color: "#8a3b00", weight: 2, opacity: 0.95, fillColor: "#e8740c", fillOpacity: 0.18 };
-const outlineCache = new Map<string, any>(); // city key → boundary geometry (successes only)
-let outlineReqId = 0; // guards against a slow request painting over a newer selection
-
-function drawOutlineGeom(geom: any): void {
-  cityOutlineLayer.clearLayers();
-  if (!geom) return;
-  const layer = L.geoJSON({ type: "Feature", geometry: geom } as any, { style: () => cityOutlineStyle, interactive: false }).addTo(cityOutlineLayer);
-  // Zoom to the boundary — at the world-ish zoom a city outline is just a dot,
-  // so the whole point of drawing it is lost without moving in.
-  try { map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 10 }); } catch { /* ignore */ }
-}
-export function clearCityOutline(): void { cityOutlineLayer.clearLayers(); outlineReqId++; }
-
-async function showCityOutline(lat: number, lng: number, name: string, adm0: string): Promise<void> {
-  cityOutlineLayer.clearLayers();
-  const key = (name + "|" + adm0).toLowerCase();
-  const reqId = ++outlineReqId;
-  if (outlineCache.has(key)) { drawOutlineGeom(outlineCache.get(key)); return; }
-  const { geom } = await resolveCityBoundary(lat, lng, name, adm0);
-  // Only cache real geometries: "no result" can be a transient error (network, 429
-  // throttle), and caching it would stick "no outline" on the city until reload.
-  if (geom) outlineCache.set(key, geom);
-  if (reqId === outlineReqId) drawOutlineGeom(geom || null); // only if still the current selection
-}
 function updateCities(): void {
   if (!(app.showCities && app.mode === "explore")) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
   if (!cityDataLoaded) { loadCities(); return; }

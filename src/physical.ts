@@ -86,13 +86,26 @@ function buildPeakMarkers(): void {
     peakMarkers.push(m);
   });
 }
+// Reveal more peaks as you zoom in, by elevation — only the giants at world view,
+// country-level summits (Galdhøpiggen, …) once you're down on the region.
+function peakMinZoom(elev: number): number {
+  if (elev >= 6000) return 2;
+  if (elev >= 4000) return 3;
+  if (elev >= 2500) return 4;
+  if (elev >= 1500) return 5;
+  if (elev >= 800) return 6;
+  return 7;
+}
 export function refreshPeaks(): void {
   const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
   if (on) buildPeakMarkers();
+  const z = map.getZoom();
   peakMarkers.forEach((m) => {
-    if (on && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
-    else if (!on && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
-    if (on) { const p = (m as any).peak; m.setTooltipContent(escapeHtml(featureLabel("Mountain", p.name, peakRevealed(p.name)))); }
+    const p = (m as any).peak;
+    const show = on && z >= peakMinZoom(p.elevation);
+    if (show && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
+    else if (!show && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
+    if (show) m.setTooltipContent(escapeHtml(featureLabel("Mountain", p.name, peakRevealed(p.name))));
   });
   updatePeakLabels();
 }
@@ -205,7 +218,7 @@ let physUpdateScheduled = false;
 export function schedulePhysicalUpdate(): void {
   if (physUpdateScheduled) return;
   physUpdateScheduled = true;
-  requestAnimationFrame(() => { physUpdateScheduled = false; refreshRivers(); refreshLakes(); });
+  requestAnimationFrame(() => { physUpdateScheduled = false; refreshPeaks(); refreshRivers(); refreshLakes(); });
 }
 
 // --- Lakes (Explore "Lakes" layer) — major lakes from Natural Earth, lazy. ---

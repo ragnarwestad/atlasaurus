@@ -119,7 +119,7 @@ export function placeCountryLabels(): void {
 export function updatePeakLabels(): void {
   const mapEl = document.getElementById("map");
   if (!mapEl) return;
-  const on = map.getZoom() >= 4;
+  const on = map.getZoom() >= 3;
   mapEl.classList.toggle("peak-labels-on", on);
   // (Rivers and lakes are revealed per-feature by their own zoom threshold.)
 }

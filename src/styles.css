@@ -149,25 +149,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
 /* Hover doesn't exist on touch devices, so hide the Hover-info toggle there. */
 @media (hover: none) { #hover-toggle { display: none; } }
 
-/* Countries / Continents tabs (underline style) */
+/* Quiz category tab row (Country / Continent / Mountains) */
 .sb-tabs { display: flex; gap: 18px; border-bottom: 1px solid #e1e7ec; }
-.sb-tab {
-  padding: 4px 1px 8px; font: 600 13px system-ui, sans-serif; cursor: pointer;
-  background: none; border: none; color: #8a97a3;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-}
-.sb-tab:hover { color: #3878c7; }
-.sb-tab.active { color: #1b3a5c; border-bottom-color: #3878c7; }
-.list-fold {
-  align-self: center; margin-bottom: 4px; margin-right: -11px;
-  background: none; border: none; cursor: pointer; padding: 4px 4px 4px 0; display: flex; align-items: center;
-}
-.list-fold .fold-caret {
-  width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;
-  border-top: 6px solid #9aa6b1; transition: transform .15s;
-}
-.list-fold:hover .fold-caret { border-top-color: #5a6b7a; }
-.sb-tabsec.collapsed .list-fold .fold-caret { transform: rotate(-90deg); }
 
 #sort-row, #scheme-row {
   display: flex; align-items: center; gap: 6px; margin-top: 9px;
@@ -208,7 +191,6 @@ body { display: flex; font-family: system-ui, sans-serif; }
 .peak-label { font: 700 11px system-ui, sans-serif; color: #3a4654; padding: 0; display: none; }
 .peak-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .peak-label a:hover { text-decoration: underline; }
-.peak-label .peak-elev { color: #6a7886; font-weight: 600; }
 .river-label { font: italic 600 11px system-ui, sans-serif; color: #2c5f8a; padding: 0; }
 .river-label a { color: inherit; text-decoration: none; pointer-events: auto; }
 .river-label a:hover { text-decoration: underline; }

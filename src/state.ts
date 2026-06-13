@@ -55,6 +55,9 @@ export const app = {
   showCities: false,
   showHover: false, // off = Explore starts empty; hover only highlights the shape
   isolate: false,
+  // Explore "guess mode": individual features clicked to reveal their real name
+  // (the toggle reveals a whole type at once; a click reveals just the one).
+  revealedPeaks: new Set<string>(),
   // Region grouping (Regions tab) + per-region map tint hues
   groupScheme: "continent" as GroupScheme,
   regionHue: {} as Record<string, number>,
@@ -108,6 +111,12 @@ export const territoriesBySov: Record<string, Territory[]> = {};
 // Small shared helpers
 // ---------------------------------------------------------------------------
 export function fmtInt(n: number): string { return Math.round(n).toLocaleString("en-US"); }
+
+// Explore guess-mode label: the real name once revealed, else an anonymous
+// "<Type> ?" placeholder the user can guess and click to confirm.
+export function featureLabel(typeWord: string, name: string, revealed: boolean): string {
+  return revealed ? name : typeWord + " ?";
+}
 
 export function fetchJson(urls: string[]): Promise<any> {
   let i = 0;

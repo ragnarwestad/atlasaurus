@@ -6,7 +6,7 @@ import { allPolygonParts, lineLengthKm } from "./geo";
 import { wikiUrl, escapeHtml } from "./wiki";
 import { PEAKS, type Peak } from "./peaks";
 import { map, peakLayer, riverLayer, lakeLayer, featureCanvas } from "./map";
-import { app, hooks, byIso, fmtInt, fetchJson } from "./state";
+import { app, hooks, byIso, fmtInt, fetchJson, featureLabel } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { updatePeakLabels } from "./labels";
 
@@ -70,24 +70,29 @@ function buildPeakList(): void {
     });
   });
 }
+// A peak's name shows when the Mountains toggle reveals the whole type, or when
+// this one was individually clicked; otherwise the label stays "Mountain ?".
+function peakRevealed(name: string): boolean { return app.showPeaks || app.revealedPeaks.has(name); }
 const peakMarkers: L.Marker[] = [];
 function buildPeakMarkers(): void {
   if (peakMarkers.length) return;
   const z = map.getZoom();
   PEAKS.forEach((p) => {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
-    m.bindTooltip(escapeHtml(p.name), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
-    const open = () => peakOpen(p);
+    (m as any).peak = p;
+    m.bindTooltip(escapeHtml(featureLabel("Mountain", p.name, peakRevealed(p.name))), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
+    const open = () => { app.revealedPeaks.add(p.name); refreshPeaks(); peakOpen(p); };
     wireFeatureClick(m, open);
     peakMarkers.push(m);
   });
 }
 export function refreshPeaks(): void {
-  const on = app.showPeaks && app.mode === "explore";
+  const on = app.mode === "explore"; // always shown in Explore; the toggle reveals names, not visibility
   if (on) buildPeakMarkers();
   peakMarkers.forEach((m) => {
     if (on && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
     else if (!on && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
+    if (on) { const p = (m as any).peak; m.setTooltipContent(escapeHtml(featureLabel("Mountain", p.name, peakRevealed(p.name)))); }
   });
   updatePeakLabels();
 }

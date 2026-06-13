@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
-  app, countries, fmtInt, realCountries, entryForLayer, popOf, areaOf,
+  app, countries, fmtInt, featureLabel, realCountries, entryForLayer, popOf, areaOf,
   layerCenter, placeMinZoom, type CountryEntry,
 } from "./state";
 
@@ -25,6 +25,16 @@ describe("fmtInt", () => {
   it("rounds and formats with en-US thousands separators", () => {
     expect(fmtInt(1234567.4)).toBe("1,234,567");
     expect(fmtInt(999.6)).toBe("1,000");
+  });
+});
+
+describe("featureLabel", () => {
+  it("shows the real name once revealed", () => {
+    expect(featureLabel("Mountain", "Mount Everest", true)).toBe("Mount Everest");
+  });
+  it("hides the name behind a '<Type> ?' placeholder when not revealed", () => {
+    expect(featureLabel("Mountain", "Mount Everest", false)).toBe("Mountain ?");
+    expect(featureLabel("Lake", "Lake Victoria", false)).toBe("Lake ?");
   });
 });
 

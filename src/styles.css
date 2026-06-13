@@ -32,12 +32,13 @@ body { display: flex; font-family: system-ui, sans-serif; }
    .feat-sec / .sb-fold / .feat-body header chrome). The open section holds the
    shared question UI; disabled sections are greyed "coming soon" placeholders. */
 .quiz-sec-body { padding: 4px 14px 12px; }
-#quiz-type, #mtn-type, #city-type { display: flex; flex-wrap: wrap; gap: 6px; }
-#quiz-type .qt-btn, #mtn-type .qt-btn, #city-type .qt-btn {
+#quiz-type, #mtn-type, #city-type, #lake-type, #river-type { display: flex; flex-wrap: wrap; gap: 6px; }
+#quiz-type .qt-btn, #mtn-type .qt-btn, #city-type .qt-btn, #lake-type .qt-btn, #river-type .qt-btn {
   padding: 4px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
   border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
 }
-#quiz-type .qt-btn.active, #mtn-type .qt-btn.active, #city-type .qt-btn.active { background: #3878c7; color: #fff; border-color: #3878c7; }
+#quiz-type .qt-btn.active, #mtn-type .qt-btn.active, #city-type .qt-btn.active,
+#lake-type .qt-btn.active, #river-type .qt-btn.active { background: #3878c7; color: #fff; border-color: #3878c7; }
 #quiz-prompt { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; color: #1b3a5c; min-height: 28px; }
 #quiz-prompt img { width: 34px; height: 26px; box-shadow: 0 0 2px rgba(0,0,0,.4); border-radius: 2px; flex: 0 0 auto; }
 #quiz-prompt .quiz-bigflag { width: 96px; height: 72px; box-shadow: 0 0 3px rgba(0,0,0,.4); border-radius: 3px; }

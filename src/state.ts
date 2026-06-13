@@ -35,7 +35,7 @@ export interface RestInfo { area?: number; currencies?: string; languages?: stri
 // Region grouping scheme for the Explore "Regions" tab. The quiz always uses
 // standard continents.
 export type GroupScheme = "continent" | "unRegion" | "subregion" | "wbRegion";
-export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry" | "cityname" | "citycountry" | "rivername" | "lakename";
+export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry" | "cityname" | "citycountry" | "rivername" | "lakename" | "rivercountry" | "lakecountry";
 
 export const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 
@@ -73,6 +73,7 @@ export const app = {
   quizType: "name" as QuizType,
   quizPeak: null as Peak | null,
   quizCity: null as CityRec | null,       // cities quiz: the target city to locate
+  quizWaterIso: [] as string[],           // rivers/lakes "which country": correct countries' iso codes
   quizStarted: false,
   quizNeighbourSet: new Set<CountryEntry>(),
   quizTarget: null as CountryEntry | null,

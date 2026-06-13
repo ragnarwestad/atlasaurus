@@ -38,7 +38,7 @@ import {placeCountryLabels, refreshCountryLabels} from "./labels";
 import {loadCapitals} from "./places";
 import {CONTINENT_QUIZ_STYLES, groupOf} from "./regions";
 import {buildSidebar, setActiveTab} from "./sidebar";
-import {answerContinent, handleGuess, handlePeakCountryGuess, handleCityCountryGuess, toggleNbPick} from "./quiz";
+import {answerContinent, handleGuess, handlePeakCountryGuess, handleCityCountryGuess, handleWaterCountryGuess, toggleNbPick} from "./quiz";
 
 // ---------------------------------------------------------------------------
 // Status line (loading / error)
@@ -105,6 +105,10 @@ function styleForLayer(e: CountryEntry): L.PathOptions | null {
         if (app.quizCity && e.iso && e.iso === app.quizCity.iso) return quizCorrectStyle; // the city's country (green)
         if (app.quizGuess && e === app.quizGuess) return quizWrongStyle;                   // wrong pick (red)
         return baseStyle;
+      } else if (app.quizType === "rivercountry" || app.quizType === "lakecountry") {
+        if (e.iso && app.quizWaterIso.includes(e.iso)) return quizCorrectStyle; // any country the water touches (green)
+        if (app.quizGuess && e === app.quizGuess) return quizWrongStyle;        // wrong pick (red)
+        return baseStyle;
       } else if (app.quizType === "peakname" || app.quizType === "cityname") {
         return baseStyle; // answer shown on the marker, not the countries
       } else {
@@ -170,6 +174,35 @@ export function refreshPolygons(): void {
       // re-append the path mid-interaction, swallowing clicks.
     }
   });
+}
+
+// Point-in-polygon (ray cast) against a single ring.
+function pointInRing(lat: number, lng: number, ring: L.LatLng[]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const yi = ring[i].lat, xi = ring[i].lng, yj = ring[j].lat, xj = ring[j].lng;
+    if (((yi > lat) !== (yj > lat)) && (lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function eachRing(latlngs: any, cb: (ring: L.LatLng[]) => void): void {
+  if (!latlngs || !latlngs.length) return;
+  if (typeof latlngs[0].lat === "number") cb(latlngs);
+  else for (const x of latlngs) eachRing(x, cb);
+}
+// Which country contains a coordinate (even-odd over all rings, so holes count).
+// Used to derive the countries a river/lake passes through for the water quiz.
+export function countryAt(lat: number, lng: number): CountryEntry | null {
+  for (const e of countries) {
+    if (e.isLandmass) continue;
+    let b: L.LatLngBounds;
+    try { b = e.layer.getBounds(); } catch { continue; }
+    if (!b.contains([lat, lng])) continue;
+    let inside = false;
+    eachRing(e.layer.getLatLngs(), (ring) => { if (pointInRing(lat, lng, ring)) inside = !inside; });
+    if (inside) return e;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,6 +406,8 @@ export function loadBorders(): void {
                 if (!entry.isLandmass) handlePeakCountryGuess(entry);
               } else if (app.quizType === "citycountry") {
                 if (!entry.isLandmass) handleCityCountryGuess(entry);
+              } else if (app.quizType === "rivercountry" || app.quizType === "lakecountry") {
+                if (!entry.isLandmass) handleWaterCountryGuess(entry);
               } else if (app.quizType === "peakname" || app.quizType === "cityname") { /* answered via the search list */
               } else {
                 if (app.locMode === "map") handleGuess(entry);

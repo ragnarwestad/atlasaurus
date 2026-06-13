@@ -209,7 +209,12 @@
             <span class="sb-title">Lakes</span>
           </button></h2>
         </div>
-        <div class="feat-body quiz-sec-body"></div>
+        <div class="feat-body quiz-sec-body">
+          <div id="lake-type">
+            <button type="button" class="qt-btn active" data-qtype="lakename">Name it</button>
+            <button type="button" class="qt-btn" data-qtype="lakecountry">Which country</button>
+          </div>
+        </div>
       </section>
       <section class="feat-sec quiz-sec collapsed" id="quiz-sec-mountains">
         <div class="sb-title-row feat-head-row">
@@ -232,7 +237,12 @@
             <span class="sb-title">Rivers</span>
           </button></h2>
         </div>
-        <div class="feat-body quiz-sec-body"></div>
+        <div class="feat-body quiz-sec-body">
+          <div id="river-type">
+            <button type="button" class="qt-btn active" data-qtype="rivername">Name it</button>
+            <button type="button" class="qt-btn" data-qtype="rivercountry">Which country</button>
+          </div>
+        </div>
       </section>
 
       <!-- Shared question UI — relocated into whichever section is open. -->
@@ -351,8 +361,9 @@
             <b>Which country</b>: the peak is named (not marked); click the country it's in
             or search and select it (border peaks accept any of their countries).</li>
         <li><b>Lakes</b> / <b>Rivers</b> — <b>Name it</b>: the lake shape or river course is
-            highlighted on the map; search and pick its name. (No "which country" — many
-            span several.)</li>
+            highlighted on the map; search and pick its name. <b>Which country</b>: the
+            lake/river is named; click or search a country it touches — any one counts, and
+            all are listed in the answer.</li>
         <li>Wrong answers are revealed on the map (correct green, wrong red) with flag and
             name; use <b>Skip</b> or <b>Next →</b> to move on.</li>
       </ul>

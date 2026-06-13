@@ -76,12 +76,18 @@ test("Regions opens and runs (no sub-mode row)", async ({ page }) => {
   await expect(page.locator("#quiz-sec-regions #quiz-type")).toHaveCount(0);
 });
 
-test("Lakes and Rivers run a name-search round (no sub-modes, no country answer)", async ({ page }) => {
-  for (const id of ["lakes", "rivers"]) {
+test("Lakes and Rivers have Name it / Which country, switching answer widget", async ({ page }) => {
+  for (const [id, mode] of [["lakes", "lake"], ["rivers", "river"]] as const) {
     await page.click(`[data-quiz-sec="${id}"]`);
     await expect(page.locator(`#quiz-sec-${id}`)).not.toHaveClass(/collapsed/);
-    await expect(page.locator(`#quiz-sec-${id} #name-box`)).toBeVisible(); // search the name
-    await expect(page.locator(`#quiz-sec-${id} #loc-box`)).toBeHidden();    // no "which country"
-    await expect(page.locator(`#quiz-sec-${id} #quiz-choices`)).toBeHidden();
+    await expect(page.locator(`#${mode}-type .qt-btn`)).toHaveText(["Name it", "Which country"]);
+    // Name it (default): search box shown, no country box.
+    await expect(page.locator(`#quiz-sec-${id} #name-box`)).toBeVisible();
+    await expect(page.locator(`#quiz-sec-${id} #loc-box`)).toBeHidden();
+    // Which country: country search + map-click (loc-box), name box hidden.
+    await page.click(`#${mode}-type .qt-btn[data-qtype="${mode}country"]`);
+    await expect(page.locator(`#quiz-sec-${id} #loc-box`)).toBeVisible();
+    await expect(page.locator(`#quiz-sec-${id} #loc-mode`)).toBeHidden();
+    await expect(page.locator(`#quiz-sec-${id} #name-box`)).toBeHidden();
   }
 });

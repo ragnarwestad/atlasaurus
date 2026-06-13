@@ -134,6 +134,21 @@ function neighbourEntries(entry: CountryEntry): CountryEntry[] {
   return codes.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
 }
 
+// Pick a random pool member while avoiding the recently-asked ones (up to half
+// the pool), so questions don't repeat soon after each other. History is kept
+// per key (country / peak / city / river / lake). Callers guard pool.length > 0.
+const recentByKey: Record<string, unknown[]> = {};
+function pickNext<T>(key: string, pool: T[]): T {
+  const hist = recentByKey[key] || (recentByKey[key] = []);
+  const cap = Math.max(1, Math.floor(pool.length / 2));
+  const recent = new Set(hist.slice(-cap));
+  let pick = pool[Math.floor(Math.random() * pool.length)];
+  for (let i = 0; i < 40 && recent.has(pick); i++) pick = pool[Math.floor(Math.random() * pool.length)];
+  hist.push(pick);
+  if (hist.length > cap) hist.splice(0, hist.length - cap);
+  return pick;
+}
+
 // Reset the map to the "locate a country" UI (used by Spot and by name/flag/capital):
 // hide the choice/neighbour boxes, clear and show the search box.
 function setupLocateBox(): void {
@@ -180,8 +195,7 @@ export function nextQuestion(): void {
     : app.quizType === "neighbour" ? realCountries().filter((c) => neighbourEntries(c).length > 0)
     : realCountries();
   if (!pool.length) return;
-  let t = app.quizTarget;
-  for (let i = 0; i < 20 && (!t || t === app.quizTarget); i++) t = pool[Math.floor(Math.random() * pool.length)];
+  const t = pickNext("country", pool);
   app.quizTarget = t;
   app.quizGuess = null;
   app.quizAnswered = false;
@@ -254,9 +268,7 @@ function drawQuizPeak(withLabel: boolean): void {
 function nextPeakQuestion(): void {
   const pool = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
   if (!pool.length) return;
-  let p = app.quizPeak;
-  for (let i = 0; i < 20 && (!p || p === app.quizPeak); i++) p = pool[Math.floor(Math.random() * pool.length)];
-  app.quizPeak = p;
+  app.quizPeak = pickNext("peak", pool);
   app.quizTarget = null; app.quizGuess = null; app.quizAnswered = false;
   app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
   nbBox.hidden = true; quizChoicesEl.hidden = true;
@@ -345,8 +357,7 @@ function nextCityQuestion(): void {
     ? cityQuizPool().filter((c) => c.iso && byIso[c.iso])
     : cityQuizPool();
   if (!pool.length) return;
-  let c = app.quizCity;
-  for (let i = 0; i < 20 && (!c || c === app.quizCity); i++) c = pool[Math.floor(Math.random() * pool.length)];
+  const c = pickNext("city", pool);
   app.quizCity = c;
   app.quizTarget = null; app.quizPeak = null; app.quizGuess = null; app.quizAnswered = false;
   app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
@@ -471,15 +482,16 @@ function nextWaterQuestion(): void {
   const pool = isRiver ? riverQuizPool() : lakeQuizPool();
   if (!pool.length) return;
   // Pick a fresh target; for "which country" require one that resolves to ≥1 country.
-  let item = quizWaterTarget;
+  const key = isRiver ? "river" : "lake";
+  let item: WaterQuizItem | null = null;
   let countries: CountryEntry[] = [];
   for (let i = 0; i < 25; i++) {
-    const cand = pool[Math.floor(Math.random() * pool.length)];
-    if (cand === quizWaterTarget && pool.length > 1) continue;
+    const cand = pickNext(key, pool);
     if (!isCountry) { item = cand; break; }
     const cs = waterCountries(cand);
     if (cs.length) { item = cand; countries = cs; break; }
   }
+  if (!item) return;
   quizWaterTarget = item;
   quizWaterCountries = countries;
   app.quizWaterIso = countries.map((c) => c.iso || "").filter(Boolean);

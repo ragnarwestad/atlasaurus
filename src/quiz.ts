@@ -177,18 +177,7 @@ export function nextQuestion(): void {
     nextCityQuestion();
     return;
   }
-  if (isWaterQuiz()) {
-    // Rivers/lakes are fetched lazily; load first if necessary, then retry.
-    const isRiver = app.quizType === "rivername" || app.quizType === "rivercountry";
-    const ready = isRiver ? riversReady() : lakesReady();
-    if (!ready) {
-      (isRiver ? loadRiverData() : loadLakeData())
-        .then(() => { if (app.mode === "quiz" && isWaterQuiz()) nextQuestion(); }).catch(() => { /* ignore */ });
-      return;
-    }
-    nextWaterQuestion();
-    return;
-  }
+  if (isWaterQuiz()) { nextWaterQuestion(); return; }
   // Restrict the pool to countries that have what the prompt needs.
   const pool = app.quizType === "flag" ? realCountries().filter((c) => c.iso2)
     : app.quizType === "capital" ? realCountries().filter((c) => c.capitalName)
@@ -473,6 +462,27 @@ function waterCountries(item: WaterQuizItem): CountryEntry[] {
 function nextWaterQuestion(): void {
   const isCountry = app.quizType === "rivercountry" || app.quizType === "lakecountry";
   const isRiver = app.quizType === "rivername" || app.quizType === "rivercountry";
+
+  // Reset state and show the answer UI immediately, so the panel isn't blank
+  // while the river/lake dataset loads.
+  quizWaterTarget = null; quizWaterCountries = []; app.quizWaterIso = [];
+  app.quizTarget = null; app.quizPeak = null; app.quizCity = null; app.quizGuess = null; app.quizAnswered = false;
+  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
+  renderQuizPrompt();
+  quizFeedbackEl.className = "";
+  if (isCountry) setupCountryAnswerBox(); else setupNameBox();
+  quizNextBtn.disabled = true;
+
+  // Dataset is fetched lazily (usually already preloaded). Until it's ready the
+  // answer UI shows a "Loading…" hint; once ready we pick a target and draw it.
+  if (!(isRiver ? riversReady() : lakesReady())) {
+    quizFeedbackEl.textContent = "Loading…";
+    (isRiver ? loadRiverData() : loadLakeData())
+      .then(() => { if (app.mode === "quiz" && isWaterQuiz()) nextWaterQuestion(); })
+      .catch(() => { /* ignore */ });
+    return;
+  }
+
   const pool = isRiver ? riverQuizPool() : lakeQuizPool();
   if (!pool.length) return;
   // Pick a fresh target; for "which country" require one that resolves to ≥1 country.
@@ -489,22 +499,16 @@ function nextWaterQuestion(): void {
   quizWaterTarget = item;
   quizWaterCountries = countries;
   app.quizWaterIso = countries.map((c) => c.iso || "").filter(Boolean);
-  app.quizTarget = null; app.quizPeak = null; app.quizCity = null; app.quizGuess = null; app.quizAnswered = false;
-  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
-  renderQuizPrompt();
-  quizFeedbackEl.className = "";
+  renderQuizPrompt(); // which-country prompt now shows the resolved name
   if (isCountry) {
-    setupCountryAnswerBox();   // no highlight — the name is in the prompt
+    applyLocMode();   // refresh the "In which country is <name>?" hint
   } else {
-    setupNameBox();
+    quizFeedbackEl.className = "";
     quizFeedbackEl.textContent = isRiver ? "Which river is highlighted? Search and pick it." : "Which lake is highlighted? Search and pick it.";
-    if (item) {
-      quizLayer.clearLayers();
-      drawWater(item, "target", false);
-      try { map.fitBounds(item.bounds, { maxZoom: 7, padding: [40, 40] }); } catch { /* ignore */ }
-    }
+    quizLayer.clearLayers();
+    drawWater(item, "target", false);
+    try { map.fitBounds(item.bounds, { maxZoom: 7, padding: [40, 40] }); } catch { /* ignore */ }
   }
-  quizNextBtn.disabled = true;
   refreshPolygons();
 }
 function handleWaterNameGuess(name: string): void {

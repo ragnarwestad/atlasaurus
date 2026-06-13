@@ -68,7 +68,7 @@ function renderQuizPrompt(): void {
   } else if (app.quizType === "capital") {
     // Capital quiz: show the capital city; click its country.
     quizPromptEl.innerHTML = app.quizTarget.capitalName
-      ? '<span class="quiz-cap-tag">capital</span> <span>' + escapeHtml(app.quizTarget.capitalName) + "</span>"
+      ? "<span>" + escapeHtml(app.quizTarget.capitalName) + "</span>"
       : "(no capital)";
   } else if (app.quizType === "continent" || app.quizType === "neighbour") {
     // Show the country (flag + name); pick its continent / click a neighbour.
@@ -77,7 +77,7 @@ function renderQuizPrompt(): void {
   } else if (app.quizType === "spot") {
     // Spot quiz: the country is highlighted/pinned on the map — naming it is the
     // task, so the prompt must NOT reveal the name.
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">pinned</span> <span>Which country?</span>';
+    quizPromptEl.innerHTML = "<span>Which country?</span>";
   } else {
     // Name quiz: just the name (no flag — that would give it away).
     quizPromptEl.innerHTML = "<span>" + escapeHtml(app.quizTarget.name) + "</span>";

@@ -78,4 +78,40 @@ export const PEAKS: Peak[] = [
   { name: "Musala", iso: ["BGR"], region: "Europe", elevation: 2925, lat: 42.179, lng: 23.585 },
   { name: "Mount Korab", iso: ["ALB", "MKD"], region: "Europe", elevation: 2764, lat: 41.789, lng: 20.546 },
   { name: "Mount Ararat", iso: ["TUR"], region: "Asia", elevation: 5137, lat: 39.702, lng: 44.298 },
+
+  // National high points — Asia
+  { name: "Ismoil Somoni Peak", iso: ["TJK"], region: "Asia", elevation: 7495, lat: 38.940, lng: 72.016 },
+  { name: "Gangkhar Puensum", iso: ["BTN", "CHN"], region: "Asia", elevation: 7570, lat: 28.047, lng: 90.461 },
+  { name: "Noshaq", iso: ["AFG", "PAK"], region: "Asia", elevation: 7492, lat: 36.433, lng: 71.828 },
+  { name: "Damavand", iso: ["IRN"], region: "Asia", elevation: 5610, lat: 35.955, lng: 52.109, wiki: "Mount Damavand" },
+  { name: "Hkakabo Razi", iso: ["MMR"], region: "Asia", elevation: 5881, lat: 28.333, lng: 97.533 },
+  { name: "Mount Kinabalu", iso: ["MYS"], region: "Asia", elevation: 4095, lat: 6.075, lng: 116.558 },
+  { name: "Yu Shan", iso: ["TWN"], region: "Asia", elevation: 3952, lat: 23.470, lng: 120.957, wiki: "Yu Shan (mountain)" },
+  { name: "Fansipan", iso: ["VNM"], region: "Asia", elevation: 3147, lat: 22.303, lng: 103.775 },
+  { name: "Mount Apo", iso: ["PHL"], region: "Asia", elevation: 2954, lat: 6.987, lng: 125.273 },
+  { name: "Paektu Mountain", iso: ["PRK", "CHN"], region: "Asia", elevation: 2744, lat: 41.993, lng: 128.077 },
+
+  // National high points — Africa
+  { name: "Mount Stanley", iso: ["UGA", "COD"], region: "Africa", elevation: 5109, lat: 0.385, lng: 29.872 },
+  { name: "Ras Dashen", iso: ["ETH"], region: "Africa", elevation: 4550, lat: 13.235, lng: 38.367 },
+  { name: "Mount Toubkal", iso: ["MAR"], region: "Africa", elevation: 4167, lat: 31.061, lng: -7.915 },
+  { name: "Mount Cameroon", iso: ["CMR"], region: "Africa", elevation: 4040, lat: 4.203, lng: 9.170 },
+  { name: "Thabana Ntlenyana", iso: ["LSO"], region: "Africa", elevation: 3482, lat: -29.467, lng: 29.273 },
+  { name: "Emi Koussi", iso: ["TCD"], region: "Africa", elevation: 3445, lat: 19.794, lng: 18.530 },
+  { name: "Mount Mulanje", iso: ["MWI"], region: "Africa", elevation: 3002, lat: -15.955, lng: 35.600 },
+
+  // National high points — South America
+  { name: "Huascarán", iso: ["PER"], region: "South America", elevation: 6768, lat: -9.121, lng: -77.604 },
+  { name: "Sajama", iso: ["BOL"], region: "South America", elevation: 6542, lat: -18.106, lng: -68.883, wiki: "Nevado Sajama" },
+  { name: "Pico Cristóbal Colón", iso: ["COL"], region: "South America", elevation: 5700, lat: 10.838, lng: -73.686 },
+  { name: "Pico Bolívar", iso: ["VEN"], region: "South America", elevation: 4978, lat: 8.541, lng: -71.046 },
+  { name: "Pico da Neblina", iso: ["BRA"], region: "South America", elevation: 2995, lat: 0.804, lng: -65.978 },
+  { name: "Mount Roraima", iso: ["VEN", "BRA", "GUY"], region: "South America", elevation: 2810, lat: 5.143, lng: -60.762 },
+
+  // National high points — North & Central America, Caribbean
+  { name: "Volcán Tajumulco", iso: ["GTM"], region: "North America", elevation: 4220, lat: 15.043, lng: -91.903, wiki: "Tajumulco" },
+  { name: "Cerro Chirripó", iso: ["CRI"], region: "North America", elevation: 3820, lat: 9.484, lng: -83.489 },
+  { name: "Volcán Barú", iso: ["PAN"], region: "North America", elevation: 3475, lat: 8.808, lng: -82.543 },
+  { name: "Pico Duarte", iso: ["DOM"], region: "North America", elevation: 3098, lat: 19.023, lng: -70.993 },
+  { name: "Blue Mountain Peak", iso: ["JAM"], region: "North America", elevation: 2256, lat: 18.044, lng: -76.585 },
 ];

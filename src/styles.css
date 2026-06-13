@@ -64,11 +64,15 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #quiz-feedback { margin-top: 10px; font-size: 13px; line-height: 1.5; min-height: 38px; color: #5a6b7a; }
 #quiz-feedback.correct { color: #1b7a3d; font-weight: 600; }
 #quiz-feedback.wrong { color: #b3261e; font-weight: 600; }
-/* Round filled badge (green ✓ / red ✗) before answered feedback. */
+/* Answered feedback: round filled badge (green ✓ / red ✗) in its own column so
+   long text wraps under itself, not under the badge. */
+#quiz-feedback.correct, #quiz-feedback.wrong {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: start;
+}
 #quiz-feedback.correct::before, #quiz-feedback.wrong::before {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; margin-right: 6px; border-radius: 50%;
-  color: #fff; font-size: 10px; font-weight: 700; vertical-align: middle;
+  width: 16px; height: 16px; margin-top: 2px; border-radius: 50%;
+  color: #fff; font-size: 10px; font-weight: 700;
 }
 #quiz-feedback.correct::before { content: "✓"; background: #1b7a3d; }
 #quiz-feedback.wrong::before { content: "✗"; background: #b3261e; }

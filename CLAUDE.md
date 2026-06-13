@@ -23,8 +23,18 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
   these modules so it stays testable.
 - `map.ts` runs `L.map("map")` at import time — anything importing it
   (countries/panel/labels/physical/places/regions/sidebar/quiz/main) is NOT
-  unit-testable; interaction behaviour is covered by the manual browser
-  smoke-test instead. Environment is `happy-dom` so importing Leaflet works.
+  unit-testable; interaction behaviour is covered by the Playwright e2e tests
+  instead (see below). Environment is `happy-dom` so importing Leaflet works.
+
+## Tests (Playwright e2e)
+- Browser tests live in `e2e/*.spec.ts`, run with `pnpm test:e2e`. Config is
+  `playwright.config.ts`; it auto-starts `pnpm dev` on port 5173 and drives the
+  **system Chrome** (`channel: "chrome"`) — no bundled-browser download, so
+  `pnpm-workspace.yaml`'s build-script restriction doesn't block setup.
+- Keep them **offline-safe**: the app fetches geodata from CDNs at runtime, so
+  assert on static UI (help modal, toggles, sidebar structure), not on
+  data-dependent counts. **Extend these specs** rather than improvising one-off
+  browser scripts.
 
 ## Lint (Biome)
 - `pnpm lint` runs Biome **lint-only** (`biome.jsonc`). The formatter is

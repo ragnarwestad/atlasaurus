@@ -17,7 +17,7 @@ import {
   setActiveTab, markActiveContinent, initSidebarSections, buildFeatureLists, setSectionEnabled,
 } from "./sidebar";
 import {
-  setMode, nextQuestion, setQuizCat, applyNbMode, applyLocMode, renderNbResults,
+  setMode, nextQuestion, openQuizSection, applyNbMode, applyLocMode, renderNbResults,
   renderLocResults, nbCheckAnswers, nbInput, nbCheck, locInput, quizNextBtn, quizSkipBtn,
 } from "./quiz";
 
@@ -76,8 +76,8 @@ document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
     if (app.mode === "quiz") nextQuestion();
   });
 });
-document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => {
-  b.addEventListener("click", () => setQuizCat(b.dataset.cat as "country" | "continent" | "mountains"));
+document.querySelectorAll<HTMLElement>("[data-quiz-sec]").forEach((b) => {
+  b.addEventListener("click", () => openQuizSection(b.dataset.quizSec!));
 });
 
 const capToggle = document.getElementById("show-capitals") as HTMLInputElement;

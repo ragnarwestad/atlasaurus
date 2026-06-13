@@ -25,20 +25,19 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #mode-tabs .mode-tab:hover { color: #3878c7; }
 #mode-tabs .mode-tab.active { background: #fff; color: #1b3a5c; border-bottom-color: #3878c7; }
 #explore-panel, #quiz-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-#explore-panel { overflow-y: auto; }
+#explore-panel, #quiz-panel { overflow-y: auto; }
 #explore-panel[hidden], #quiz-panel[hidden] { display: none; }
 
-/* Quiz panel */
-#quiz-cat { margin-top: 9px; }
-.qc-tab {
-  padding: 4px 1px 8px; font: 600 13px system-ui, sans-serif; cursor: pointer;
-  background: none; border: none; color: #8a97a3;
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
+/* Quiz panel — one collapsible section per feature (reuses the Explore
+   .feat-sec / .sb-fold / .feat-body header chrome). The open section holds the
+   shared question UI; disabled sections are greyed "coming soon" placeholders. */
+.quiz-sec-body { padding: 4px 14px 12px; }
+.quiz-soon { margin: 4px 0 0; font-size: 13px; color: #8a97a3; }
+.quiz-soon-tag {
+  font: 700 9px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .05em;
+  color: #9aa6b1; border: 1px solid #d8e0e8; border-radius: 6px; padding: 1px 4px; margin-left: 6px;
 }
-.qc-tab:hover { color: #3878c7; }
-.qc-tab.active { color: #1b3a5c; border-bottom-color: #3878c7; }
-#quiz-type, #mtn-type { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-#quiz-type[hidden], #mtn-type[hidden] { display: none; }
+#quiz-type, #mtn-type { display: flex; flex-wrap: wrap; gap: 6px; }
 #mtn-type .qt-btn {
   padding: 4px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
   border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;

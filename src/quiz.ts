@@ -474,20 +474,55 @@ export function setMode(m: "explore" | "quiz"): void {
     quizContLayer.clearLayers();
   } else {
     app.selectedLayer = null; app.selectedContinent = null; app.expandedContinent = null;
-    if (!app.quizStarted) { app.quizStarted = true; app.quizCorrect = 0; app.quizTotal = 0; nextQuestion(); }
+    if (!app.quizStarted) { app.quizStarted = true; app.quizCorrect = 0; app.quizTotal = 0; }
+    // Resume the open section's quiz, or open Countries the first time round.
+    const open = currentQuizSection();
+    if (open) setQuizCat(SECTION_CAT[open]); else openQuizSection("countries");
     renderQuizScore();
   }
   hooks.refreshAll();
 }
 
-// Top-level quiz category: "Country" (sub-types By name/flag/capital/Neighbour) or
-// "Continent" (its own round — no sub-types).
-const quizTypeEl = document.getElementById("quiz-type") as HTMLElement;
-const mtnTypeEl = document.getElementById("mtn-type") as HTMLElement;
-export function setQuizCat(cat: "country" | "continent" | "mountains"): void {
-  document.querySelectorAll<HTMLElement>(".qc-tab").forEach((b) => { b.classList.toggle("active", b.dataset.cat === cat); });
-  quizTypeEl.hidden = cat !== "country";
-  mtnTypeEl.hidden = cat !== "mountains";
+// ---------------------------------------------------------------------------
+// Quiz sections (accordion): one collapsible section per feature, mirroring the
+// Explore list. Opening a section starts that quiz and relocates the shared
+// question UI (#quiz-ui) into its body. Countries/Mountains carry their own mode
+// rows (#quiz-type / #mtn-type); Regions is the continent round (no sub-modes).
+// ---------------------------------------------------------------------------
+const QUIZ_SECTIONS = ["countries", "cities", "regions", "lakes", "mountains", "rivers"];
+const SECTION_CAT: Record<string, "country" | "continent" | "mountains"> = {
+  countries: "country", regions: "continent", mountains: "mountains",
+};
+const quizUiEl = document.getElementById("quiz-ui") as HTMLElement;
+
+function currentQuizSection(): string | null {
+  return QUIZ_SECTIONS.find((s) => {
+    const el = document.getElementById("quiz-sec-" + s);
+    return !!el && !el.classList.contains("collapsed");
+  }) || null;
+}
+
+export function openQuizSection(id: string): void {
+  const sec = document.getElementById("quiz-sec-" + id);
+  if (!sec || sec.classList.contains("disabled")) return;
+  // Clicking the already-open section collapses it (quiz paused, reveals cleared).
+  if (!sec.classList.contains("collapsed")) {
+    sec.classList.add("collapsed");
+    quizLayer.clearLayers();
+    quizContLayer.clearLayers();
+    return;
+  }
+  // Accordion: only one section open at a time.
+  QUIZ_SECTIONS.forEach((s) => document.getElementById("quiz-sec-" + s)?.classList.add("collapsed"));
+  sec.classList.remove("collapsed");
+  sec.querySelector(".quiz-sec-body")!.appendChild(quizUiEl); // move shared UI in
+  setQuizCat(SECTION_CAT[id]);
+}
+
+// Set the active quiz type for a section's category, then ask the first question.
+// "country"/"mountains" read the active button in their mode row; "continent"
+// (Regions) has a single round.
+function setQuizCat(cat: "country" | "continent" | "mountains"): void {
   if (cat === "continent") {
     app.quizType = "continent";
   } else if (cat === "mountains") {

@@ -158,27 +158,80 @@
     </div>
 
     <div id="quiz-panel" hidden>
-      <div class="sb-group">
-        <div class="sb-title-row">
-          <h2 class="sb-title">Find the</h2>
-          <button class="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
+      <!-- One collapsible section per feature, top to bottom (mirrors the Explore
+           list). Opening a section starts that quiz; the shared question UI
+           (#quiz-ui) is moved into the open section's body. Cities/Lakes/Rivers
+           are disabled placeholders until their rounds are built. -->
+      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-countries">
+        <div class="sb-title-row feat-head-row">
+          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="countries">
+            <span class="fold-caret"></span>
+            <span class="sb-title">Countries</span>
+          </button></h2>
         </div>
-        <div class="sb-tabs" id="quiz-cat">
-          <button type="button" class="qc-tab active" data-cat="country">Country</button>
-          <button type="button" class="qc-tab" data-cat="continent">Continent</button>
-          <button type="button" class="qc-tab" data-cat="mountains">Mountains</button>
+        <div class="feat-body quiz-sec-body">
+          <div id="quiz-type">
+            <button type="button" class="qt-btn active" data-qtype="name">By name</button>
+            <button type="button" class="qt-btn" data-qtype="flag">By flag</button>
+            <button type="button" class="qt-btn" data-qtype="capital">By capital</button>
+            <button type="button" class="qt-btn" data-qtype="spot">Spot it</button>
+            <button type="button" class="qt-btn" data-qtype="neighbour">Neighbour</button>
+          </div>
         </div>
-        <div id="quiz-type">
-          <button type="button" class="qt-btn active" data-qtype="name">By name</button>
-          <button type="button" class="qt-btn" data-qtype="flag">By flag</button>
-          <button type="button" class="qt-btn" data-qtype="capital">By capital</button>
-          <button type="button" class="qt-btn" data-qtype="spot">Spot it</button>
-          <button type="button" class="qt-btn" data-qtype="neighbour">Neighbour</button>
+      </section>
+      <section class="feat-sec quiz-sec collapsed disabled" id="quiz-sec-cities">
+        <div class="sb-title-row feat-head-row">
+          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="cities">
+            <span class="fold-caret"></span>
+            <span class="sb-title">Cities <span class="quiz-soon-tag">soon</span></span>
+          </button></h2>
         </div>
-        <div id="mtn-type" hidden>
-          <button type="button" class="qt-btn active" data-qtype="peakname">Name it</button>
-          <button type="button" class="qt-btn" data-qtype="peakcountry">Which country</button>
+        <div class="feat-body quiz-sec-body"><p class="quiz-soon">Coming soon.</p></div>
+      </section>
+      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-regions">
+        <div class="sb-title-row feat-head-row">
+          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="regions">
+            <span class="fold-caret"></span>
+            <span class="sb-title">Regions</span>
+          </button></h2>
         </div>
+        <div class="feat-body quiz-sec-body"></div>
+      </section>
+      <section class="feat-sec quiz-sec collapsed disabled" id="quiz-sec-lakes">
+        <div class="sb-title-row feat-head-row">
+          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="lakes">
+            <span class="fold-caret"></span>
+            <span class="sb-title">Lakes <span class="quiz-soon-tag">soon</span></span>
+          </button></h2>
+        </div>
+        <div class="feat-body quiz-sec-body"><p class="quiz-soon">Coming soon.</p></div>
+      </section>
+      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-mountains">
+        <div class="sb-title-row feat-head-row">
+          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="mountains">
+            <span class="fold-caret"></span>
+            <span class="sb-title">Mountains</span>
+          </button></h2>
+        </div>
+        <div class="feat-body quiz-sec-body">
+          <div id="mtn-type">
+            <button type="button" class="qt-btn active" data-qtype="peakname">Name it</button>
+            <button type="button" class="qt-btn" data-qtype="peakcountry">Which country</button>
+          </div>
+        </div>
+      </section>
+      <section class="feat-sec quiz-sec collapsed disabled" id="quiz-sec-rivers">
+        <div class="sb-title-row feat-head-row">
+          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="rivers">
+            <span class="fold-caret"></span>
+            <span class="sb-title">Rivers <span class="quiz-soon-tag">soon</span></span>
+          </button></h2>
+        </div>
+        <div class="feat-body quiz-sec-body"><p class="quiz-soon">Coming soon.</p></div>
+      </section>
+
+      <!-- Shared question UI — relocated into whichever section is open. -->
+      <div id="quiz-ui">
         <div id="quiz-prompt"></div>
         <div id="loc-box" hidden>
           <div id="loc-mode">
@@ -265,20 +318,24 @@
 
       <div class="help-panel" data-help-panel="quiz" role="tabpanel" hidden>
       <p>Switch to the <b>Quiz</b> tab (top of the sidebar) for several rounds with a
-         running score. Pick what to find — <b>Country</b>, <b>Continent</b> or
-         <b>Mountains</b>:</p>
+         running score. The panel reads top to bottom as collapsible sections — one
+         per feature (<b>Countries</b>, <b>Cities</b>, <b>Regions</b>, <b>Lakes</b>,
+         <b>Mountains</b>, <b>Rivers</b>), just like the Explore list. Open a section
+         to start its quiz; opening another switches to it. <b>Cities</b>, <b>Lakes</b>
+         and <b>Rivers</b> are coming soon.</p>
+      <p>Inside <b>Countries</b>, pick a mode:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.
             <b>By flag / By capital</b> — answer by <b>Click on map</b> or
             <b>Select country</b> (search by name).</li>
         <li><b>Spot it</b> — the reverse: a random country is highlighted and pinned on the
             map; type its name to identify it.</li>
-        <li><b>Continent</b> — a country is named; click any country in its continent on
-            the map. The correct continent turns green, a wrong pick red.</li>
         <li><b>Neighbour</b> — find <i>all</i> countries that border the target. Choose how
             to answer: <b>Click on map</b> or <b>Select countries</b> (search by name),
             then <b>Check</b>. Found neighbours show green, missed ones and wrong picks are
             marked too.</li>
+        <li><b>Regions</b> — a country is named; click any country in its continent on
+            the map. The correct continent turns green, a wrong pick red.</li>
         <li><b>Mountains</b> — a peak is marked on the map. <b>Name it</b> (pick from four
             options) or <b>Which country</b> (click the country it's in; border peaks accept
             any of their countries).</li>

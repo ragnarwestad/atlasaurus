@@ -64,6 +64,17 @@ function neighbourEntries(entry: CountryEntry): CountryEntry[] {
   return codes.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
 }
 
+// Reset the map to the "locate a country" UI (used by Spot and by name/flag/capital):
+// hide the choice/neighbour boxes, clear and show the search box.
+function setupLocateBox(): void {
+  quizChoicesEl.hidden = true;
+  quizContLayer.clearLayers();
+  nbBox.hidden = true;
+  locInput.value = ""; locInput.disabled = false;
+  locResults.innerHTML = "";
+  locBox.hidden = false;
+}
+
 export function nextQuestion(): void {
   // The neighbour quiz needs the borders dataset; load it first if necessary.
   if (app.quizType === "neighbour" && !app.countryData) {
@@ -108,12 +119,7 @@ export function nextQuestion(): void {
   } else if (app.quizType === "spot") {
     // Spot: highlight + drop a pin on a random country; the user names it by
     // search. Reset to the world view so the pin is always on screen.
-    quizChoicesEl.hidden = true;
-    quizContLayer.clearLayers();
-    nbBox.hidden = true;
-    locInput.value = ""; locInput.disabled = false;
-    locResults.innerHTML = "";
-    locBox.hidden = false;
+    setupLocateBox();
     locModeEl.hidden = true;     // always answered by typing the name
     app.locMode = "search";
     applyLocMode();
@@ -122,12 +128,7 @@ export function nextQuestion(): void {
     if (c) L.circleMarker(c, { radius: 9, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 }).addTo(quizLayer);
     quizFeedbackEl.textContent = "Which country is highlighted? Type its name.";
   } else {
-    quizChoicesEl.hidden = true;
-    quizContLayer.clearLayers();
-    nbBox.hidden = true;
-    locInput.value = ""; locInput.disabled = false;
-    locResults.innerHTML = "";
-    locBox.hidden = false;
+    setupLocateBox();
     // "By name" already gives you the name, so searching for it is pointless —
     // hide the mode picker and force map clicks. Flag/capital keep both options.
     const nameOnly = app.quizType === "name";

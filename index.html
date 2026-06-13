@@ -3,10 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;text y='.9em' font-size='90'&gt;%F0%9F%8C%90&lt;/text&gt;&lt;/svg&gt;" />
   <title>Atlasaurus — Countries, Borders &amp; Capitals</title>
 </head>
 <body>
   <aside id="sidebar">
+    <div id="brand">
+      <span class="brand-globe">🌐</span> Atlasaurus
+      <button class="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
+    </div>
     <div id="mode-tabs">
       <button type="button" class="mode-tab active" data-mode="explore">Explore</button>
       <button type="button" class="mode-tab" data-mode="quiz">Quiz</button>
@@ -19,7 +24,6 @@
             <span class="fold-caret"></span>
             <h2 class="sb-title">Map options</h2>
           </button>
-          <button class="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
         </div>
         <div class="map-toggles">
           <label id="name-toggle">
@@ -208,7 +212,7 @@
   <div id="help-modal" hidden>
     <div class="help-card" role="dialog" aria-modal="true" aria-label="About this map">
       <button class="help-close" type="button" aria-label="Close">×</button>
-      <h2>Atlasaurus</h2>
+      <h2><span class="brand-globe">🌐</span> Atlasaurus</h2>
       <p>An interactive map of every country — borders, capitals, flags and facts —
          grouped into continents, with overseas territories drawn in. The sidebar has
          two modes at the top: <b>Explore</b> (browse the map) and <b>Quiz</b> (test

@@ -7,6 +7,15 @@ body { display: flex; font-family: system-ui, sans-serif; }
   background: #fff;
 }
 
+/* Brand wordmark */
+#brand {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; font: 800 14px system-ui, sans-serif; color: #1b3a5c;
+  border-bottom: 1px solid #d8d8d8; letter-spacing: .2px;
+}
+#brand .brand-globe { font-size: 15px; line-height: 1; }
+#brand .help-btn { margin-left: auto; }
+
 /* Top-level mode tabs (Explore / Quiz) */
 #mode-tabs { display: flex; border-bottom: 1px solid #d8d8d8; flex: 0 0 auto; }
 #mode-tabs .mode-tab {

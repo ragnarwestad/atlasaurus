@@ -25,6 +25,7 @@ const quizScoreEl = document.getElementById("quiz-score")!;
 const quizChoicesEl = document.getElementById("quiz-choices")!;
 export const quizNextBtn = document.getElementById("quiz-next") as HTMLButtonElement;
 export const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
+export const quizResetBtn = document.getElementById("quiz-reset") as HTMLButtonElement;
 
 function renderQuizPrompt(): void {
   if (app.quizType === "peakname") {
@@ -83,8 +84,30 @@ function renderQuizPrompt(): void {
     quizPromptEl.innerHTML = "<span>" + escapeHtml(app.quizTarget.name) + "</span>";
   }
 }
+// Score is kept per category (the six sections). quizCorrect/quizTotal are the
+// ACTIVE category's live counters; switching section saves them into quizScores
+// and loads the new category's. Switching mode within a section keeps counting.
+type ScoreCat = "country" | "city" | "continent" | "mountains" | "lake" | "river";
+const CAT_LABEL: Record<ScoreCat, string> = {
+  country: "Countries", city: "Cities", continent: "Regions", mountains: "Mountains", lake: "Lakes", river: "Rivers",
+};
+const quizScores: Record<string, { correct: number; total: number }> = {};
+let scoreCat: ScoreCat = "country";
+function setScoreCategory(cat: ScoreCat): void {
+  if (cat === scoreCat) return; // same section — keep the running counters
+  quizScores[scoreCat] = { correct: app.quizCorrect, total: app.quizTotal };
+  scoreCat = cat;
+  const s = quizScores[cat] || { correct: 0, total: 0 };
+  app.quizCorrect = s.correct; app.quizTotal = s.total;
+  renderQuizScore(); // the active category changed — refresh the readout
+}
+export function resetScores(): void {
+  for (const k of Object.keys(quizScores)) delete quizScores[k];
+  app.quizCorrect = 0; app.quizTotal = 0;
+  renderQuizScore();
+}
 function renderQuizScore(): void {
-  quizScoreEl.textContent = app.quizTotal ? "Score: " + app.quizCorrect + " / " + app.quizTotal : "";
+  quizScoreEl.textContent = app.quizTotal ? CAT_LABEL[scoreCat] + ": " + app.quizCorrect + " / " + app.quizTotal : "";
 }
 // Neighbouring countries (mledoze `borders`, resolved to entries we have).
 function neighbourEntries(entry: CountryEntry): CountryEntry[] {
@@ -843,7 +866,7 @@ export function setMode(m: "explore" | "quiz"): void {
     quizContLayer.clearLayers();
   } else {
     app.selectedLayer = null; app.selectedContinent = null; app.expandedContinent = null;
-    if (!app.quizStarted) { app.quizStarted = true; app.quizCorrect = 0; app.quizTotal = 0; }
+    app.quizStarted = true; // per-category scores persist for the session; reset via the button
     // Resume the open section's quiz, or open Countries the first time round.
     const open = currentQuizSection();
     if (open) setQuizCat(SECTION_CAT[open]); else openQuizSection("countries");
@@ -892,6 +915,7 @@ export function openQuizSection(id: string): void {
 // "country"/"mountains" read the active button in their mode row; "continent"
 // (Regions) has a single round.
 function setQuizCat(cat: "country" | "city" | "continent" | "mountains" | "lake" | "river"): void {
+  setScoreCategory(cat); // swap the live score counters to this section's
   if (cat === "continent") {
     app.quizType = "continent";
   } else if (cat === "lake") {

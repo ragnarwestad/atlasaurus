@@ -19,7 +19,7 @@ import {
 import {
   setMode, nextQuestion, openQuizSection, applyNbMode, applyLocMode, renderNbResults,
   renderLocResults, renderNameResults, nbCheckAnswers, nbInput, nbCheck, locInput, nameInput,
-  quizNextBtn, quizSkipBtn,
+  quizNextBtn, quizSkipBtn, quizResetBtn, resetScores,
 } from "./quiz";
 
 // ---------------------------------------------------------------------------
@@ -50,6 +50,7 @@ document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
 });
 quizNextBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
 quizSkipBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
+quizResetBtn.addEventListener("click", resetScores);
 nbInput.addEventListener("input", () => renderNbResults(nbInput.value));
 nbCheck.addEventListener("click", nbCheckAnswers);
 document.querySelectorAll<HTMLInputElement>('#nb-mode input[name="nbmode"]').forEach((r) => {

@@ -69,6 +69,15 @@ test("Mountains 'Which country' has search + map-click both live, no mode toggle
   await expect(page.locator("#quiz-sec-mountains #name-box")).toBeHidden();
 });
 
+test("score shows the active category and the reset button clears it", async ({ page }) => {
+  await page.click('[data-quiz-sec="mountains"]');
+  await page.fill("#name-input", "ever"); // PEAKS is bundled — works offline
+  await page.locator("#name-results li").first().click(); // answer (right or wrong)
+  await expect(page.locator("#quiz-score")).toHaveText(/^Mountains: \d \/ 1$/);
+  await page.click("#quiz-reset");
+  await expect(page.locator("#quiz-score")).toHaveText("");
+});
+
 test("Regions opens and runs (no sub-mode row)", async ({ page }) => {
   await page.click('[data-quiz-sec="regions"]');
   await expect(page.locator("#quiz-sec-regions")).not.toHaveClass(/collapsed/);

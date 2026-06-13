@@ -373,7 +373,7 @@ export function loadBorders(): void {
                 if (!entry.isLandmass) handlePeakCountryGuess(entry);
               } else if (app.quizType === "citycountry") {
                 if (!entry.isLandmass) handleCityCountryGuess(entry);
-              } else if (app.quizType === "peakname" || app.quizType === "cityname") { /* answered via the choice buttons */
+              } else if (app.quizType === "peakname" || app.quizType === "cityname") { /* answered via the search list */
               } else {
                 if (app.locMode === "map") handleGuess(entry);
               }

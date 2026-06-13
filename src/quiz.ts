@@ -116,10 +116,11 @@ export function nextQuestion(): void {
   }
   if (app.quizType === "rivername" || app.quizType === "lakename") {
     // Rivers/lakes are fetched lazily; load first if necessary, then retry.
-    const ready = app.quizType === "rivername" ? riversReady() : lakesReady();
+    const isRiver = app.quizType === "rivername";
+    const ready = isRiver ? riversReady() : lakesReady();
     if (!ready) {
-      const load = app.quizType === "rivername" ? loadRiverData() : loadLakeData();
-      load.then(() => { if (app.mode === "quiz" && (app.quizType === "rivername" || app.quizType === "lakename")) nextQuestion(); }).catch(() => { /* ignore */ });
+      (isRiver ? loadRiverData() : loadLakeData())
+        .then(() => { if (app.mode === "quiz" && (app.quizType === "rivername" || app.quizType === "lakename")) nextQuestion(); }).catch(() => { /* ignore */ });
       return;
     }
     nextWaterQuestion();
@@ -192,13 +193,13 @@ export function nextQuestion(): void {
 // ---------------------------------------------------------------------------
 // Mountain-peak quiz (Name it / Which country)
 // ---------------------------------------------------------------------------
+// Add the peak marker (orange) to quizLayer; the caller clears the layer first.
 function drawQuizPeak(withLabel: boolean): void {
-  quizLayer.clearLayers();
   if (!app.quizPeak) return;
   const m = L.marker([app.quizPeak.lat, app.quizPeak.lng], { icon: peakIcon(map.getZoom(), true), keyboard: false });
   if (withLabel) {
-    m.bindTooltip('<a href="' + wikiUrl(app.quizPeak.wiki || app.quizPeak.name) + '" target="_blank" rel="noopener">' +
-      escapeHtml(app.quizPeak.name) + "</a>", { permanent: true, direction: "top", interactive: true, className: "map-label" });
+    m.bindTooltip(nameLink(app.quizPeak.name, wikiUrl(app.quizPeak.wiki || app.quizPeak.name)),
+      { permanent: true, direction: "top", interactive: true, className: "map-label" });
   }
   m.addTo(quizLayer);
 }
@@ -220,6 +221,7 @@ function nextPeakQuestion(): void {
     setupNameBox();
     quizFeedbackEl.textContent = "Which mountain is marked? Search and pick it.";
     if (app.quizPeak) map.setView([app.quizPeak.lat, app.quizPeak.lng], 4);
+    quizLayer.clearLayers();
     drawQuizPeak(false);
   } else {
     // Which country: no marker (it would give the answer away) — click the
@@ -232,15 +234,25 @@ function nextPeakQuestion(): void {
 function handlePeakNameGuess(name: string): void {
   if (app.mode !== "quiz" || app.quizAnswered || !app.quizPeak) return;
   app.quizAnswered = true; app.quizTotal++;
-  const ok = name === app.quizPeak.name;
+  const target = app.quizPeak;
+  const ok = name === target.name;
   if (ok) app.quizCorrect++;
   nameInput.disabled = true; nameResults.innerHTML = "";
+  const facts = " — " + fmtInt(target.elevation) + " m, " + peakCountryNames(target) + ".";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + app.quizPeak.name +
-    " — " + fmtInt(app.quizPeak.elevation) + " m, " + peakCountryNames(app.quizPeak) + ".";
+  quizFeedbackEl.textContent = ok ? "✓ Correct! " + target.name + facts : "✗ That's " + name + ". It's " + target.name + facts;
   renderQuizScore();
   quizNextBtn.disabled = false;
-  drawQuizPeak(true);
+  // Green dot on the right peak; red dot on the one you picked + a line between.
+  quizLayer.clearLayers();
+  const tll: LatLng = [target.lat, target.lng];
+  markDot(tll, nameLink(target.name, wikiUrl(target.wiki || target.name)), "correct");
+  const wrong = ok ? null : PEAKS.find((p) => p.name === name);
+  if (wrong) {
+    const wll: LatLng = [wrong.lat, wrong.lng];
+    markDot(wll, nameLink(wrong.name, wikiUrl(wrong.wiki || wrong.name)), "wrong");
+    connectDots(wll, tll);
+  }
 }
 export function handlePeakCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || app.quizType !== "peakcountry" || app.quizAnswered || !app.quizPeak || entry.isLandmass) return;
@@ -255,7 +267,11 @@ export function handlePeakCountryGuess(entry: CountryEntry): void {
   renderQuizScore();
   quizNextBtn.disabled = false;
   locInput.disabled = true; locResults.innerHTML = "";
-  drawQuizPeak(true);                          // reveal where the peak actually is
+  // Reveal: the peak (orange) + green dot(s) on its country(ies), red on the wrong pick + line.
+  quizLayer.clearLayers();
+  drawQuizPeak(true);
+  const correct = app.quizPeak.iso.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
+  revealCountryDots(correct, ok ? null : entry);
   refreshPolygons();
 }
 
@@ -264,13 +280,13 @@ export function handlePeakCountryGuess(entry: CountryEntry): void {
 // you search its name; "Which country" names the city (no marker) and you click
 // or search its country. Pool comes from places.ts.
 // ---------------------------------------------------------------------------
+// Add the city marker (orange) to quizLayer; the caller clears the layer first.
 function drawQuizCity(withLabel: boolean): void {
-  quizLayer.clearLayers();
   const c = app.quizCity;
   if (!c) return;
   const m = L.circleMarker([c.lat, c.lng], { radius: 7, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 });
   if (withLabel) {
-    m.bindTooltip('<a href="' + cityWikiUrl(c.name) + '" target="_blank" rel="noopener">' + escapeHtml(c.name) + "</a>",
+    m.bindTooltip(nameLink(c.name, cityWikiUrl(c.name)),
       { permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-target" });
   }
   m.addTo(quizLayer);
@@ -296,6 +312,7 @@ function nextCityQuestion(): void {
     setupNameBox();
     quizFeedbackEl.textContent = "Which city is marked? Search and pick it.";
     if (c) map.setView([c.lat, c.lng], 5);
+    quizLayer.clearLayers();
     drawQuizCity(false);
   } else {
     // Which country: no marker — click the country on the map or search-select it.
@@ -307,15 +324,25 @@ function nextCityQuestion(): void {
 function handleCityNameGuess(name: string): void {
   if (app.mode !== "quiz" || app.quizAnswered || !app.quizCity) return;
   app.quizAnswered = true; app.quizTotal++;
-  const ok = name === app.quizCity.name;
+  const target = app.quizCity;
+  const ok = name === target.name;
   if (ok) app.quizCorrect++;
   nameInput.disabled = true; nameResults.innerHTML = "";
+  const where = target.adm0 ? ", " + target.adm0 : "";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + app.quizCity.name +
-    (app.quizCity.adm0 ? ", " + app.quizCity.adm0 : "") + ".";
+  quizFeedbackEl.textContent = ok ? "✓ Correct! " + target.name + where + "." : "✗ That's " + name + ". It's " + target.name + where + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
-  drawQuizCity(true);
+  // Green dot on the right city; red dot on the one you picked + a line between.
+  quizLayer.clearLayers();
+  const tll: LatLng = [target.lat, target.lng];
+  markDot(tll, nameLink(target.name, cityWikiUrl(target.name)), "correct");
+  const wrong = ok ? null : cityQuizPool().find((c) => c.name === name);
+  if (wrong) {
+    const wll: LatLng = [wrong.lat, wrong.lng];
+    markDot(wll, nameLink(wrong.name, cityWikiUrl(wrong.name)), "wrong");
+    connectDots(wll, tll);
+  }
 }
 export function handleCityCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || app.quizType !== "citycountry" || app.quizAnswered || !app.quizCity || entry.isLandmass) return;
@@ -331,7 +358,10 @@ export function handleCityCountryGuess(entry: CountryEntry): void {
   renderQuizScore();
   quizNextBtn.disabled = false;
   locInput.disabled = true; locResults.innerHTML = "";
-  drawQuizCity(true);                          // reveal where the city actually is
+  // Reveal: the city (orange) + green dot on its country, red on the wrong pick + line.
+  quizLayer.clearLayers();
+  drawQuizCity(true);
+  revealCountryDots(where ? [where] : [], ok ? null : entry);
   refreshPolygons();
 }
 
@@ -340,25 +370,31 @@ export function handleCityCountryGuess(entry: CountryEntry): void {
 // the feature's geometry is highlighted on the map (no label); search its name.
 // ---------------------------------------------------------------------------
 let quizWaterTarget: WaterQuizItem | null = null;
-function drawWaterHighlight(item: WaterQuizItem, withLabel: boolean): void {
-  quizLayer.clearLayers();
-  const isLake = app.quizType === "lakename";
+function isLakeShape(): boolean { return app.quizType === "lakename"; }
+const WATER_COLORS: Record<DotKind, { stroke: string; fill: string }> = {
+  target: { stroke: "#8a3b00", fill: "#e8740c" },  // the feature in question (orange)
+  correct: { stroke: "#1b7a3d", fill: "#54c47e" }, // matches DOT_COLORS.correct (green)
+  wrong: { stroke: "#9c1b12", fill: "#e8675c" },   // matches DOT_COLORS.wrong (red)
+};
+// Draw a water feature's geometry (lake polygon / river line) into quizLayer in
+// the given colour; the caller clears the layer first.
+function drawWater(item: WaterQuizItem, kind: DotKind, withLabel: boolean): void {
+  const isLake = isLakeShape();
+  const col = WATER_COLORS[kind];
   item.layers.forEach((layer) => {
     const ll = (layer as any).getLatLngs();
-    const shape = isLake
-      ? L.polygon(ll, { color: "#8a3b00", weight: 2, fillColor: "#e8740c", fillOpacity: 0.5 })
-      : L.polyline(ll, { color: "#e8740c", weight: 4, opacity: 0.95 });
-    shape.addTo(quizLayer);
+    (isLake
+      ? L.polygon(ll, { color: col.stroke, weight: 2, fillColor: col.fill, fillOpacity: 0.5 })
+      : L.polyline(ll, { color: col.fill, weight: 4, opacity: 0.95 })).addTo(quizLayer);
   });
   if (withLabel) {
-    L.tooltip({ permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-target" })
-      .setLatLng(item.bounds.getCenter())
-      .setContent('<a href="' + wikiUrl(item.name) + '" target="_blank" rel="noopener">' + escapeHtml(item.name) + "</a>")
-      .addTo(quizLayer);
+    L.tooltip({ permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-" + kind })
+      .setLatLng(item.bounds.getCenter()).setContent(nameLink(item.name, wikiUrl(item.name))).addTo(quizLayer);
   }
 }
 function nextWaterQuestion(): void {
-  const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
+  const isRiver = app.quizType === "rivername";
+  const pool = isRiver ? riverQuizPool() : lakeQuizPool();
   if (!pool.length) return;
   let item = quizWaterTarget;
   for (let i = 0; i < 20 && (!item || item === quizWaterTarget); i++) item = pool[Math.floor(Math.random() * pool.length)];
@@ -368,11 +404,10 @@ function nextWaterQuestion(): void {
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   setupNameBox();
-  quizFeedbackEl.textContent = app.quizType === "rivername"
-    ? "Which river is highlighted? Search and pick it."
-    : "Which lake is highlighted? Search and pick it.";
+  quizFeedbackEl.textContent = isRiver ? "Which river is highlighted? Search and pick it." : "Which lake is highlighted? Search and pick it.";
   if (item) {
-    drawWaterHighlight(item, false);
+    quizLayer.clearLayers();
+    drawWater(item, "target", false);
     try { map.fitBounds(item.bounds, { maxZoom: 7, padding: [40, 40] }); } catch { /* ignore */ }
   }
   quizNextBtn.disabled = true;
@@ -381,14 +416,24 @@ function nextWaterQuestion(): void {
 function handleWaterNameGuess(name: string): void {
   if (app.mode !== "quiz" || app.quizAnswered || !quizWaterTarget) return;
   app.quizAnswered = true; app.quizTotal++;
-  const ok = name === quizWaterTarget.name;
+  const target = quizWaterTarget;
+  const ok = name === target.name;
   if (ok) app.quizCorrect++;
   nameInput.disabled = true; nameResults.innerHTML = "";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = (ok ? "✓ Correct! " : "✗ It's ") + quizWaterTarget.name + ".";
+  quizFeedbackEl.textContent = ok ? "✓ Correct! " + target.name + "." : "✗ That's " + name + ". It's " + target.name + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
-  drawWaterHighlight(quizWaterTarget, true);   // reveal the name on the map
+  // Right feature green, the one you picked red, with a line between.
+  quizLayer.clearLayers();
+  drawWater(target, "correct", true);
+  const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
+  const wrong = ok ? null : pool.find((it) => it.name === name);
+  if (wrong) {
+    drawWater(wrong, "wrong", true);
+    const w = wrong.bounds.getCenter(), t = target.bounds.getCenter();
+    connectDots([w.lat, w.lng], [t.lat, t.lng]);
+  }
 }
 
 function showContinentLabels(): void {
@@ -647,27 +692,19 @@ export function handleGuess(entry: CountryEntry): void {
   app.quizTotal++;
   const ok = entry === app.quizTarget;
   quizLayer.clearLayers();
-  const tCenter = layerCenter(app.quizTarget);
   if (ok) {
     app.quizCorrect++;
     quizFeedbackEl.className = "correct";
     quizFeedbackEl.textContent = "✓ Correct! It's " + app.quizTarget.name + ".";
-    if (tCenter) addQuizDot(app.quizTarget, tCenter, "correct"); // labelled green dot
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "✗ That's " + escapeHtml(entry.name) +
       '. <a href="#" class="quiz-zoom">' + escapeHtml(app.quizTarget.name) + "</a> is the right one.";
     const z = quizFeedbackEl.querySelector(".quiz-zoom");
     if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
-    // Draw a line from the guess to the correct country (both labelled) so the
-    // location is clear even for a tiny island. (No auto-zoom — use the link.)
-    const gCenter = layerCenter(entry);
-    if (gCenter && tCenter) {
-      L.polyline([gCenter, tCenter], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
-      addQuizDot(app.quizTarget, tCenter, "correct");  // green: the right answer
-      addQuizDot(entry, gCenter, "wrong");         // red: your guess
-    }
   }
+  // Green dot on the right country; red dot on the wrong pick + a line between.
+  revealCountryDots([app.quizTarget], ok ? null : entry);
   renderQuizScore();
   quizNextBtn.disabled = false;
   locInput.disabled = true;
@@ -681,21 +718,45 @@ const DOT_COLORS: Record<DotKind, { stroke: string; fill: string }> = {
   wrong: { stroke: "#9c1b12", fill: "#e8675c" },
   target: { stroke: "#1b3a5c", fill: "#3878c7" },
 };
+// A coloured reveal dot with a Wikipedia-linked label (added to quizLayer; the
+// caller clears the layer first). Shared by every round's correct/wrong reveal.
+function markDot(latlng: LatLng, labelHtml: string, kind: DotKind): void {
+  const col = DOT_COLORS[kind];
+  L.circleMarker(latlng, {
+    radius: kind === "wrong" ? 5 : 6, color: col.stroke, weight: 2, fillColor: col.fill, fillOpacity: 1,
+  }).bindTooltip(labelHtml, {
+    permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-" + kind,
+  }).addTo(quizLayer);
+}
+function connectDots(a: LatLng, b: LatLng): void {
+  L.polyline([a, b], { color: "#8a3b00", weight: 2, opacity: 0.85, dashArray: "5 5" }).addTo(quizLayer);
+}
+function nameLink(name: string, url: string): string {
+  return '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(name) + "</a>";
+}
 function addQuizDot(entry: CountryEntry, latlng: LatLng, kind: DotKind): void {
-  // Always show flag + name on the dots once a guess is made.
+  // Country dot: flag + name (the answer is revealed, so the name links to Wikipedia).
   const flag = entry.iso2
     ? '<img class="quiz-dot-flag" src="https://flagcdn.com/24x18/' + entry.iso2 + '.png" alt=""> '
     : "";
-  const col = DOT_COLORS[kind];
-  // The answer is already revealed, so link the name to Wikipedia (interactive
-  // tooltip) — handy for reading up on a country you just learned.
-  const nameLink = '<a href="' + wikiUrl(entry.name) + '" target="_blank" rel="noopener">' +
-    escapeHtml(entry.name) + "</a>";
-  L.circleMarker(latlng, {
-    radius: kind === "wrong" ? 5 : 6, color: col.stroke, weight: 2, fillColor: col.fill, fillOpacity: 1,
-  }).bindTooltip(flag + nameLink, {
-    permanent: true, direction: "top", interactive: true, className: "map-label quiz-label quiz-label-" + kind,
-  }).addTo(quizLayer);
+  markDot(latlng, flag + nameLink(entry.name, wikiUrl(entry.name)), kind);
+}
+// Shared "country answer" reveal (used by By-name and every "which country"
+// round): a green dot on each correct country, a red dot on the wrong pick, and a
+// dashed line from the wrong pick to the nearest correct country.
+function revealCountryDots(correct: CountryEntry[], wrong: CountryEntry | null): void {
+  const wll = wrong ? layerCenter(wrong) : null;
+  let nearest: LatLng | null = null, nd = Infinity;
+  correct.forEach((c) => {
+    const ll = layerCenter(c);
+    if (!ll) return;
+    addQuizDot(c, ll, "correct");
+    if (wll) { const d = (ll[0] - wll[0]) ** 2 + (ll[1] - wll[1]) ** 2; if (d < nd) { nd = d; nearest = ll; } }
+  });
+  if (wrong && wll && !correct.includes(wrong)) {
+    addQuizDot(wrong, wll, "wrong");
+    if (nearest) connectDots(wll, nearest);
+  }
 }
 
 function zoomToTarget(maxZoom: number): void {

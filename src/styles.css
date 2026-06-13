@@ -102,11 +102,7 @@ body { display: flex; font-family: system-ui, sans-serif; }
 /* Neighbour quiz: search + chips + check; locate + name-search share the styling */
 #nb-box, #loc-box, #name-box { margin-top: 12px; }
 #nb-box[hidden], #loc-box[hidden], #name-box[hidden] { display: none; }
-#nb-mode, #loc-mode { display: flex; gap: 14px; margin-bottom: 10px; font-size: 13px; color: #41525f; }
-#loc-mode[hidden] { display: none; }
-#nb-mode label, #loc-mode label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-#nb-mode input, #loc-mode input { margin: 0; }
-#nb-box.map-mode #nb-input, #nb-box.map-mode #nb-results,
+/* By name hides its search box (map-only); the search input shows otherwise. */
 #loc-box.map-mode #loc-input, #loc-box.map-mode #loc-results { display: none; }
 #nb-input, #loc-input, #name-input { width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 13px; border: 1px solid #ccc; border-radius: 6px; }
 #nb-results, #loc-results, #name-results { list-style: none; margin: 4px 0 0; padding: 0; max-height: 160px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; }

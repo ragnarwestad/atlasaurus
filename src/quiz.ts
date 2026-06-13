@@ -218,6 +218,7 @@ export function nextQuestion(): void {
     nameBox.hidden = true;
     quizContLayer.clearLayers();
     app.nbSelected = new Set();
+    app.nbMode = "search"; // no toggle — clicking the map and searching both add picks
     nbInput.value = ""; nbInput.disabled = false;
     nbResults.innerHTML = "";
     renderNbChips();
@@ -228,8 +229,7 @@ export function nextQuestion(): void {
     // Spot: highlight + drop a pin on a random country; the user names it by
     // search. Reset to the world view so the pin is always on screen.
     setupLocateBox();
-    locModeEl.hidden = true;     // always answered by typing the name
-    app.locMode = "search";
+    app.locMode = "search";      // always answered by typing the name (map-click excluded for Spot)
     applyLocMode();
     const c = app.quizTarget ? layerCenter(app.quizTarget) : null;
     map.setView([20, 0], 2);
@@ -237,15 +237,9 @@ export function nextQuestion(): void {
     quizFeedbackEl.textContent = "Which country is highlighted? Type its name.";
   } else {
     setupLocateBox();
-    // "By name" already gives you the name, so searching for it is pointless —
-    // hide the mode picker and force map clicks. Flag/capital keep both options.
-    const nameOnly = app.quizType === "name";
-    locModeEl.hidden = nameOnly;
-    if (nameOnly) {
-      app.locMode = "map";
-      const mapRadio = document.querySelector<HTMLInputElement>('#loc-mode input[value="map"]');
-      if (mapRadio) mapRadio.checked = true;
-    }
+    // No mode toggle — map-clicking always answers. The search box shows too,
+    // except for By name (where the name is given, so searching is trivial).
+    setLocMode(app.quizType === "name" ? "map" : "search");
     applyLocMode();
   }
   quizNextBtn.disabled = true;
@@ -603,15 +597,12 @@ export const nbInput = document.getElementById("nb-input") as HTMLInputElement;
 const nbResults = document.getElementById("nb-results")!;
 const nbChips = document.getElementById("nb-chips")!;
 export const nbCheck = document.getElementById("nb-check") as HTMLButtonElement;
-// Two mutually-exclusive ways to answer the Neighbour round: click the
-// neighbours on the map, or search and pick them by name.
+// Neighbour round: clicking the map and searching both add picks (no toggle).
 export function applyNbMode(): void {
   nbBox.classList.toggle("map-mode", app.nbMode === "map");
   if (app.nbMode === "map") { nbInput.value = ""; renderNbResults(""); }
   if (app.mode === "quiz" && app.quizType === "neighbour" && !app.quizAnswered) {
-    quizFeedbackEl.textContent = app.nbMode === "map"
-      ? "Click every country that borders it on the map, then Check."
-      : "Search and add every country that borders it, then Check.";
+    quizFeedbackEl.textContent = "Click every bordering country on the map, or search to add them, then Check.";
   }
 }
 
@@ -619,16 +610,12 @@ export function applyNbMode(): void {
 //     (peak / city): answer by clicking the map or by searching a country by
 //     name. The two are mutually exclusive. ---
 const locBox = document.getElementById("loc-box") as HTMLElement;
-const locModeEl = document.getElementById("loc-mode") as HTMLElement;
 export const locInput = document.getElementById("loc-input") as HTMLInputElement;
 const locResults = document.getElementById("loc-results")!;
 
-// Set the locate mode and tick the matching radio.
-function setLocMode(mode: "map" | "search"): void {
-  app.locMode = mode;
-  const radio = document.querySelector<HTMLInputElement>('#loc-mode input[value="' + mode + '"]');
-  if (radio) radio.checked = true;
-}
+// "search" shows the country search box; "map" hides it (By name only). Map
+// clicks answer regardless — there is no longer a mode toggle.
+function setLocMode(mode: "map" | "search"): void { app.locMode = mode; }
 // "Which country is X?" — the peak/city country-answer rounds reuse the locate
 // box, but with NO mode toggle: the search box and map-clicking are both live at
 // once (the feature itself is left unmarked so it can't give the answer away).
@@ -646,7 +633,6 @@ function setupCountryAnswerBox(): void {
   nameBox.hidden = true;
   quizLayer.clearLayers();
   setupLocateBox();
-  locModeEl.hidden = true;   // no toggle — search + map-click are both active
   setLocMode("search");      // show the search input (map-clicks route regardless)
   map.setView([20, 0], 2);   // neutral world view
   applyLocMode();
@@ -656,7 +642,9 @@ export function applyLocMode(): void {
   if (app.locMode === "map") { locInput.value = ""; renderLocResults(""); }
   if (app.mode !== "quiz" || app.quizAnswered) return;
   if (isLocateQuiz()) {
-    quizFeedbackEl.textContent = app.locMode === "map" ? "Click it on the map." : "Find and select the country.";
+    quizFeedbackEl.textContent = app.quizType === "name"
+      ? "Click it on the map."
+      : "Click it on the map, or search and select it.";
   } else if (isCountryAnswerQuiz()) {
     // Both answer paths are open at once, so the hint mentions both.
     quizFeedbackEl.textContent = "In which country is " + countryAnswerSubject() + "? Select it, or click it on the map.";

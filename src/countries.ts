@@ -401,7 +401,7 @@ export function loadBorders(): void {
               if (app.quizType === "continent") {
                 if (!entry.isLandmass) answerContinent(entry.continent || "Other");
               } else if (app.quizType === "neighbour") {
-                if (app.nbMode === "map" && !entry.isLandmass && entry !== app.quizTarget) toggleNbPick(entry);
+                if (!entry.isLandmass && entry !== app.quizTarget) toggleNbPick(entry);
               } else if (app.quizType === "peakcountry") {
                 if (!entry.isLandmass) handlePeakCountryGuess(entry);
               } else if (app.quizType === "citycountry") {
@@ -409,8 +409,8 @@ export function loadBorders(): void {
               } else if (app.quizType === "rivercountry" || app.quizType === "lakecountry") {
                 if (!entry.isLandmass) handleWaterCountryGuess(entry);
               } else if (app.quizType === "peakname" || app.quizType === "cityname") { /* answered via the search list */
-              } else {
-                if (app.locMode === "map") handleGuess(entry);
+              } else if (app.quizType !== "spot") {
+                handleGuess(entry); // name/flag/capital — clicking the map always answers
               }
               return;
             }

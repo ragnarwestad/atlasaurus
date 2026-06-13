@@ -274,10 +274,6 @@
       <div id="quiz-ui">
         <div id="quiz-prompt"></div>
         <div id="loc-box" hidden>
-          <div id="loc-mode">
-            <label><input type="radio" name="locmode" value="map" checked /> Click on map</label>
-            <label><input type="radio" name="locmode" value="search" /> Select country</label>
-          </div>
           <input id="loc-input" type="search" aria-label="Type the country" placeholder="Type the country…" autocomplete="off" />
           <ul id="loc-results"></ul>
         </div>
@@ -287,10 +283,6 @@
         </div>
         <div id="quiz-choices" hidden></div>
         <div id="nb-box" hidden>
-          <div id="nb-mode">
-            <label><input type="radio" name="nbmode" value="map" checked /> Click on map</label>
-            <label><input type="radio" name="nbmode" value="search" /> Select countries</label>
-          </div>
           <input id="nb-input" type="search" aria-label="Add a bordering country" placeholder="Add a bordering country…" autocomplete="off" />
           <ul id="nb-results"></ul>
           <div id="nb-chips"></div>
@@ -375,14 +367,13 @@
       <p>Inside <b>Countries</b>, pick a mode:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.
-            <b>By flag / By capital</b> — answer by <b>Click on map</b> or
-            <b>Select country</b> (search by name).</li>
+            <b>By flag / By capital</b> — click the country on the map, or search and
+            select it by name.</li>
         <li><b>Spot it</b> — the reverse: a random country is highlighted and pinned on the
             map; type its name to identify it.</li>
-        <li><b>Neighbour</b> — find <i>all</i> countries that border the target. Choose how
-            to answer: <b>Click on map</b> or <b>Select countries</b> (search by name),
-            then <b>Check</b>. Found neighbours show green, missed ones and wrong picks are
-            marked too.</li>
+        <li><b>Neighbour</b> — find <i>all</i> countries that border the target: click them
+            on the map, or search to add them, then <b>Check</b>. Found neighbours show
+            green, missed ones and wrong picks are marked too.</li>
         <li><b>Cities</b> — <b>Name it</b>: a city is marked on the map; search and pick its
             name. <b>Which country</b>: the city is named (not marked); click the country
             it's in or search and select it.</li>

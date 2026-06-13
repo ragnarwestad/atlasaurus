@@ -66,7 +66,7 @@ test("Mountains 'Which country' has search + map-click both live, no mode toggle
   await page.click('#mtn-type .qt-btn[data-qtype="peakcountry"]');
   await expect(page.locator("#quiz-sec-mountains #loc-box")).toBeVisible();
   await expect(page.locator("#quiz-sec-mountains #loc-input")).toBeVisible(); // country search always available
-  await expect(page.locator("#quiz-sec-mountains #loc-mode")).toBeHidden();   // no Click-on-map / Select toggle
+  await expect(page.locator("#quiz-sec-mountains #loc-mode")).toHaveCount(0);  // the Click/Select toggle is gone
   await expect(page.locator("#quiz-sec-mountains #name-box")).toBeHidden();
 });
 
@@ -111,7 +111,7 @@ test("Lakes and Rivers have Name it / Which country, switching answer widget", a
     // Which country: country search + map-click (loc-box), name box hidden.
     await page.click(`#${mode}-type .qt-btn[data-qtype="${mode}country"]`);
     await expect(page.locator(`#quiz-sec-${id} #loc-box`)).toBeVisible();
-    await expect(page.locator(`#quiz-sec-${id} #loc-mode`)).toBeHidden();
+    await expect(page.locator(`#quiz-sec-${id} #loc-mode`)).toHaveCount(0);
     await expect(page.locator(`#quiz-sec-${id} #name-box`)).toBeHidden();
   }
 });

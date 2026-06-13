@@ -17,7 +17,7 @@ import {
   setActiveTab, markActiveContinent, initSidebarSections, buildFeatureLists, setSectionEnabled,
 } from "./sidebar";
 import {
-  setMode, nextQuestion, openQuizSection, applyNbMode, applyLocMode, renderNbResults,
+  setMode, nextQuestion, openQuizSection, renderNbResults,
   renderLocResults, renderNameResults, nbCheckAnswers, nbInput, nbCheck, locInput, nameInput,
   quizNextBtn, quizSkipBtn, quizResetBtn, resetScores,
 } from "./quiz";
@@ -78,24 +78,8 @@ quizSkipBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuest
 quizResetBtn.addEventListener("click", resetScores);
 nbInput.addEventListener("input", () => renderNbResults(nbInput.value));
 nbCheck.addEventListener("click", nbCheckAnswers);
-document.querySelectorAll<HTMLInputElement>('#nb-mode input[name="nbmode"]').forEach((r) => {
-  r.addEventListener("change", () => {
-    if (!r.checked) return;
-    app.nbMode = r.value === "search" ? "search" : "map";
-    applyNbMode();
-    if (app.nbMode === "search") nbInput.focus();
-  });
-});
 locInput.addEventListener("input", () => renderLocResults(locInput.value));
 nameInput.addEventListener("input", () => renderNameResults(nameInput.value));
-document.querySelectorAll<HTMLInputElement>('#loc-mode input[name="locmode"]').forEach((r) => {
-  r.addEventListener("change", () => {
-    if (!r.checked) return;
-    app.locMode = r.value === "search" ? "search" : "map";
-    applyLocMode();
-    if (app.locMode === "search" && !app.quizAnswered) locInput.focus();
-  });
-});
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
     app.quizType = b.dataset.qtype as QuizType;

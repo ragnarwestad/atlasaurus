@@ -283,7 +283,7 @@ function handlePeakNameGuess(name: string): void {
   nameInput.disabled = true; nameResults.innerHTML = "";
   const facts = " — " + fmtInt(target.elevation) + " m, " + peakCountryNames(target) + ".";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok ? "✓ Correct! " + target.name + facts : "You selected " + name + ", the correct answer is " + target.name + facts;
+  quizFeedbackEl.textContent = ok ? "Correct! " + target.name + facts : "You selected " + name + ", the correct answer is " + target.name + facts;
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Green dot on the right peak; red dot on the one you picked + a line between.
@@ -305,7 +305,7 @@ export function handlePeakCountryGuess(entry: CountryEntry): void {
   const names = peakCountryNames(app.quizPeak);
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + app.quizPeak.name + " is in " + names + "."
+    ? "Correct! " + app.quizPeak.name + " is in " + names + "."
     : "You selected " + entry.name + ", the correct answer is " + names + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
@@ -372,7 +372,7 @@ function handleCityNameGuess(name: string): void {
   nameInput.disabled = true; nameResults.innerHTML = "";
   const where = target.adm0 ? ", " + target.adm0 : "";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok ? "✓ Correct! " + target.name + where + "." : "You selected " + name + ", the correct answer is " + target.name + where + ".";
+  quizFeedbackEl.textContent = ok ? "Correct! " + target.name + where + "." : "You selected " + name + ", the correct answer is " + target.name + where + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Green dot on the right city; red dot on the one you picked + a line between.
@@ -395,7 +395,7 @@ export function handleCityCountryGuess(entry: CountryEntry): void {
   const countryName = (where && where.name) || app.quizCity.adm0 || "another country";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + app.quizCity.name + " is in " + countryName + "."
+    ? "Correct! " + app.quizCity.name + " is in " + countryName + "."
     : "You selected " + entry.name + ", the correct answer is " + countryName + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
@@ -519,7 +519,7 @@ function handleWaterNameGuess(name: string): void {
   if (ok) app.quizCorrect++;
   nameInput.disabled = true; nameResults.innerHTML = "";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok ? "✓ Correct! " + target.name + "." : "You selected " + name + ", the correct answer is " + target.name + ".";
+  quizFeedbackEl.textContent = ok ? "Correct! " + target.name + "." : "You selected " + name + ", the correct answer is " + target.name + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Right feature green, the one you picked red, with a line between.
@@ -542,7 +542,7 @@ export function handleWaterCountryGuess(entry: CountryEntry): void {
   const verb = app.quizType === "rivercountry" ? "runs through" : "lies in";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + quizWaterTarget.name + " " + verb + " " + names + "."
+    ? "Correct! " + quizWaterTarget.name + " " + verb + " " + names + "."
     : "You selected " + entry.name + ", the correct answer is " + names + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
@@ -580,7 +580,7 @@ export function answerContinent(name: string): void {
   });
   quizFeedbackEl.className = ok ? "correct" : "wrong";
   quizFeedbackEl.textContent = ok
-    ? "✓ Correct! " + app.quizTarget.name + " is in " + correct + "."
+    ? "Correct! " + app.quizTarget.name + " is in " + correct + "."
     : "You selected " + name + ", the correct answer is " + correct + ".";
   renderQuizScore();
   quizNextBtn.disabled = false;
@@ -788,7 +788,7 @@ export function nbCheckAnswers(): void {
   const ok = missed.length === 0 && wrong.length === 0;
   if (ok) app.quizCorrect++;
   const total = app.quizNeighbourSet.size;
-  let msg = (ok ? "✓ " : "") + "Found " + (total - missed.length) + " of " + total +
+  let msg = "Found " + (total - missed.length) + " of " + total +
     " neighbours of " + app.quizTarget.name + ".";
   if (wrong.length) msg += " Wrong: " + wrong.map((w) => w.name).join(", ") + ".";
   if (missed.length) msg += " Missed: " + missed.map((m) => m.name).join(", ") + ".";
@@ -822,7 +822,7 @@ export function handleGuess(entry: CountryEntry): void {
   if (ok) {
     app.quizCorrect++;
     quizFeedbackEl.className = "correct";
-    quizFeedbackEl.textContent = "✓ Correct! It's " + app.quizTarget.name + ".";
+    quizFeedbackEl.textContent = "Correct! It's " + app.quizTarget.name + ".";
   } else {
     quizFeedbackEl.className = "wrong";
     quizFeedbackEl.innerHTML = "You selected " + escapeHtml(entry.name) +

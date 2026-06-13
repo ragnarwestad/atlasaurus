@@ -18,6 +18,13 @@ export const peakList: PhysFeature[] = [];
 export const riverList: PhysFeature[] = [];
 export const lakeList: PhysFeature[] = [];
 
+// Wire a clickable map feature: a click opens its detail box (suppressing the
+// background-click deselect), and clicking its permanent label does the same.
+function wireFeatureClick(layer: L.Layer, open: () => void): void {
+  layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
+  layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
+}
+
 // Load every physical dataset up front so the sidebar lists are always populated
 // (rivers/lakes are otherwise fetched lazily only when their toggle is switched on).
 export function loadPhysicalData(): void {
@@ -71,8 +78,7 @@ function buildPeakMarkers(): void {
     const m = L.marker([p.lat, p.lng], { icon: peakIcon(z), keyboard: false });
     m.bindTooltip(escapeHtml(p.name), { permanent: true, direction: "right", offset: peakLabelOffset(z), interactive: false, className: "map-label peak-label" });
     const open = () => peakOpen(p);
-    m.on("click", (e) => { L.DomEvent.stop(e); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
-    m.on("tooltipopen", (e: any) => attachLabelClick(e.tooltip, open));
+    wireFeatureClick(m, open);
     peakMarkers.push(m);
   });
 }
@@ -149,8 +155,7 @@ function loadRivers(): void {
           { permanent: true, direction: "center", interactive: false, className: "map-label river-label" });
         const km = lenByName[name]; // whole named river's mapped length
         const open = () => renderFeatureInfo(name, wikiUrl(name), "River", km > 1 ? [["Length", "≈ " + fmtInt(km) + " km (mapped course)"]] : []);
-        layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
-        layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
+        wireFeatureClick(layer, open);
         const lb = (layer as L.Polyline).getBounds();
         boundsByName[name] = boundsByName[name] ? boundsByName[name].extend(lb) : L.latLngBounds(lb.getSouthWest(), lb.getNorthEast());
         openByName[name] = open;
@@ -238,8 +243,7 @@ function loadLakes(): void {
         (layer as L.Path).bindTooltip(escapeHtml(name),
           { permanent: true, direction: "center", interactive: false, className: "map-label lake-label" });
         const open = () => renderFeatureInfo(name, wikiUrl(name), "Lake", rows);
-        layer.on("click", (ev) => { L.DomEvent.stop(ev); app.suppressMapClick = true; setTimeout(() => { app.suppressMapClick = false; }, 0); open(); });
-        layer.on("tooltipopen", (ev: any) => attachLabelClick(ev.tooltip, open));
+        wireFeatureClick(layer, open);
         const lb = (layer as L.Polygon).getBounds();
         lakeList.push({ name, wiki: wikiUrl(name), focus: () => { try { map.fitBounds(lb, { maxZoom: 7, padding: [40, 40] }); } catch {} open(); } });
       },

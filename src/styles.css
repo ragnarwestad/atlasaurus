@@ -310,6 +310,8 @@ body { display: flex; font-family: system-ui, sans-serif; }
 
 /* About / help button + modal */
 .sb-title-row { display: flex; align-items: center; justify-content: space-between; }
+.sb-heading { margin: 0; font: inherit; }
+.feat-head-row .sb-heading { width: 100%; }
 .sb-fold { display: flex; align-items: center; gap: 7px; background: none; border: none; cursor: pointer; padding: 0; }
 .sb-fold .fold-caret {
   width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent;

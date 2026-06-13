@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   app, countries, fmtInt, featureLabel, realCountries, entryForLayer, popOf, areaOf,
-  layerCenter, placeMinZoom, quizRevealsCountries, quizRevealsCities, type CountryEntry,
+  layerCenter, placeMinZoom, quizRevealsCountries, quizRevealsCities,
+  quizRevealsPeaks, quizRevealsRivers, quizRevealsLakes, type CountryEntry,
 } from "./state";
 
 // Minimal fake CountryEntry — only the properties the helpers actually read.
@@ -52,10 +53,12 @@ describe("quiz reveal predicates", () => {
     app.mode = "quiz"; app.quizType = "capital"; app.quizAnswered = false;
     expect(quizRevealsCountries()).toBe(false);
     expect(quizRevealsCities()).toBe(false);
+    expect(quizRevealsPeaks()).toBe(false);
   });
-  it("reveal all country names after a country-identifying round", () => {
+  it("reveal all country names after ANY answered round", () => {
     app.mode = "quiz"; app.quizAnswered = true;
-    for (const t of ["name", "flag", "capital", "spot", "neighbour", "peakcountry", "citycountry", "rivercountry", "lakecountry"] as const) {
+    for (const t of ["name", "flag", "capital", "spot", "neighbour", "continent",
+      "peakname", "peakcountry", "cityname", "citycountry", "rivername", "rivercountry", "lakename", "lakecountry"] as const) {
       app.quizType = t;
       expect(quizRevealsCountries()).toBe(true);
     }
@@ -66,12 +69,16 @@ describe("quiz reveal predicates", () => {
     app.quizType = "citycountry"; expect(quizRevealsCities()).toBe(true);
     app.quizType = "capital"; expect(quizRevealsCities()).toBe(false);
   });
-  it("do not reveal for the feature Name-it rounds or the continent round", () => {
+  it("reveal each feature's names only after its own Name-it round", () => {
     app.mode = "quiz"; app.quizAnswered = true;
-    for (const t of ["peakname", "rivername", "lakename", "continent"] as const) {
-      app.quizType = t;
-      expect(quizRevealsCountries()).toBe(false);
-    }
+    app.quizType = "peakname"; expect(quizRevealsPeaks()).toBe(true);
+    expect(quizRevealsRivers()).toBe(false);
+    expect(quizRevealsLakes()).toBe(false);
+    app.quizType = "rivername"; expect(quizRevealsRivers()).toBe(true);
+    expect(quizRevealsPeaks()).toBe(false);
+    app.quizType = "lakename"; expect(quizRevealsLakes()).toBe(true);
+    // The "which country" feature rounds don't reveal the feature's own names.
+    app.quizType = "peakcountry"; expect(quizRevealsPeaks()).toBe(false);
   });
   it("never reveal outside Quiz mode", () => {
     app.quizAnswered = true; app.quizType = "capital";

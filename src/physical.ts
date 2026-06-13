@@ -6,7 +6,7 @@ import { allPolygonParts, lineLengthKm } from "./geo";
 import { wikiUrl, escapeHtml } from "./wiki";
 import { PEAKS, type Peak } from "./peaks";
 import { map, peakLayer, riverLayer, lakeLayer, featureCanvas } from "./map";
-import { app, hooks, byIso, fmtInt, fetchJson, featureLabel } from "./state";
+import { app, hooks, byIso, fmtInt, fetchJson, featureLabel, quizRevealsPeaks, quizRevealsRivers, quizRevealsLakes } from "./state";
 import { renderFeatureInfo, attachLabelClick } from "./panel";
 import { updatePhysLabels } from "./labels";
 
@@ -98,16 +98,19 @@ function peakMinZoom(elev: number): number {
 }
 export function refreshPeaks(): void {
   // Practice (guess) always shows the icons; Explore (browse) only when the
-  // toggle is on; Quiz hides them (the quiz draws its own markers).
-  const on = app.mode === "practice" || (app.mode === "explore" && app.showPeaks);
+  // toggle is on; Quiz hides them — except after the "Name it" peak round, when
+  // we reveal all real peak names so the user can orient (the round's own marker
+  // already labels the target/wrong peak, so those are skipped below).
+  const reveal = quizRevealsPeaks();
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showPeaks) || reveal;
   if (on) buildPeakMarkers();
   const z = map.getZoom();
   peakMarkers.forEach((m) => {
     const p = (m as any).peak;
-    const show = on && z >= peakMinZoom(p.elevation);
+    const show = on && z >= peakMinZoom(p.elevation) && !(reveal && app.quizDotFeatures.has(p.name));
     if (show && !peakLayer.hasLayer(m)) peakLayer.addLayer(m);
     else if (!show && peakLayer.hasLayer(m)) peakLayer.removeLayer(m);
-    if (show) m.setTooltipContent(escapeHtml(featureLabel("Mountain", p.name, peakRevealed(p.name))));
+    if (show) m.setTooltipContent(escapeHtml(featureLabel("Mountain", p.name, reveal || peakRevealed(p.name))));
   });
   updatePhysLabels();
 }
@@ -196,12 +199,13 @@ function loadRivers(): Promise<void> {
 // AND the zoom has reached its threshold. (Direct membership, no nested group, so
 // the result is the same whether triggered by the toggle or by zooming.)
 function updateRiverVisibility(): void {
-  const on = app.mode === "practice" || (app.mode === "explore" && app.showRivers);
+  const reveal = quizRevealsRivers(); // after "Name it", reveal all real river names
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showRivers) || reveal;
   const z = map.getZoom();
   riverEntries.forEach((e) => {
-    const show = on && z >= e.mz;
+    const show = on && z >= e.mz && !(reveal && app.quizDotFeatures.has(e.name));
     if (show) {
-      e.layer.setTooltipContent(escapeHtml(featureLabel("River", e.name, riverRevealed(e.name))));
+      e.layer.setTooltipContent(escapeHtml(featureLabel("River", e.name, reveal || riverRevealed(e.name))));
       if (!riverLayer.hasLayer(e.layer)) riverLayer.addLayer(e.layer);
     } else if (riverLayer.hasLayer(e.layer)) {
       riverLayer.removeLayer(e.layer);
@@ -284,12 +288,13 @@ function loadLakes(): Promise<void> {
 // Manage each lake directly in lakeLayer: show only when the toggle is on AND the
 // zoom has reached its area threshold (direct membership, no nested group).
 function updateLakeVisibility(): void {
-  const on = app.mode === "practice" || (app.mode === "explore" && app.showLakes);
+  const reveal = quizRevealsLakes(); // after "Name it", reveal all real lake names
+  const on = app.mode === "practice" || (app.mode === "explore" && app.showLakes) || reveal;
   const z = map.getZoom();
   lakeEntries.forEach((e) => {
-    const show = on && z >= e.mz;
+    const show = on && z >= e.mz && !(reveal && app.quizDotFeatures.has(e.name));
     if (show) {
-      e.layer.setTooltipContent(escapeHtml(featureLabel("Lake", e.name, lakeRevealed(e.name)))); // no-op on the unlabeled polygons
+      e.layer.setTooltipContent(escapeHtml(featureLabel("Lake", e.name, reveal || lakeRevealed(e.name)))); // no-op on the unlabeled polygons
       if (!lakeLayer.hasLayer(e.layer)) lakeLayer.addLayer(e.layer);
     } else if (lakeLayer.hasLayer(e.layer)) {
       lakeLayer.removeLayer(e.layer);

@@ -84,9 +84,10 @@ export const app = {
   quizContCorrect: null as string | null, // continent quiz: correct continent (green)
   quizContWrong: null as string | null,   // continent quiz: wrongly guessed continent (red)
   // Names already carried by a reveal dot after an answer — skipped when the
-  // surrounding real names are revealed, so a country/city isn't labelled twice.
+  // surrounding real names are revealed, so a feature isn't labelled twice.
   quizDotCountries: new Set<string>(),
   quizDotCities: new Set<string>(),
+  quizDotFeatures: new Set<string>(), // peak/river/lake names marked by the round
   nbSelected: new Set<CountryEntry>(),    // neighbour quiz: current picks
   nbMode: "map" as "map" | "search",
   locMode: "map" as "map" | "search",
@@ -133,18 +134,24 @@ export function featureLabel(typeWord: string, name: string, revealed: boolean):
   return revealed ? name : typeWord + " ?";
 }
 
-// After answering a quiz round, the surrounding real names are revealed so the
-// user can orient in the area: all country names for the rounds where you
-// identify a country, all city names for the Cities-section rounds.
-const COUNTRY_REVEAL_TYPES: ReadonlySet<QuizType> = new Set<QuizType>([
-  "name", "flag", "capital", "spot", "neighbour",
-  "peakcountry", "citycountry", "rivercountry", "lakecountry",
-]);
+// After answering ANY quiz round, the surrounding real country names are revealed
+// so the user can orient in the area. The feature layers reveal their own names
+// too, but only for the round that asks about them: the Cities-section rounds
+// reveal all city names, and each "Name it" round reveals that feature's names.
 export function quizRevealsCountries(): boolean {
-  return app.mode === "quiz" && app.quizAnswered && COUNTRY_REVEAL_TYPES.has(app.quizType);
+  return app.mode === "quiz" && app.quizAnswered;
 }
 export function quizRevealsCities(): boolean {
   return app.mode === "quiz" && app.quizAnswered && (app.quizType === "cityname" || app.quizType === "citycountry");
+}
+export function quizRevealsPeaks(): boolean {
+  return app.mode === "quiz" && app.quizAnswered && app.quizType === "peakname";
+}
+export function quizRevealsRivers(): boolean {
+  return app.mode === "quiz" && app.quizAnswered && app.quizType === "rivername";
+}
+export function quizRevealsLakes(): boolean {
+  return app.mode === "quiz" && app.quizAnswered && app.quizType === "lakename";
 }
 
 export function fetchJson(urls: string[]): Promise<any> {

@@ -13,7 +13,7 @@ import {
 import { hideHoverInfo } from "./panel";
 import {
   peakIcon, peakCountryNames, riverQuizPool, lakeQuizPool, riversReady, lakesReady,
-  loadRiverData, loadLakeData, type WaterQuizItem,
+  loadRiverData, loadLakeData, refreshPeaks, refreshRivers, refreshLakes, type WaterQuizItem,
 } from "./physical";
 import { cityQuizPool, cityDataReady, loadCityData, refreshCities } from "./places";
 import { refreshCountryLabels } from "./labels";
@@ -162,9 +162,14 @@ function setupLocateBox(): void {
 }
 
 export function nextQuestion(): void {
-  // A fresh question clears last answer's reveal-dot bookkeeping.
+  // A fresh question clears the previous answer's reveal: drop the dot bookkeeping
+  // and, with quizAnswered now false, re-run the reveal refreshes so they hide the
+  // names/features that were shown after the last answer.
+  app.quizAnswered = false;
   app.quizDotCountries.clear();
   app.quizDotCities.clear();
+  app.quizDotFeatures.clear();
+  revealSurroundings();
   // The neighbour quiz needs the borders dataset; load it first if necessary.
   if (app.quizType === "neighbour" && !app.countryData) {
     loadCountryData().then(() => nextQuestion()).catch(() => { /* ignore */ });
@@ -292,13 +297,16 @@ function handlePeakNameGuess(name: string): void {
   // Green dot on the right peak; red dot on the one you picked + a line between.
   quizLayer.clearLayers();
   const tll: LatLng = [target.lat, target.lng];
+  app.quizDotFeatures.add(target.name);
   markDot(tll, nameLink(target.name, wikiUrl(target.wiki || target.name)), "correct");
   const wrong = ok ? null : PEAKS.find((p) => p.name === name);
   if (wrong) {
     const wll: LatLng = [wrong.lat, wrong.lng];
+    app.quizDotFeatures.add(wrong.name);
     markDot(wll, nameLink(wrong.name, wikiUrl(wrong.wiki || wrong.name)), "wrong");
     connectDots(wll, tll);
   }
+  revealSurroundings();
 }
 export function handlePeakCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || app.quizType !== "peakcountry" || app.quizAnswered || !app.quizPeak || entry.isLandmass) return;
@@ -533,14 +541,17 @@ function handleWaterNameGuess(name: string): void {
   quizNextBtn.disabled = false;
   // Right feature green, the one you picked red, with a line between.
   quizLayer.clearLayers();
+  app.quizDotFeatures.add(target.name);
   drawWater(target, "correct", true);
   const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
   const wrong = ok ? null : pool.find((it) => it.name === name);
   if (wrong) {
+    app.quizDotFeatures.add(wrong.name);
     drawWater(wrong, "wrong", true);
     const w = wrong.bounds.getCenter(), t = target.bounds.getCenter();
     connectDots([w.lat, w.lng], [t.lat, t.lng]);
   }
+  revealSurroundings();
 }
 export function handleWaterCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || !(app.quizType === "rivercountry" || app.quizType === "lakecountry") || app.quizAnswered || !quizWaterTarget || entry.isLandmass) return;
@@ -602,6 +613,7 @@ export function answerContinent(name: string): void {
   quizLayer.clearLayers();
   const c = layerCenter(app.quizTarget);
   if (c) addQuizDot(app.quizTarget, c, "correct");
+  revealSurroundings();
 }
 
 // --- Neighbour quiz: pick all bordering countries (search box + map clicks),
@@ -889,6 +901,9 @@ function addQuizDot(entry: CountryEntry, latlng: LatLng, kind: DotKind): void {
 function revealSurroundings(): void {
   refreshCountryLabels();
   refreshCities();
+  refreshPeaks();
+  refreshRivers();
+  refreshLakes();
 }
 // Shared "country answer" reveal (used by By-name and every "which country"
 // round): a green dot on each correct country, a red dot on the wrong pick, and a

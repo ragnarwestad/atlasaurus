@@ -20,15 +20,15 @@ test("the ? button opens and closes the help modal", async ({ page }) => {
 
 test("Map-options toggles persist across a reload", async ({ page }) => {
   await page.goto("/");
-  await page.waitForSelector("#show-capitals");
-  await page.check("#show-capitals");
+  await page.waitForSelector("#show-mountains");
+  await page.check("#show-mountains");
   await page.check("#show-flags");
   await page.reload();
-  await page.waitForSelector("#show-capitals");
-  await expect(page.locator("#show-capitals")).toBeChecked();
+  await page.waitForSelector("#show-flags");
+  await expect(page.locator("#show-mountains")).toBeChecked();
   await expect(page.locator("#show-flags")).toBeChecked();
   await expect(page.locator("#show-cities")).not.toBeChecked(); // untouched stays off
   // Clean up so the persisted state doesn't leak into other tests.
-  await page.uncheck("#show-capitals");
+  await page.uncheck("#show-mountains");
   await page.uncheck("#show-flags");
 });

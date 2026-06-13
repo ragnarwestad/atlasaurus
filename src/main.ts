@@ -48,8 +48,8 @@ hooks.rebuildFeatureLists = buildFeatureLists; // physical.ts repopulates the li
 // Map a toggle id (with a "" or "pr-" prefix) to the app flag it drives. Used to
 // mirror the active panel's checkboxes into the shared render flags on mode entry
 // (Explore and Practice keep separate checkbox sets, hence separate state).
-const TOGGLE_MAP: [string, "showNames" | "showCities" | "showCapitals" | "showFlags" | "showLakes" | "showPeaks" | "showRivers" | "showHover"][] = [
-  ["show-names", "showNames"], ["show-cities", "showCities"], ["show-capitals", "showCapitals"],
+const TOGGLE_MAP: [string, "showNames" | "showCities" | "showFlags" | "showLakes" | "showPeaks" | "showRivers" | "showHover"][] = [
+  ["show-names", "showNames"], ["show-cities", "showCities"],
   ["show-flags", "showFlags"], ["show-lakes", "showLakes"], ["show-mountains", "showPeaks"],
   ["show-rivers", "showRivers"], ["show-hover", "showHover"],
 ];
@@ -108,9 +108,6 @@ document.querySelectorAll<HTMLElement>("[data-quiz-sec]").forEach((b) => {
   b.addEventListener("click", () => openQuizSection(b.dataset.quizSec!));
 });
 
-const capToggle = document.getElementById("show-capitals") as HTMLInputElement;
-capToggle.addEventListener("change", () => { app.showCapitals = capToggle.checked; refreshCapitals(); });
-
 const flagToggle = document.getElementById("show-flags") as HTMLInputElement;
 flagToggle.addEventListener("change", () => { app.showFlags = flagToggle.checked; refreshFlags(); });
 
@@ -137,10 +134,9 @@ regionToggle.addEventListener("change", () => { setSectionEnabled("regions", reg
 
 // Practice (guess) reveal toggles — its own checkbox set, separate from Explore's.
 // No feature lists here, so (unlike Explore) they don't call setSectionEnabled.
-const PRACTICE_TOGGLES: [string, "showNames" | "showCities" | "showCapitals" | "showFlags" | "showLakes" | "showPeaks" | "showRivers" | "showHover", () => void][] = [
+const PRACTICE_TOGGLES: [string, "showNames" | "showCities" | "showFlags" | "showLakes" | "showPeaks" | "showRivers" | "showHover", () => void][] = [
   ["pr-show-names", "showNames", refreshCountryLabels],
   ["pr-show-cities", "showCities", refreshCities],
-  ["pr-show-capitals", "showCapitals", refreshCapitals],
   ["pr-show-flags", "showFlags", refreshFlags],
   ["pr-show-lakes", "showLakes", refreshLakes],
   ["pr-show-mountains", "showPeaks", refreshPeaks],
@@ -250,11 +246,11 @@ map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(
 // ---------------------------------------------------------------------------
 const EXPLORE_TOGGLE_IDS = [
   "show-names", "show-cities", "show-regions", "show-lakes", "show-mountains",
-  "show-rivers", "show-capitals", "show-flags", "show-hover",
+  "show-rivers", "show-flags", "show-hover",
 ];
 const PRACTICE_TOGGLE_IDS = [
   "pr-show-names", "pr-show-cities", "pr-show-lakes", "pr-show-mountains",
-  "pr-show-rivers", "pr-show-capitals", "pr-show-flags", "pr-show-hover",
+  "pr-show-rivers", "pr-show-flags", "pr-show-hover",
 ];
 const EXPLORE_KEY = "atlasaurus.toggles", PRACTICE_KEY = "atlasaurus.toggles.practice";
 function saveSet(key: string, ids: string[]): void {

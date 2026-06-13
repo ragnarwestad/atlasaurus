@@ -48,9 +48,6 @@
           </div>
           <hr class="toggle-sep" />
           <div class="toggle-grid">
-            <label id="cap-toggle">
-              <input type="checkbox" id="show-capitals" /> Capitals
-            </label>
             <label id="flag-toggle">
               <input type="checkbox" id="show-flags" /> Flags
             </label>
@@ -178,7 +175,6 @@
             </div>
             <hr class="toggle-sep" />
             <div class="toggle-grid">
-              <label><input type="checkbox" id="pr-show-capitals" /> Capitals</label>
               <label><input type="checkbox" id="pr-show-flags" /> Flags</label>
               <label id="pr-hover-toggle"><input type="checkbox" id="pr-show-hover" /> Hover info</label>
             </div>
@@ -341,9 +337,10 @@
       <ul>
         <li><b>Map options</b> — switch a feature on to show it on the map with its real
             names: <b>Countries</b>, <b>Cities</b>, <b>Mountains</b>, <b>Rivers</b>,
-            <b>Lakes</b>. <b>Regions</b> tints the map by grouping. <b>Capitals</b>,
-            <b>Flags</b> and <b>Hover info</b> overlay the map. Bigger cities and the
-            major rivers, lakes and peaks come first, with more as you zoom in.</li>
+            <b>Lakes</b> (capital cities show with a red ring among the Cities).
+            <b>Regions</b> tints the map by grouping; <b>Flags</b> and <b>Hover info</b>
+            overlay the map. Bigger cities and the major rivers, lakes and peaks come
+            first, with more as you zoom in.</li>
         <li><b>Feature lists</b> — switching a feature on enables its list below
             (<b>Countries</b> is always on). Every list filters by name, and clicking an
             entry zooms to it and opens its details. The country list adds <b>Sort</b>
@@ -353,7 +350,7 @@
         <li><b>Select</b> a country (on the map or from a list) for a fact panel
             (population, area, GDP, currency, languages…) plus dashed lines to its
             territories (Alaska, Greenland, Réunion…). Click the ocean to clear.</li>
-        <li><b>Map labels</b> are just text — click any feature (country, capital, city,
+        <li><b>Map labels</b> are just text — click any feature (country, city,
             peak, river or lake) for a detail box, with its Wikipedia link inside.</li>
         <li><b>Hover info</b> shows a flag · name · capital tooltip at the cursor.</li>
       </ul>

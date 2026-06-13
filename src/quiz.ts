@@ -825,8 +825,10 @@ export function handleGuess(entry: CountryEntry): void {
     quizFeedbackEl.textContent = "Correct! It's " + app.quizTarget.name + ".";
   } else {
     quizFeedbackEl.className = "wrong";
-    quizFeedbackEl.innerHTML = "You selected " + escapeHtml(entry.name) +
-      ', the correct answer is <a href="#" class="quiz-zoom">' + escapeHtml(app.quizTarget.name) + "</a>.";
+    // Wrapped in a single <span> so the grid sees one text cell (the badge is the
+    // other) — otherwise the link/text split into separate grid columns.
+    quizFeedbackEl.innerHTML = "<span>You selected " + escapeHtml(entry.name) +
+      ', the correct answer is <a href="#" class="quiz-zoom">' + escapeHtml(app.quizTarget.name) + "</a>.</span>";
     const z = quizFeedbackEl.querySelector(".quiz-zoom");
     if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
   }

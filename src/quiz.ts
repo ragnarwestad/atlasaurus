@@ -33,7 +33,7 @@ function renderQuizPrompt(): void {
     return;
   }
   if (app.quizType === "peakcountry") {
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">peak</span> <span>' + escapeHtml(app.quizPeak ? app.quizPeak.name : "") + "</span>";
+    quizPromptEl.innerHTML = "<span>" + escapeHtml(app.quizPeak ? app.quizPeak.name : "") + "</span>";
     return;
   }
   if (app.quizType === "cityname") {
@@ -43,7 +43,7 @@ function renderQuizPrompt(): void {
   }
   if (app.quizType === "citycountry") {
     // "Which country": show the city name; the country is the answer, so hide it.
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">city</span> <span>' + escapeHtml(app.quizCity ? app.quizCity.name : "") + "</span>";
+    quizPromptEl.innerHTML = "<span>" + escapeHtml(app.quizCity ? app.quizCity.name : "") + "</span>";
     return;
   }
   if (app.quizType === "rivername") {
@@ -56,8 +56,7 @@ function renderQuizPrompt(): void {
   }
   if (app.quizType === "rivercountry" || app.quizType === "lakecountry") {
     // "Which country": name the river/lake (the country is the answer).
-    const tag = app.quizType === "rivercountry" ? "river" : "lake";
-    quizPromptEl.innerHTML = '<span class="quiz-cap-tag">' + tag + '</span> <span>' + escapeHtml(quizWaterTarget ? quizWaterTarget.name : "") + "</span>";
+    quizPromptEl.innerHTML = "<span>" + escapeHtml(quizWaterTarget ? quizWaterTarget.name : "") + "</span>";
     return;
   }
   if (!app.quizTarget) { quizPromptEl.innerHTML = ""; return; }

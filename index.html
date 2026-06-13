@@ -67,7 +67,7 @@
           <div class="feat-body">
             <div class="filter-sort">
               <span class="search-wrap">
-                <input id="search" type="search" placeholder="Filter countries…" autocomplete="off" />
+                <input id="search" type="search" aria-label="Filter countries" placeholder="Filter countries…" autocomplete="off" />
                 <button id="search-clear" type="button" title="Clear filter" aria-label="Clear filter" hidden>×</button>
               </span>
               <label id="sort-row">Sort
@@ -89,7 +89,7 @@
             </button></h2>
           </div>
           <div class="feat-body">
-            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-cities" placeholder="Filter cities…" autocomplete="off" /></span>
+            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-cities" aria-label="Filter cities" placeholder="Filter cities…" autocomplete="off" /></span>
             <ul class="feat-list" id="feat-list-cities"></ul>
           </div>
         </section>
@@ -122,7 +122,7 @@
             </button></h2>
           </div>
           <div class="feat-body">
-            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-lakes" placeholder="Filter lakes…" autocomplete="off" /></span>
+            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-lakes" aria-label="Filter lakes" placeholder="Filter lakes…" autocomplete="off" /></span>
             <ul class="feat-list" id="feat-list-lakes"></ul>
           </div>
         </section>
@@ -134,7 +134,7 @@
             </button></h2>
           </div>
           <div class="feat-body">
-            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-mountains" placeholder="Filter mountains…" autocomplete="off" /></span>
+            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-mountains" aria-label="Filter mountains" placeholder="Filter mountains…" autocomplete="off" /></span>
             <ul class="feat-list" id="feat-list-mountains"></ul>
           </div>
         </section>
@@ -146,7 +146,7 @@
             </button></h2>
           </div>
           <div class="feat-body">
-            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-rivers" placeholder="Filter rivers…" autocomplete="off" /></span>
+            <span class="feat-search-wrap"><input type="search" class="feat-search" id="feat-search-rivers" aria-label="Filter rivers" placeholder="Filter rivers…" autocomplete="off" /></span>
             <ul class="feat-list" id="feat-list-rivers"></ul>
           </div>
         </section>
@@ -181,7 +181,7 @@
             <label><input type="radio" name="locmode" value="map" checked /> Click on map</label>
             <label><input type="radio" name="locmode" value="search" /> Select country</label>
           </div>
-          <input id="loc-input" type="search" placeholder="Type the country…" autocomplete="off" />
+          <input id="loc-input" type="search" aria-label="Type the country" placeholder="Type the country…" autocomplete="off" />
           <ul id="loc-results"></ul>
         </div>
         <div id="quiz-choices" hidden></div>
@@ -190,7 +190,7 @@
             <label><input type="radio" name="nbmode" value="map" checked /> Click on map</label>
             <label><input type="radio" name="nbmode" value="search" /> Select countries</label>
           </div>
-          <input id="nb-input" type="search" placeholder="Add a bordering country…" autocomplete="off" />
+          <input id="nb-input" type="search" aria-label="Add a bordering country" placeholder="Add a bordering country…" autocomplete="off" />
           <ul id="nb-results"></ul>
           <div id="nb-chips"></div>
           <button id="nb-check" type="button">Check answers</button>

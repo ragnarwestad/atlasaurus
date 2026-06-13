@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector("#mode-tabs .mode-tab");
   await page.click('.mode-tab[data-mode="quiz"]');
-  await page.click('.quiz-subtab[data-sub="practice"]'); // the guess map lives under Practice
+  await page.check('#quiz-subtabs input[value="practice"]'); // the guess map lives under Practice
   await page.waitForSelector(".peak-label", { state: "attached", timeout: 20_000 });
 });
 

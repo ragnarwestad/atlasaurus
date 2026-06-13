@@ -19,7 +19,7 @@ test("Quiz tab opens Challenge by default", async ({ page }) => {
   await page.click('.mode-tab[data-mode="quiz"]');
   await expect(page.locator("#quiz-panel")).toBeVisible();
   await expect(page.locator("#explore-panel")).toBeHidden();
-  await expect(page.locator('.quiz-subtab[data-sub="challenge"]')).toHaveClass(/active/);
+  await expect(page.locator('#quiz-subtabs input[value="challenge"]')).toBeChecked();
   await expect(page.locator("#challenge-panel")).toBeVisible();
   await expect(page.locator("#practice-panel")).toBeHidden();
   await expect(page.locator("#challenge-panel .quiz-sec")).toHaveCount(6); // the scored sections
@@ -27,11 +27,11 @@ test("Quiz tab opens Challenge by default", async ({ page }) => {
 
 test("switching Challenge <-> Practice swaps the sub-panel", async ({ page }) => {
   await page.click('.mode-tab[data-mode="quiz"]'); // Challenge by default
-  await page.click('.quiz-subtab[data-sub="practice"]');
+  await page.check('#quiz-subtabs input[value="practice"]');
   await expect(page.locator("#practice-panel")).toBeVisible();
   await expect(page.locator("#challenge-panel")).toBeHidden();
   await expect(page.locator("#practice-panel #pr-show-names")).toBeVisible(); // Practice's own toggles
-  await page.click('.quiz-subtab[data-sub="challenge"]');
+  await page.check('#quiz-subtabs input[value="challenge"]');
   await expect(page.locator("#challenge-panel")).toBeVisible();
   await expect(page.locator("#practice-panel")).toBeHidden();
 });

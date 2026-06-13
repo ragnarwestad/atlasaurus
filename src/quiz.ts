@@ -884,9 +884,11 @@ export function setMode(m: "explore" | "practice" | "quiz"): void {
   (document.getElementById("quiz-panel") as HTMLElement).hidden = !inQuiz;
   (document.getElementById("practice-panel") as HTMLElement).hidden = m !== "practice";
   (document.getElementById("challenge-panel") as HTMLElement).hidden = m !== "quiz";
-  document.querySelectorAll<HTMLElement>(".quiz-subtab").forEach((b) => {
-    b.classList.toggle("active", inQuiz && b.dataset.sub === (m === "quiz" ? "challenge" : "practice"));
-  });
+  if (inQuiz) {
+    const sub = m === "quiz" ? "challenge" : "practice";
+    const r = document.querySelector<HTMLInputElement>('#quiz-subtabs input[value="' + sub + '"]');
+    if (r) r.checked = true;
+  }
   hideHoverInfo();
   if (m === "quiz") {
     app.selectedLayer = null; app.selectedContinent = null; app.expandedContinent = null;

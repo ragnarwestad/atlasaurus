@@ -70,8 +70,12 @@ function enterMode(m: "explore" | "practice" | "quiz"): void {
 document.querySelectorAll<HTMLElement>(".mode-tab").forEach((b) => {
   b.addEventListener("click", () => enterMode(b.dataset.mode === "explore" ? "explore" : lastQuizSub));
 });
-document.querySelectorAll<HTMLElement>(".quiz-subtab").forEach((b) => {
-  b.addEventListener("click", () => { lastQuizSub = b.dataset.sub === "challenge" ? "quiz" : "practice"; enterMode(lastQuizSub); });
+document.querySelectorAll<HTMLInputElement>('#quiz-subtabs input[name="quizsub"]').forEach((r) => {
+  r.addEventListener("change", () => {
+    if (!r.checked) return;
+    lastQuizSub = r.value === "practice" ? "practice" : "quiz";
+    enterMode(lastQuizSub);
+  });
 });
 quizNextBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
 quizSkipBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });

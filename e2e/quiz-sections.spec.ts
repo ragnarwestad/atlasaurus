@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector("#mode-tabs .mode-tab");
   await page.click('.mode-tab[data-mode="quiz"]');
-  await page.click('.quiz-subtab[data-sub="challenge"]'); // scored rounds live under Challenge
+  await page.check('#quiz-subtabs input[value="challenge"]'); // scored rounds live under Challenge
   await expect(page.locator("#challenge-panel")).toBeVisible();
 });
 
@@ -87,7 +87,7 @@ test("quiz scores persist across a reload", async ({ page }) => {
   await page.reload();
   await page.waitForSelector("#mode-tabs .mode-tab");
   await page.click('.mode-tab[data-mode="quiz"]');
-  await page.click('.quiz-subtab[data-sub="challenge"]');
+  await page.check('#quiz-subtabs input[value="challenge"]');
   await page.click('[data-quiz-sec="mountains"]');
   await expect(page.locator("#quiz-score")).toHaveText(/^Mountains: \d \/ 1$/); // restored
   await page.click("#quiz-reset"); // don't leave a persisted score behind

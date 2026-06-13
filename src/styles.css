@@ -28,14 +28,11 @@ body { display: flex; font-family: system-ui, sans-serif; }
 #explore-panel, #quiz-panel { overflow-y: auto; }
 #explore-panel[hidden], #quiz-panel[hidden] { display: none; }
 
-/* Quiz sub-tabs: Practice (self-paced guess) vs Challenge (scored rounds) */
-#quiz-subtabs { display: flex; border-bottom: 1px solid #e1e7ec; }
-.quiz-subtab {
-  flex: 1; padding: 9px 8px; font: 600 12px system-ui, sans-serif; cursor: pointer;
-  background: none; border: none; color: #8a97a3; border-bottom: 2px solid transparent; margin-bottom: -1px;
-}
-.quiz-subtab:hover { color: #3878c7; }
-.quiz-subtab.active { color: #1b3a5c; border-bottom-color: #3878c7; }
+/* Quiz sub-choice: Challenge (scored) vs Practice (self-paced guess) — radios,
+   so it reads as a sub-control, not a second row of tabs. */
+#quiz-subtabs { display: flex; justify-content: center; gap: 28px; padding: 14px; border-bottom: 1px solid #e6ebf0; }
+#quiz-subtabs label { display: flex; align-items: center; gap: 6px; font: 600 13px system-ui, sans-serif; color: #5a6b7a; cursor: pointer; user-select: none; }
+#quiz-subtabs input { margin: 0; cursor: pointer; }
 #practice-panel[hidden], #challenge-panel[hidden] { display: none; }
 .practice-hint { padding: 0 14px; margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: #8a97a3; }
 

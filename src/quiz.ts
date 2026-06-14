@@ -8,7 +8,9 @@ import { PEAKS } from "./peaks";
 import { map, quizLayer, quizContLayer } from "./map";
 import {
   app, hooks, byIso, realCountries, layerCenter, fmtInt, loadCountryData,
-  type CountryEntry, type QuizType,
+  pointsFor, roundComplete, questionNumber, nearestDistractors,
+  QUIZ_FULL_POINTS, QUIZ_HELP_POINTS, QUIZ_ROUND_SIZES,
+  type CountryEntry, type QuizType, type NamedPoint,
 } from "./state";
 import { hideHoverInfo } from "./panel";
 import {
@@ -20,15 +22,31 @@ import { refreshCountryLabels } from "./labels";
 import { CONTINENT_LABEL_POS } from "./regions";
 import { refreshPolygons, countryAt } from "./countries";
 
+const quizStartEl = document.getElementById("quiz-start")!;
+const quizUiEl = document.getElementById("quiz-ui")!;
+const quizStartBestEl = document.getElementById("quiz-start-best")!;
+const quizPlayinfoEl = document.getElementById("quiz-playinfo")!;
+const quizPlayPhaseEl = document.getElementById("quiz-playphase")!;
 const quizPromptEl = document.getElementById("quiz-prompt")!;
 const quizFeedbackEl = document.getElementById("quiz-feedback")!;
 const quizScoreEl = document.getElementById("quiz-score")!;
 const quizChoicesEl = document.getElementById("quiz-choices")!;
+const quizSummaryEl = document.getElementById("quiz-summary")!;
+const qsScoreEl = quizSummaryEl.querySelector(".qs-score") as HTMLElement;
+const qsBestEl = quizSummaryEl.querySelector(".qs-best") as HTMLElement;
 export const quizNextBtn = document.getElementById("quiz-next") as HTMLButtonElement;
-export const quizSkipBtn = document.getElementById("quiz-skip") as HTMLButtonElement;
+export const quizAgainBtn = document.getElementById("quiz-again") as HTMLButtonElement;
+export const quizNewQuizBtn = document.getElementById("quiz-newquiz") as HTMLButtonElement;
+export const quizStartBtn = document.getElementById("quiz-start-btn") as HTMLButtonElement;
+export const quizQuitBtn = document.getElementById("quiz-quit") as HTMLButtonElement;
 export const quizResetBtn = document.getElementById("quiz-reset") as HTMLButtonElement;
 
+// Append the full-points reward to a pre-answer instruction, so every round shows
+// what a correct answer is worth right in the hint. Only used on the pre-answer
+// instructions — the answered/help paths set their own feedback.
+function instr(text: string): string { return text + " (" + QUIZ_FULL_POINTS + " pts)"; }
 function renderQuizPrompt(): void {
+  renderQuizScore(); // keep the "Q n/10 · pts · Best" readout in step with each question
   if (app.quizType === "peakname") {
     quizPromptEl.innerHTML = "<span>Which mountain?</span>";
     return;
@@ -84,50 +102,228 @@ function renderQuizPrompt(): void {
     quizPromptEl.innerHTML = "<span>" + escapeHtml(app.quizTarget.name) + "</span>";
   }
 }
-// Score is kept per category (the six sections). quizCorrect/quizTotal are the
-// ACTIVE category's live counters; switching section saves them into quizScores
-// and loads the new category's. Switching mode within a section keeps counting.
-type ScoreCat = "country" | "city" | "continent" | "mountains" | "lake" | "river";
+// Challenge has three phases: Start (configure category/type/length) → Playing
+// (app.roundSize questions) → Finished (summary). quizPoints/quizCorrect/quizTotal
+// are the CURRENT round's live counters; only the BEST round per (category, type,
+// round size) is persisted — different setups aren't comparable, so kept apart.
+export type ScoreCat = "country" | "city" | "continent" | "mountains" | "lake" | "river";
+type Best = { points: number; correct: number };
 const CAT_LABEL: Record<ScoreCat, string> = {
-  country: "Countries", city: "Cities", continent: "Regions", mountains: "Mountains", lake: "Lakes", river: "Rivers",
+  country: "Countries", city: "Cities", continent: "Regions", lake: "Lakes", mountains: "Mountains", river: "Rivers",
 };
-const quizScores: Record<string, { correct: number; total: number }> = {};
+const bestByCat: Record<string, Best> = {};
 let scoreCat: ScoreCat = "country";
-function setScoreCategory(cat: ScoreCat): void {
-  if (cat === scoreCat) return; // same section — keep the running counters
-  quizScores[scoreCat] = { correct: app.quizCorrect, total: app.quizTotal };
-  scoreCat = cat;
-  const s = quizScores[cat] || { correct: 0, total: 0 };
-  app.quizCorrect = s.correct; app.quizTotal = s.total;
-  renderQuizScore(); // the active category changed — refresh the readout
+let roundRecorded = false;   // has this round's result been folded into the best yet
+let roundNewBest = false;    // did this round beat the previous best
+let roundPrevBest: number | null = null; // the best before this round (for the summary)
+// A best belongs to one exact setup: category + question type + round length.
+function bestKey(): string { return scoreCat + ":" + app.quizType + ":" + app.roundSize; }
+function roundMax(): number { return app.roundSize * QUIZ_FULL_POINTS; }
+
+// Show exactly one phase block (start / playing / finished).
+function setPhase(phase: "start" | "playing" | "finished"): void {
+  quizStartEl.hidden = phase !== "start";
+  quizUiEl.hidden = phase !== "playing";
+  quizSummaryEl.hidden = phase !== "finished";
 }
-export function resetScores(): void {
-  for (const k of Object.keys(quizScores)) delete quizScores[k];
-  app.quizCorrect = 0; app.quizTotal = 0;
-  renderQuizScore();
+// Zero the live counters for a fresh round.
+function startRound(): void {
+  app.quizPoints = 0; app.quizCorrect = 0; app.quizTotal = 0;
+  app.quizAnswered = false; app.quizHelp = false;
+  roundRecorded = false; roundNewBest = false; roundPrevBest = null;
+}
+function setScoreCategory(cat: ScoreCat): void { scoreCat = cat; }
+
+// --- Start phase: pick category/type/length, then Start. ---
+// "Best for this setup" line + the (conditional) reset button.
+function updateStartBest(): void {
+  const best = bestByCat[bestKey()];
+  quizStartBestEl.textContent = best ? "Best for this setup: " + best.points + "/" + roundMax() : "No record yet";
+  quizResetBtn.hidden = !best;
+}
+// Select a category: reflect it on the buttons, swap in its type row (Regions has
+// none), set the active type, and refresh the best line.
+export function selectCategory(cat: ScoreCat): void {
+  setScoreCategory(cat);
+  document.querySelectorAll<HTMLElement>("#quiz-cat .cat-btn").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
+  let activeType: QuizType = "continent";
+  document.querySelectorAll<HTMLElement>("#quiz-type-field .type-row").forEach((row) => {
+    const show = row.dataset.cat === cat;
+    row.hidden = !show;
+    if (show) activeType = (row.querySelector<HTMLElement>(".qt-btn.active")?.dataset.qtype as QuizType) || activeType;
+  });
+  const note = document.querySelector<HTMLElement>("#quiz-type-field .type-none");
+  if (note) note.hidden = cat !== "continent";
+  app.quizType = cat === "continent" ? "continent" : activeType;
+  updateStartBest();
+}
+// Select a question type within the open category's row.
+export function selectType(qtype: QuizType): void {
+  app.quizType = qtype;
+  updateStartBest();
+}
+// Reset only THIS setup's best (category + type + length).
+export function resetScore(): void {
+  delete bestByCat[bestKey()];
+  saveBest();
+  updateStartBest();
+}
+// Return to the Start screen (also used by Quit and New quiz). Clears reveals.
+export function showStart(): void {
+  setPhase("start");
+  app.quizAnswered = false;
+  quizLayer.clearLayers(); quizContLayer.clearLayers();
+  revealSurroundings();
+  updateStartBest();
+  syncRoundSizeButtons();
+}
+export function quitQuiz(): void { showStart(); }
+
+// --- Playing phase. ---
+// Begin a quiz with the chosen setup.
+export function startQuiz(): void {
+  setPhase("playing");
+  quizPlayinfoEl.textContent = playSetupLabel();
+  startRound();
+  nextQuestion();
+}
+// "Countries · By flag" — the active category + type, shown in the play header.
+function playSetupLabel(): string {
+  if (app.quizType === "continent") return CAT_LABEL[scoreCat];
+  const row = document.querySelector<HTMLElement>('#quiz-type-field .type-row:not([hidden])');
+  const label = row?.querySelector<HTMLElement>(".qt-btn.active")?.textContent || "";
+  return CAT_LABEL[scoreCat] + (label ? " · " + label : "");
 }
 function renderQuizScore(): void {
-  quizScoreEl.textContent = app.quizTotal ? CAT_LABEL[scoreCat] + ": " + app.quizCorrect + " / " + app.quizTotal : "";
-  saveScores();
+  const qn = questionNumber(app.quizTotal, app.quizAnswered, app.roundSize);
+  quizPlayPhaseEl.textContent = "Playing — Q " + qn + "/" + app.roundSize;
+  const best = bestByCat[bestKey()];
+  quizScoreEl.textContent = app.quizPoints + " pts" + (best ? " · Best: " + best.points : "");
 }
-// Persist scores across reloads (localStorage). The active category's running
-// counters live in quizCorrect/quizTotal, so merge them into the saved map.
-const SCORES_KEY = "atlasaurus.scores";
-function saveScores(): void {
-  const all = { ...quizScores, [scoreCat]: { correct: app.quizCorrect, total: app.quizTotal } };
-  try { localStorage.setItem(SCORES_KEY, JSON.stringify(all)); } catch { /* storage unavailable */ }
+// Tally one answered question into the round counters and return the points won
+// (5 normally, 2 if the "show options" help was used, 0 if wrong).
+function scoreAnswer(ok: boolean): number {
+  app.quizTotal++;
+  if (ok) app.quizCorrect++;
+  const pts = pointsFor(ok, app.quizHelp);
+  app.quizPoints += pts;
+  return pts;
 }
-function restoreScores(): void {
-  let saved: Record<string, { correct: number; total: number }> = {};
-  try { saved = JSON.parse(localStorage.getItem(SCORES_KEY) || "{}"); } catch { return; }
+
+// --- Finished phase: fold the round into the best (once), then show the summary. ---
+function showSummary(): void {
+  const key = bestKey();
+  if (!roundRecorded) {
+    const prev = bestByCat[key];
+    roundPrevBest = prev ? prev.points : null;
+    roundNewBest = roundPrevBest === null || app.quizPoints > roundPrevBest;
+    if (roundNewBest) { bestByCat[key] = { points: app.quizPoints, correct: app.quizCorrect }; saveBest(); }
+    roundRecorded = true;
+  }
+  setPhase("finished");
+  qsScoreEl.textContent = app.quizPoints + " / " + roundMax() + " pts · " + app.quizCorrect + " / " + app.roundSize + " correct";
+  qsBestEl.textContent = roundNewBest
+    ? (roundPrevBest === null ? "★ New best!" : "★ New best! (prev " + roundPrevBest + ")")
+    : "Best: " + (bestByCat[key] ? bestByCat[key].points : app.quizPoints);
+}
+// Same setup, fresh round.
+export function playAgain(): void {
+  setPhase("playing");
+  startRound();
+  nextQuestion();
+}
+function pointsNote(pts: number): string { return " (+" + pts + " pts)"; }
+// Retire the help button and, if the 5-option help was showing, colour and lock
+// its buttons: every correct option green, the wrong pick (if any) red. Shared by
+// the "Name it" and "Which country" rounds (a no-op when no choices are up).
+function finishChoices(correctNames: string[], pickedName: string): void {
+  quizHelpBtn.hidden = true;
+  if (quizChoicesEl.hidden) return;
+  const correct = new Set(correctNames);
+  quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+    btn.disabled = true;
+    const t = btn.textContent || "";
+    if (correct.has(t)) btn.classList.add("correct");
+    else if (t === pickedName) btn.classList.add("wrong");
+  });
+}
+// Close-out for "Name it": lock the search box, then settle the choice buttons.
+function endNameAnswer(correctName: string, pickedName: string): void {
+  nameInput.disabled = true; nameResults.innerHTML = "";
+  finishChoices([correctName], pickedName);
+}
+// Close-out for "Which country": lock the country search box, then settle the
+// choice buttons (every correct country green, the wrong pick red).
+function endCountryAnswer(correct: CountryEntry[], picked: CountryEntry): void {
+  locInput.disabled = true; locResults.innerHTML = "";
+  finishChoices(correct.map((c) => c.name), picked.name);
+}
+// Build a 5-option shuffled list: the correct answer plus four sampled from the
+// supplied (already nearest-ranked) distractor names.
+function buildOptions(correctName: string, distractors: string[]): string[] {
+  const picks: string[] = [];
+  const bag = distractors.slice();
+  while (picks.length < 4 && bag.length) picks.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
+  const options = picks.concat(correctName);
+  for (let i = options.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [options[i], options[j]] = [options[j], options[i]];
+  }
+  return options;
+}
+// Render choice buttons into #quiz-choices and commit to the reduced reward: the
+// search boxes give way to the options, each wired to answer the round.
+function renderChoices(options: { label: string; pick: () => void }[]): void {
+  app.quizHelp = true;
+  nameBox.hidden = true; locBox.hidden = true; quizHelpBtn.hidden = true;
+  quizChoicesEl.innerHTML = "";
+  options.forEach((o) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = o.label;
+    btn.addEventListener("click", () => { if (!app.quizAnswered) o.pick(); });
+    quizChoicesEl.appendChild(btn);
+  });
+  quizChoicesEl.hidden = false;
+  quizFeedbackEl.textContent = "Pick the right one (" + QUIZ_HELP_POINTS + " pts)";
+}
+// Persist the best round per category across reloads (localStorage). The current
+// round is ephemeral — a reload starts a new round but the bests survive.
+const BEST_KEY = "atlasaurus.best";
+function saveBest(): void {
+  try { localStorage.setItem(BEST_KEY, JSON.stringify(bestByCat)); } catch { /* storage unavailable */ }
+}
+function restoreBest(): void {
+  let saved: Record<string, Partial<Best>> = {};
+  try { saved = JSON.parse(localStorage.getItem(BEST_KEY) || "{}"); } catch { return; }
   for (const k of Object.keys(saved)) {
     const s = saved[k];
-    if (s && typeof s.total === "number" && typeof s.correct === "number") quizScores[k] = { correct: s.correct, total: s.total };
+    if (s && typeof s.points === "number") bestByCat[k] = { points: s.points, correct: typeof s.correct === "number" ? s.correct : 0 };
   }
-  const cur = quizScores[scoreCat]; // seed the active category's live counters
-  if (cur) { app.quizCorrect = cur.correct; app.quizTotal = cur.total; }
 }
-restoreScores();
+restoreBest();
+// The chosen round length is a single global preference, also persisted.
+const ROUNDSIZE_KEY = "atlasaurus.roundsize";
+function restoreRoundSize(): void {
+  const n = Number(localStorage.getItem(ROUNDSIZE_KEY));
+  if (QUIZ_ROUND_SIZES.includes(n)) app.roundSize = n;
+}
+restoreRoundSize();
+// Reflect the active round length on the size buttons (called on load + on change).
+function syncRoundSizeButtons(): void {
+  document.querySelectorAll<HTMLElement>("#round-size .rs-btn").forEach((b) => {
+    b.classList.toggle("active", Number(b.dataset.size) === app.roundSize);
+  });
+}
+// Change the round length on the Start screen: persist it and refresh the best
+// line (it's locked once a quiz is underway, so no in-round restart needed).
+export function setRoundSize(n: number): void {
+  if (!QUIZ_ROUND_SIZES.includes(n) || n === app.roundSize) return;
+  app.roundSize = n;
+  try { localStorage.setItem(ROUNDSIZE_KEY, String(n)); } catch { /* storage unavailable */ }
+  syncRoundSizeButtons();
+  updateStartBest();
+}
 // Neighbouring countries (mledoze `borders`, resolved to entries we have).
 function neighbourEntries(entry: CountryEntry): CountryEntry[] {
   const codes = (app.countryData && entry.iso && app.countryData[entry.iso] && app.countryData[entry.iso].borders) || [];
@@ -162,10 +358,14 @@ function setupLocateBox(): void {
 }
 
 export function nextQuestion(): void {
+  // Round over? Show the summary instead of generating another question.
+  if (app.mode === "quiz" && roundComplete(app.quizTotal, app.roundSize)) { showSummary(); return; }
   // A fresh question clears the previous answer's reveal: drop the dot bookkeeping
   // and, with quizAnswered now false, re-run the reveal refreshes so they hide the
   // names/features that were shown after the last answer.
   app.quizAnswered = false;
+  app.quizHelp = false; // every question starts at full points until help is used
+  quizHelpBtn.hidden = true; // shown again only by the rounds that support the help
   app.quizDotCountries.clear();
   app.quizDotCities.clear();
   app.quizDotFeatures.clear();
@@ -208,7 +408,7 @@ export function nextQuestion(): void {
     nbBox.hidden = true;
     locBox.hidden = true;
     nameBox.hidden = true;
-    quizFeedbackEl.textContent = "Click any country in its continent on the map.";
+    quizFeedbackEl.textContent = instr("Click any country in its continent on the map.");
   } else if (app.quizType === "neighbour") {
     quizChoicesEl.hidden = true;
     locBox.hidden = true;
@@ -231,7 +431,7 @@ export function nextQuestion(): void {
     const c = app.quizTarget ? layerCenter(app.quizTarget) : null;
     map.setView([20, 0], 2);
     if (c) L.circleMarker(c, { radius: 9, color: "#8a3b00", weight: 3, fillColor: "#e8740c", fillOpacity: 0.9 }).addTo(quizLayer);
-    quizFeedbackEl.textContent = "Which country is highlighted? Type its name.";
+    quizFeedbackEl.textContent = instr("Which country is highlighted? Type its name.");
   } else {
     setupLocateBox();
     // No mode toggle — map-clicking always answers. The search box shows too,
@@ -239,6 +439,8 @@ export function nextQuestion(): void {
     setLocMode(app.quizType === "name" ? "map" : "search");
     applyLocMode();
   }
+  // Flag / capital / spot offer the 5-option help (By name doesn't — name's given).
+  quizHelpBtn.hidden = !helpableLocate();
   quizNextBtn.disabled = true;
   refreshPolygons();
 }
@@ -270,7 +472,7 @@ function nextPeakQuestion(): void {
     // Name it: the peak is marked; identify it by searching the name.
     locBox.hidden = true;
     setupNameBox();
-    quizFeedbackEl.textContent = "Which mountain is marked? Search and pick it.";
+    quizFeedbackEl.textContent = instr("Which mountain is marked? Search and pick it.");
     if (app.quizPeak) map.setView([app.quizPeak.lat, app.quizPeak.lng], 4);
     quizLayer.clearLayers();
     drawQuizPeak(false);
@@ -284,14 +486,14 @@ function nextPeakQuestion(): void {
 }
 function handlePeakNameGuess(name: string): void {
   if (app.mode !== "quiz" || app.quizAnswered || !app.quizPeak) return;
-  app.quizAnswered = true; app.quizTotal++;
+  app.quizAnswered = true;
   const target = app.quizPeak;
   const ok = name === target.name;
-  if (ok) app.quizCorrect++;
-  nameInput.disabled = true; nameResults.innerHTML = "";
+  const pts = scoreAnswer(ok);
+  endNameAnswer(target.name, name);
   const facts = " — " + fmtInt(target.elevation) + " m, " + peakCountryNames(target) + ".";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok ? "Correct! " + target.name + facts : "You selected " + name + ", the correct answer is " + target.name + facts;
+  quizFeedbackEl.textContent = (ok ? "Correct! " + target.name + facts : "You selected " + name + ", the correct answer is " + target.name + facts) + pointsNote(pts);
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Green dot on the right peak; red dot on the one you picked + a line between.
@@ -310,21 +512,21 @@ function handlePeakNameGuess(name: string): void {
 }
 export function handlePeakCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || app.quizType !== "peakcountry" || app.quizAnswered || !app.quizPeak || entry.isLandmass) return;
-  app.quizGuess = entry; app.quizAnswered = true; app.quizTotal++;
+  app.quizGuess = entry; app.quizAnswered = true;
   const ok = !!entry.iso && app.quizPeak.iso.includes(entry.iso);
-  if (ok) app.quizCorrect++;
+  const pts = scoreAnswer(ok);
+  const correct = app.quizPeak.iso.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
+  endCountryAnswer(correct, entry);
   const names = peakCountryNames(app.quizPeak);
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok
+  quizFeedbackEl.textContent = (ok
     ? "Correct! " + app.quizPeak.name + " is in " + names + "."
-    : "You selected " + entry.name + ", the correct answer is " + names + ".";
+    : "You selected " + entry.name + ", the correct answer is " + names + ".") + pointsNote(pts);
   renderQuizScore();
   quizNextBtn.disabled = false;
-  locInput.disabled = true; locResults.innerHTML = "";
   // Reveal: the peak (orange) + green dot(s) on its country(ies), red on the wrong pick + line.
   quizLayer.clearLayers();
   drawQuizPeak(true);
-  const correct = app.quizPeak.iso.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
   revealCountryDots(correct, ok ? null : entry);
   refreshPolygons();
   revealSurroundings();
@@ -365,7 +567,7 @@ function nextCityQuestion(): void {
     // Name it: the city is marked; identify it by searching the name.
     locBox.hidden = true;
     setupNameBox();
-    quizFeedbackEl.textContent = "Which city is marked? Search and pick it.";
+    quizFeedbackEl.textContent = instr("Which city is marked? Search and pick it.");
     if (c) map.setView([c.lat, c.lng], 5);
     quizLayer.clearLayers();
     drawQuizCity(false);
@@ -378,14 +580,14 @@ function nextCityQuestion(): void {
 }
 function handleCityNameGuess(name: string): void {
   if (app.mode !== "quiz" || app.quizAnswered || !app.quizCity) return;
-  app.quizAnswered = true; app.quizTotal++;
+  app.quizAnswered = true;
   const target = app.quizCity;
   const ok = name === target.name;
-  if (ok) app.quizCorrect++;
-  nameInput.disabled = true; nameResults.innerHTML = "";
+  const pts = scoreAnswer(ok);
+  endNameAnswer(target.name, name);
   const where = target.adm0 ? ", " + target.adm0 : "";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok ? "Correct! " + target.name + where + "." : "You selected " + name + ", the correct answer is " + target.name + where + ".";
+  quizFeedbackEl.textContent = (ok ? "Correct! " + target.name + where + "." : "You selected " + name + ", the correct answer is " + target.name + where + ".") + pointsNote(pts);
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Green dot on the right city; red dot on the one you picked + a line between.
@@ -404,18 +606,18 @@ function handleCityNameGuess(name: string): void {
 }
 export function handleCityCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || app.quizType !== "citycountry" || app.quizAnswered || !app.quizCity || entry.isLandmass) return;
-  app.quizGuess = entry; app.quizAnswered = true; app.quizTotal++;
+  app.quizGuess = entry; app.quizAnswered = true;
   const ok = !!app.quizCity.iso && entry.iso === app.quizCity.iso;
-  if (ok) app.quizCorrect++;
+  const pts = scoreAnswer(ok);
   const where = byIso[app.quizCity.iso];
+  endCountryAnswer(where ? [where] : [], entry);
   const countryName = (where && where.name) || app.quizCity.adm0 || "another country";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok
+  quizFeedbackEl.textContent = (ok
     ? "Correct! " + app.quizCity.name + " is in " + countryName + "."
-    : "You selected " + entry.name + ", the correct answer is " + countryName + ".";
+    : "You selected " + entry.name + ", the correct answer is " + countryName + ".") + pointsNote(pts);
   renderQuizScore();
   quizNextBtn.disabled = false;
-  locInput.disabled = true; locResults.innerHTML = "";
   // Reveal: the city (orange) + green dot on its country, red on the wrong pick + line.
   quizLayer.clearLayers();
   drawQuizCity(true);
@@ -521,7 +723,7 @@ function nextWaterQuestion(): void {
     applyLocMode();   // refresh the "In which country is <name>?" hint
   } else {
     quizFeedbackEl.className = "";
-    quizFeedbackEl.textContent = isRiver ? "Which river is highlighted? Search and pick it." : "Which lake is highlighted? Search and pick it.";
+    quizFeedbackEl.textContent = instr(isRiver ? "Which river is highlighted? Search and pick it." : "Which lake is highlighted? Search and pick it.");
     quizLayer.clearLayers();
     drawWater(item, "target", false);
     try { map.fitBounds(item.bounds, { maxZoom: 7, padding: [40, 40] }); } catch { /* ignore */ }
@@ -530,13 +732,13 @@ function nextWaterQuestion(): void {
 }
 function handleWaterNameGuess(name: string): void {
   if (app.mode !== "quiz" || app.quizAnswered || !quizWaterTarget) return;
-  app.quizAnswered = true; app.quizTotal++;
+  app.quizAnswered = true;
   const target = quizWaterTarget;
   const ok = name === target.name;
-  if (ok) app.quizCorrect++;
-  nameInput.disabled = true; nameResults.innerHTML = "";
+  const pts = scoreAnswer(ok);
+  endNameAnswer(target.name, name);
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok ? "Correct! " + target.name + "." : "You selected " + name + ", the correct answer is " + target.name + ".";
+  quizFeedbackEl.textContent = (ok ? "Correct! " + target.name + "." : "You selected " + name + ", the correct answer is " + target.name + ".") + pointsNote(pts);
   renderQuizScore();
   quizNextBtn.disabled = false;
   // Right feature green, the one you picked red, with a line between.
@@ -555,18 +757,18 @@ function handleWaterNameGuess(name: string): void {
 }
 export function handleWaterCountryGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || !(app.quizType === "rivercountry" || app.quizType === "lakecountry") || app.quizAnswered || !quizWaterTarget || entry.isLandmass) return;
-  app.quizGuess = entry; app.quizAnswered = true; app.quizTotal++;
+  app.quizGuess = entry; app.quizAnswered = true;
   const ok = quizWaterCountries.some((c) => c === entry || (!!c.iso && c.iso === entry.iso));
-  if (ok) app.quizCorrect++;
+  const pts = scoreAnswer(ok);
+  endCountryAnswer(quizWaterCountries, entry);
   const names = quizWaterCountries.map((c) => c.name).join(", ") || "—";
   const verb = app.quizType === "rivercountry" ? "runs through" : "lies in";
   quizFeedbackEl.className = ok ? "correct" : "wrong";
-  quizFeedbackEl.textContent = ok
+  quizFeedbackEl.textContent = (ok
     ? "Correct! " + quizWaterTarget.name + " " + verb + " " + names + "."
-    : "You selected " + entry.name + ", the correct answer is " + names + ".";
+    : "You selected " + entry.name + ", the correct answer is " + names + ".") + pointsNote(pts);
   renderQuizScore();
   quizNextBtn.disabled = false;
-  locInput.disabled = true; locResults.innerHTML = "";
   // Reveal: the water feature (orange) + green dot(s) on its country(ies), red on the wrong pick + line.
   quizLayer.clearLayers();
   drawWater(quizWaterTarget, "target", true);
@@ -589,10 +791,9 @@ function showContinentLabels(): void {
 export function answerContinent(name: string): void {
   if (app.mode !== "quiz" || app.quizType !== "continent" || !app.quizTarget || app.quizAnswered) return;
   app.quizAnswered = true;
-  app.quizTotal++;
   const correct = app.quizTarget.continent || "Other";
   const ok = name === correct;
-  if (ok) app.quizCorrect++;
+  scoreAnswer(ok);
   quizChoicesEl.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
     btn.disabled = true;
     const c = btn.dataset.continent;
@@ -628,7 +829,7 @@ export function applyNbMode(): void {
   nbBox.classList.toggle("map-mode", app.nbMode === "map");
   if (app.nbMode === "map") { nbInput.value = ""; renderNbResults(""); }
   if (app.mode === "quiz" && app.quizType === "neighbour" && !app.quizAnswered) {
-    quizFeedbackEl.textContent = "Click every bordering country on the map, or search to add them, then Check.";
+    quizFeedbackEl.textContent = instr("Click every bordering country on the map, or search to add them, then Check.");
   }
 }
 
@@ -661,6 +862,7 @@ function setupCountryAnswerBox(): void {
   setupLocateBox();
   setLocMode("search");      // show the search input (map-clicks route regardless)
   map.setView([20, 0], 2);   // neutral world view
+  quizHelpBtn.hidden = false; // "Which country" supports the 5-option help too
   applyLocMode();
 }
 export function applyLocMode(): void {
@@ -668,16 +870,22 @@ export function applyLocMode(): void {
   if (app.locMode === "map") { locInput.value = ""; renderLocResults(""); }
   if (app.mode !== "quiz" || app.quizAnswered) return;
   if (isLocateQuiz()) {
-    quizFeedbackEl.textContent = app.quizType === "name"
+    quizFeedbackEl.textContent = instr(app.quizType === "name"
       ? "Click it on the map."
-      : "Click it on the map, or search and select it.";
+      : "Click it on the map, or search and select it.");
   } else if (isCountryAnswerQuiz()) {
     // Both answer paths are open at once, so the hint mentions both.
-    quizFeedbackEl.textContent = "In which country is " + countryAnswerSubject() + "? Select it, or click it on the map.";
+    quizFeedbackEl.textContent = instr("In which country is " + countryAnswerSubject() + "? Select it, or click it on the map.");
   }
 }
 function isLocateQuiz(): boolean {
   return app.quizType === "name" || app.quizType === "flag" || app.quizType === "capital";
+}
+// The locate rounds that support the 5-option help: flag / capital / spot, where
+// the answer is a single country. "By name" is excluded — the name is given, so a
+// name-choice list would just hand over the answer.
+function helpableLocate(): boolean {
+  return app.quizType === "flag" || app.quizType === "capital" || app.quizType === "spot";
 }
 // Rank search matches so names that START with the query come before ones that
 // merely contain it, then alphabetically — typing "a" lists Afghanistan… first,
@@ -720,14 +928,108 @@ export function renderLocResults(query: string): void {
 const nameBox = document.getElementById("name-box") as HTMLElement;
 export const nameInput = document.getElementById("name-input") as HTMLInputElement;
 const nameResults = document.getElementById("name-results")!;
+const quizHelpBtn = document.getElementById("quiz-help") as HTMLButtonElement;
 // Reset + show the feature-name search box (hides the other answer widgets).
 function setupNameBox(): void {
   quizChoicesEl.hidden = true;
+  quizChoicesEl.innerHTML = "";
   nbBox.hidden = true; locBox.hidden = true;
   quizContLayer.clearLayers();
   nameInput.value = ""; nameInput.disabled = false;
   nameResults.innerHTML = "";
+  quizHelpBtn.hidden = false; // offer the 5-option help until the round is answered
   nameBox.hidden = false;
+}
+
+// --- "Show 5 options" help (Name it only): the user trades full points for a
+//     multiple-choice list. The target plus four regionally-near distractors are
+//     shown; picking one answers via the same handler with quizHelp set. ---
+// The active Name-it round as a uniform {target point, candidate pool, handler}.
+function activeNameRound(): { target: NamedPoint; pool: NamedPoint[]; pick: (name: string) => void } | null {
+  if (app.quizType === "peakname" && app.quizPeak) {
+    return {
+      target: { name: app.quizPeak.name, lat: app.quizPeak.lat, lng: app.quizPeak.lng },
+      pool: PEAKS.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng })),
+      pick: handlePeakNameGuess,
+    };
+  }
+  if (app.quizType === "cityname" && app.quizCity) {
+    return {
+      target: { name: app.quizCity.name, lat: app.quizCity.lat, lng: app.quizCity.lng },
+      pool: cityQuizPool().map((c) => ({ name: c.name, lat: c.lat, lng: c.lng })),
+      pick: handleCityNameGuess,
+    };
+  }
+  if ((app.quizType === "rivername" || app.quizType === "lakename") && quizWaterTarget) {
+    const pool = app.quizType === "rivername" ? riverQuizPool() : lakeQuizPool();
+    const c = quizWaterTarget.bounds.getCenter();
+    return {
+      target: { name: quizWaterTarget.name, lat: c.lat, lng: c.lng },
+      pool: pool.map((it) => { const m = it.bounds.getCenter(); return { name: it.name, lat: m.lat, lng: m.lng }; }),
+      pick: handleWaterNameGuess,
+    };
+  }
+  return null;
+}
+function showNameChoices(): void {
+  const round = activeNameRound();
+  if (!round || app.quizAnswered) return;
+  // Distractors drawn from the ~14 nearest features, so they're regionally
+  // plausible (the feature is marked on the map) but vary between attempts.
+  const near = nearestDistractors(round.target, round.pool, 14);
+  const options = buildOptions(round.target.name, near);
+  renderChoices(options.map((name) => ({ label: name, pick: () => round.pick(name) })));
+}
+// The active "Which country" round as {correct countries, anchor point, handler}.
+function activeCountryRound(): { correct: Set<CountryEntry>; correctName: string; anchor: NamedPoint; pick: (e: CountryEntry) => void } | null {
+  if (app.quizType === "peakcountry" && app.quizPeak) {
+    const correct = app.quizPeak.iso.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
+    if (!correct.length) return null;
+    return { correct: new Set(correct), correctName: correct[0].name, anchor: { name: "", lat: app.quizPeak.lat, lng: app.quizPeak.lng }, pick: handlePeakCountryGuess };
+  }
+  if (app.quizType === "citycountry" && app.quizCity) {
+    const c = byIso[app.quizCity.iso];
+    if (!c) return null;
+    return { correct: new Set([c]), correctName: c.name, anchor: { name: "", lat: app.quizCity.lat, lng: app.quizCity.lng }, pick: handleCityCountryGuess };
+  }
+  if ((app.quizType === "rivercountry" || app.quizType === "lakecountry") && quizWaterTarget && quizWaterCountries.length) {
+    const m = quizWaterTarget.bounds.getCenter();
+    return { correct: new Set(quizWaterCountries), correctName: quizWaterCountries[0].name, anchor: { name: "", lat: m.lat, lng: m.lng }, pick: handleWaterCountryGuess };
+  }
+  return null;
+}
+// Shared country multiple-choice: the correct country (correct[0]) plus four
+// distractor countries near `anchor`, excluding every correct country so a "near"
+// option can't accidentally be right. Picking one answers via `pick`.
+function showEntryChoices(correct: CountryEntry[], anchor: NamedPoint, pick: (e: CountryEntry) => void): void {
+  if (app.quizAnswered || !correct.length) return;
+  const correctSet = new Set(correct);
+  const pool = realCountries()
+    .filter((c) => !correctSet.has(c))
+    .map((c) => { const ll = layerCenter(c); return ll ? { name: c.name, lat: ll[0], lng: ll[1] } : null; })
+    .filter(Boolean) as NamedPoint[];
+  const near = nearestDistractors(anchor, pool, 14);
+  const options = buildOptions(correct[0].name, near);
+  const byName = (n: string) => realCountries().find((c) => c.name === n);
+  renderChoices(options.map((name) => ({ label: name, pick: () => { const e = byName(name); if (e) pick(e); } })));
+}
+function showCountryChoices(): void {
+  const round = activeCountryRound();
+  if (round) showEntryChoices([...round.correct], round.anchor, round.pick);
+}
+// The Countries-section locate rounds (flag / capital / spot): the target country
+// itself is the answer, picked via handleGuess.
+function showLocateChoices(): void {
+  if (!helpableLocate() || !app.quizTarget) return;
+  const ll = layerCenter(app.quizTarget);
+  if (!ll) return;
+  showEntryChoices([app.quizTarget], { name: app.quizTarget.name, lat: ll[0], lng: ll[1] }, handleGuess);
+}
+// Help button entry point: show the right option list for the active round.
+export function showChoices(): void {
+  if (isCountryAnswerQuiz()) showCountryChoices();
+  else if (helpableLocate()) showLocateChoices();
+  else showNameChoices();
 }
 export function renderNameResults(query: string): void {
   const q = query.trim().toLowerCase();
@@ -804,11 +1106,10 @@ export function toggleNbPick(c: CountryEntry): void {
 export function nbCheckAnswers(): void {
   if (app.mode !== "quiz" || app.quizType !== "neighbour" || !app.quizTarget || app.quizAnswered) return;
   app.quizAnswered = true;
-  app.quizTotal++;
   const missed = Array.from(app.quizNeighbourSet).filter((n) => !app.nbSelected.has(n));
   const wrong = Array.from(app.nbSelected).filter((p) => !app.quizNeighbourSet.has(p));
   const ok = missed.length === 0 && wrong.length === 0;
-  if (ok) app.quizCorrect++;
+  scoreAnswer(ok);
   const total = app.quizNeighbourSet.size;
   let msg = "Found " + (total - missed.length) + " of " + total +
     " neighbours of " + app.quizTarget.name + ".";
@@ -839,19 +1140,19 @@ export function handleGuess(entry: CountryEntry): void {
   if (app.mode !== "quiz" || !app.quizTarget || app.quizAnswered || entry.isLandmass) return;
   app.quizGuess = entry;
   app.quizAnswered = true;
-  app.quizTotal++;
   const ok = entry === app.quizTarget;
+  const pts = scoreAnswer(ok);
+  endCountryAnswer([app.quizTarget], entry); // lock search + settle any choice buttons
   quizLayer.clearLayers();
   if (ok) {
-    app.quizCorrect++;
     quizFeedbackEl.className = "correct";
-    quizFeedbackEl.textContent = "Correct! It's " + app.quizTarget.name + ".";
+    quizFeedbackEl.textContent = "Correct! It's " + app.quizTarget.name + "." + pointsNote(pts);
   } else {
     quizFeedbackEl.className = "wrong";
     // Wrapped in a single <span> so the grid sees one text cell (the badge is the
     // other) — otherwise the link/text split into separate grid columns.
     quizFeedbackEl.innerHTML = "<span>You selected " + escapeHtml(entry.name) +
-      ', the correct answer is <a href="#" class="quiz-zoom">' + escapeHtml(app.quizTarget.name) + "</a>.</span>";
+      ', the correct answer is <a href="#" class="quiz-zoom">' + escapeHtml(app.quizTarget.name) + "</a>." + pointsNote(pts) + "</span>";
     const z = quizFeedbackEl.querySelector(".quiz-zoom");
     if (z) z.addEventListener("click", (ev) => { ev.preventDefault(); zoomToTarget(8); });
   }
@@ -859,8 +1160,6 @@ export function handleGuess(entry: CountryEntry): void {
   revealCountryDots([app.quizTarget], ok ? null : entry);
   renderQuizScore();
   quizNextBtn.disabled = false;
-  locInput.disabled = true;
-  locResults.innerHTML = "";
   refreshPolygons();
   revealSurroundings();
 }
@@ -945,11 +1244,9 @@ export function setMode(m: "explore" | "practice" | "quiz"): void {
   hideHoverInfo();
   if (m === "quiz") {
     app.selectedLayer = null; app.selectedContinent = null; app.expandedContinent = null;
-    app.quizStarted = true; // per-category scores persist for the session; reset via the button
-    // Resume the open section's quiz, or open Countries the first time round.
-    const open = currentQuizSection();
-    if (open) setQuizCat(SECTION_CAT[open]); else openQuizSection("countries");
-    renderQuizScore();
+    app.quizStarted = true; // best scores persist; entering Challenge opens the Start screen
+    selectCategory(scoreCat); // sync the Start UI to the current selection
+    showStart();
   } else {
     // Explore (browse) and Practice (guess) use the feature layers, not the quiz
     // layers — clear any leftover quiz reveals.
@@ -959,64 +1256,6 @@ export function setMode(m: "explore" | "practice" | "quiz"): void {
   hooks.refreshAll();
 }
 
-// ---------------------------------------------------------------------------
-// Quiz sections (accordion): one collapsible section per feature, mirroring the
-// Explore list. Opening a section starts that quiz and relocates the shared
-// question UI (#quiz-ui) into its body. Countries/Mountains carry their own mode
-// rows (#quiz-type / #mtn-type); Regions is the continent round (no sub-modes).
-// ---------------------------------------------------------------------------
-const QUIZ_SECTIONS = ["countries", "cities", "regions", "lakes", "mountains", "rivers"];
-const SECTION_CAT: Record<string, "country" | "city" | "continent" | "mountains" | "lake" | "river"> = {
-  countries: "country", cities: "city", regions: "continent", mountains: "mountains", lakes: "lake", rivers: "river",
-};
-const quizUiEl = document.getElementById("quiz-ui") as HTMLElement;
-
-function currentQuizSection(): string | null {
-  return QUIZ_SECTIONS.find((s) => {
-    const el = document.getElementById("quiz-sec-" + s);
-    return !!el && !el.classList.contains("collapsed");
-  }) || null;
-}
-
-export function openQuizSection(id: string): void {
-  const sec = document.getElementById("quiz-sec-" + id);
-  if (!sec || sec.classList.contains("disabled")) return;
-  // Clicking the already-open section collapses it (quiz paused, reveals cleared).
-  if (!sec.classList.contains("collapsed")) {
-    sec.classList.add("collapsed");
-    quizLayer.clearLayers();
-    quizContLayer.clearLayers();
-    return;
-  }
-  // Accordion: only one section open at a time.
-  QUIZ_SECTIONS.forEach((s) => document.getElementById("quiz-sec-" + s)?.classList.add("collapsed"));
-  sec.classList.remove("collapsed");
-  sec.querySelector(".quiz-sec-body")!.appendChild(quizUiEl); // move shared UI in
-  setQuizCat(SECTION_CAT[id]);
-}
-
-// Set the active quiz type for a section's category, then ask the first question.
-// "country"/"mountains" read the active button in their mode row; "continent"
-// (Regions) has a single round.
-function setQuizCat(cat: "country" | "city" | "continent" | "mountains" | "lake" | "river"): void {
-  setScoreCategory(cat); // swap the live score counters to this section's
-  if (cat === "continent") {
-    app.quizType = "continent";
-  } else if (cat === "lake") {
-    const active = document.querySelector<HTMLElement>("#lake-type .qt-btn.active");
-    app.quizType = (active && (active.dataset.qtype as QuizType)) || "lakename";
-  } else if (cat === "river") {
-    const active = document.querySelector<HTMLElement>("#river-type .qt-btn.active");
-    app.quizType = (active && (active.dataset.qtype as QuizType)) || "rivername";
-  } else if (cat === "city") {
-    const active = document.querySelector<HTMLElement>("#city-type .qt-btn.active");
-    app.quizType = (active && (active.dataset.qtype as QuizType)) || "cityname";
-  } else if (cat === "mountains") {
-    const active = document.querySelector<HTMLElement>("#mtn-type .qt-btn.active");
-    app.quizType = (active && (active.dataset.qtype as QuizType)) || "peakname";
-  } else {
-    const active = document.querySelector<HTMLElement>("#quiz-type .qt-btn.active");
-    app.quizType = (active && (active.dataset.qtype as QuizType)) || "name";
-  }
-  if (app.mode === "quiz") nextQuestion();
-}
+// Reflect the restored round length on the size buttons (the bests follow the
+// current selection and are refreshed by updateStartBest on Start entry).
+syncRoundSizeButtons();

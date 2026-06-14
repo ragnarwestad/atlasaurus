@@ -183,95 +183,74 @@
         <p class="practice-hint">Features show as "Country ?", "City ?" … — click one to reveal its name, or switch a type on above to reveal them all.</p>
       </div>
 
-      <!-- Challenge: the scored quiz rounds. One collapsible section per feature;
-           opening a section starts that round and the shared question UI
-           (#quiz-ui) moves into its body. -->
+      <!-- Challenge: Start (configure) → Playing (questions) → Finished (summary).
+           Each phase is its own block; only one is shown at a time. -->
       <div id="challenge-panel" hidden>
-      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-countries">
-        <div class="sb-title-row feat-head-row">
-          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="countries">
-            <span class="fold-caret"></span>
-            <span class="sb-title">Countries</span>
-          </button></h2>
+
+      <!-- START: pick category, type and length, then Start. -->
+      <div id="quiz-start">
+        <div class="qz-phase-title">Set up your quiz</div>
+        <p class="qz-phase-hint">Pick a category and type, choose how many questions, then Start quiz.</p>
+        <div class="qz-field">
+          <span class="qz-label">Category</span>
+          <div id="quiz-cat">
+            <button type="button" class="cat-btn active" data-cat="country">Countries</button>
+            <button type="button" class="cat-btn" data-cat="city">Cities</button>
+            <button type="button" class="cat-btn" data-cat="continent">Regions</button>
+            <button type="button" class="cat-btn" data-cat="lake">Lakes</button>
+            <button type="button" class="cat-btn" data-cat="mountains">Mountains</button>
+            <button type="button" class="cat-btn" data-cat="river">Rivers</button>
+          </div>
         </div>
-        <div class="feat-body quiz-sec-body">
-          <div id="quiz-type">
+        <div class="qz-field" id="quiz-type-field">
+          <span class="qz-label">Type</span>
+          <div id="quiz-type" class="type-row" data-cat="country">
             <button type="button" class="qt-btn active" data-qtype="name">By name</button>
             <button type="button" class="qt-btn" data-qtype="flag">By flag</button>
             <button type="button" class="qt-btn" data-qtype="capital">By capital</button>
             <button type="button" class="qt-btn" data-qtype="spot">Spot it</button>
             <button type="button" class="qt-btn" data-qtype="neighbour">Neighbour</button>
           </div>
-        </div>
-      </section>
-      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-cities">
-        <div class="sb-title-row feat-head-row">
-          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="cities">
-            <span class="fold-caret"></span>
-            <span class="sb-title">Cities</span>
-          </button></h2>
-        </div>
-        <div class="feat-body quiz-sec-body">
-          <div id="city-type">
+          <div id="city-type" class="type-row" data-cat="city" hidden>
             <button type="button" class="qt-btn active" data-qtype="cityname">Name it</button>
             <button type="button" class="qt-btn" data-qtype="citycountry">Which country</button>
           </div>
-        </div>
-      </section>
-      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-regions">
-        <div class="sb-title-row feat-head-row">
-          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="regions">
-            <span class="fold-caret"></span>
-            <span class="sb-title">Regions</span>
-          </button></h2>
-        </div>
-        <div class="feat-body quiz-sec-body"></div>
-      </section>
-      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-lakes">
-        <div class="sb-title-row feat-head-row">
-          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="lakes">
-            <span class="fold-caret"></span>
-            <span class="sb-title">Lakes</span>
-          </button></h2>
-        </div>
-        <div class="feat-body quiz-sec-body">
-          <div id="lake-type">
+          <div id="lake-type" class="type-row" data-cat="lake" hidden>
             <button type="button" class="qt-btn active" data-qtype="lakename">Name it</button>
             <button type="button" class="qt-btn" data-qtype="lakecountry">Which country</button>
           </div>
-        </div>
-      </section>
-      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-mountains">
-        <div class="sb-title-row feat-head-row">
-          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="mountains">
-            <span class="fold-caret"></span>
-            <span class="sb-title">Mountains</span>
-          </button></h2>
-        </div>
-        <div class="feat-body quiz-sec-body">
-          <div id="mtn-type">
+          <div id="mtn-type" class="type-row" data-cat="mountains" hidden>
             <button type="button" class="qt-btn active" data-qtype="peakname">Name it</button>
             <button type="button" class="qt-btn" data-qtype="peakcountry">Which country</button>
           </div>
-        </div>
-      </section>
-      <section class="feat-sec quiz-sec collapsed" id="quiz-sec-rivers">
-        <div class="sb-title-row feat-head-row">
-          <h2 class="sb-heading"><button type="button" class="sb-fold" data-quiz-sec="rivers">
-            <span class="fold-caret"></span>
-            <span class="sb-title">Rivers</span>
-          </button></h2>
-        </div>
-        <div class="feat-body quiz-sec-body">
-          <div id="river-type">
+          <div id="river-type" class="type-row" data-cat="river" hidden>
             <button type="button" class="qt-btn active" data-qtype="rivername">Name it</button>
             <button type="button" class="qt-btn" data-qtype="rivercountry">Which country</button>
           </div>
+          <p class="type-none" hidden>One round over all regions — click the right continent on the map.</p>
         </div>
-      </section>
+        <div class="qz-field">
+          <span class="qz-label">Number of questions</span>
+          <div id="round-size">
+            <button type="button" class="rs-btn" data-size="5">5</button>
+            <button type="button" class="rs-btn active" data-size="10">10</button>
+            <button type="button" class="rs-btn" data-size="20">20</button>
+          </div>
+        </div>
+        <div id="quiz-start-foot">
+          <span id="quiz-start-best"></span>
+          <button id="quiz-reset" type="button" hidden title="Clear this setup's best score">Reset</button>
+        </div>
+        <button id="quiz-start-btn" type="button">Start quiz</button>
+      </div>
 
-      <!-- Shared question UI — relocated into whichever section is open. -->
-      <div id="quiz-ui">
+      <!-- PLAYING: the question UI. -->
+      <div id="quiz-ui" hidden>
+        <div id="quiz-playhead">
+          <span class="qz-phase-title" id="quiz-playphase">Playing</span>
+          <button id="quiz-quit" type="button">Quit</button>
+        </div>
+        <div id="quiz-playinfo"></div>
         <div id="quiz-prompt"></div>
         <div id="quiz-feedback"></div>
         <div id="loc-box" hidden>
@@ -282,6 +261,7 @@
           <input id="name-input" type="search" aria-label="Type the name" placeholder="Type the name…" autocomplete="off" />
           <ul id="name-results"></ul>
         </div>
+        <button id="quiz-help" type="button" hidden>Stuck? Show 5 options (2 pts)</button>
         <div id="quiz-choices" hidden></div>
         <div id="nb-box" hidden>
           <input id="nb-input" type="search" aria-label="Add a bordering country" placeholder="Add a bordering country…" autocomplete="off" />
@@ -290,14 +270,24 @@
           <button id="nb-check" type="button">Check answers</button>
         </div>
         <div class="quiz-actions">
-          <button id="quiz-skip" type="button">Skip</button>
           <button id="quiz-next" type="button">Next →</button>
         </div>
         <div id="quiz-score-row">
           <div id="quiz-score"></div>
-          <button id="quiz-reset" type="button" title="Reset all category scores">Reset score</button>
         </div>
       </div>
+
+      <!-- FINISHED: round summary. -->
+      <div id="quiz-summary" hidden>
+        <div class="qs-title">Round complete</div>
+        <div class="qs-score"></div>
+        <div class="qs-best"></div>
+        <div class="qs-actions">
+          <button id="quiz-again" type="button">Play again</button>
+          <button id="quiz-newquiz" type="button">New quiz</button>
+        </div>
+      </div>
+
       </div><!-- #challenge-panel -->
     </div>
   </aside>
@@ -360,11 +350,15 @@
             position and click to reveal the real name (it stays revealed). Or switch a
             type on under <b>Reveal</b> to show all of its names at once. No score.</li>
       </ul>
-      <p><b>Challenge</b> reads top to bottom as collapsible sections — one per feature
-         (<b>Countries</b>, <b>Cities</b>, <b>Regions</b>, <b>Lakes</b>, <b>Mountains</b>,
-         <b>Rivers</b>). Open a section to start its round; the score is kept per
-         category, with a <b>Reset score</b> button.</p>
-      <p>Inside <b>Countries</b>, pick a mode:</p>
+      <p><b>Challenge</b> opens a <b>Start</b> screen where you set up one quiz: pick a
+         <b>category</b> (<b>Countries</b>, <b>Cities</b>, <b>Regions</b>, <b>Lakes</b>,
+         <b>Mountains</b>, <b>Rivers</b>), a <b>type</b>, and the <b>number of questions</b>
+         (5 / 10 / 20), then <b>Start quiz</b>. Your best score for that exact setup is
+         shown there (with a <b>Reset</b>). A correct answer is worth <b>5 pts</b>, or
+         <b>2 pts</b> if you use the <b>Show 5 options</b> help. After the last question a
+         summary shows your score and best, with <b>Play again</b> (same setup) or
+         <b>New quiz</b>.</p>
+      <p>The types:</p>
       <ul>
         <li><b>By name</b> — click the named country on the map.
             <b>By flag / By capital</b> — click the country on the map, or search and
@@ -386,8 +380,8 @@
             highlighted on the map; search and pick its name. <b>Which country</b>: the
             lake/river is named; click or search a country it touches — any one counts, and
             all are listed in the answer.</li>
-        <li>Wrong answers are revealed on the map (correct green, wrong red) with flag and
-            name; use <b>Skip</b> or <b>Next →</b> to move on.</li>
+        <li>Answers are revealed on the map (correct green, wrong red) with flag and
+            name; click <b>Next →</b> for the next question, or <b>Quit</b> to return to Start.</li>
       </ul>
       </div>
 

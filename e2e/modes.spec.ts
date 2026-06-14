@@ -22,7 +22,8 @@ test("Quiz tab opens Challenge by default", async ({ page }) => {
   await expect(page.locator('#quiz-subtabs input[value="challenge"]')).toBeChecked();
   await expect(page.locator("#challenge-panel")).toBeVisible();
   await expect(page.locator("#practice-panel")).toBeHidden();
-  await expect(page.locator("#challenge-panel .quiz-sec")).toHaveCount(6); // the scored sections
+  await expect(page.locator("#challenge-panel #quiz-start")).toBeVisible(); // the Start screen
+  await expect(page.locator("#quiz-cat .cat-btn")).toHaveCount(6); // six categories to choose
 });
 
 test("switching Challenge <-> Practice swaps the sub-panel", async ({ page }) => {

@@ -81,6 +81,9 @@ export const app = {
   quizAnswered: false,
   quizCorrect: 0,
   quizTotal: 0,
+  quizPoints: 0,        // points earned in the current round (5/question, 2 with help)
+  quizHelp: false,      // "Name it": the 5-option help was used on THIS question
+  roundSize: 10,        // questions per round (player-configurable; see QUIZ_ROUND_SIZES)
   quizContCorrect: null as string | null, // continent quiz: correct continent (green)
   quizContWrong: null as string | null,   // continent quiz: wrongly guessed continent (red)
   // Names already carried by a reveal dot after an answer — skipped when the
@@ -125,6 +128,43 @@ export const territoriesBySov: Record<string, Territory[]> = {};
 // Small shared helpers
 // ---------------------------------------------------------------------------
 export function fmtInt(n: number): string { return Math.round(n).toLocaleString("en-US"); }
+
+// Quiz scoring. Every question is worth QUIZ_FULL_POINTS; using the "show 5
+// options" help on the hard "Name it" rounds drops the reward to QUIZ_HELP_POINTS.
+export const QUIZ_FULL_POINTS = 5;
+export const QUIZ_HELP_POINTS = 2;
+export const QUIZ_ROUND_SIZE = 10; // default questions per round
+export const QUIZ_ROUND_SIZES = [5, 10, 20]; // selectable round lengths
+export function pointsFor(correct: boolean, usedHelp: boolean): number {
+  if (!correct) return 0;
+  return usedHelp ? QUIZ_HELP_POINTS : QUIZ_FULL_POINTS;
+}
+// A round ends once `size` questions have been answered.
+export function roundComplete(total: number, size: number): boolean {
+  return total >= size;
+}
+// The 1-based number of the question currently in focus — the one being answered
+// (total + 1) or the one just answered (total) — capped at the round size.
+export function questionNumber(total: number, answered: boolean, size: number): number {
+  return Math.min(answered ? total : total + 1, size);
+}
+
+// "Show 5 options" help: pick the n nearest distractor names to a target point so
+// the choices are regionally plausible (the feature is shown on the map, so far-
+// away options would be eliminable on position alone). Equirectangular squared
+// distance is enough for ranking. Names are de-duplicated and the target itself
+// excluded. Pure, so the choice generation stays unit-testable.
+export interface NamedPoint { name: string; lat: number; lng: number; }
+export function nearestDistractors(target: NamedPoint, pool: NamedPoint[], n: number): string[] {
+  const kx = Math.cos((target.lat * Math.PI) / 180);
+  const seen = new Set<string>([target.name]);
+  return pool
+    .filter((p) => { if (seen.has(p.name)) return false; seen.add(p.name); return true; })
+    .map((p) => ({ name: p.name, d: (p.lat - target.lat) ** 2 + ((p.lng - target.lng) * kx) ** 2 }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, n)
+    .map((p) => p.name);
+}
 
 // Feature name label. Explore (browse) always shows the real name. Practice is
 // the guess mode: an anonymous "<Type> ?" placeholder until revealed (by toggle

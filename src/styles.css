@@ -39,14 +39,40 @@ body { display: flex; font-family: system-ui, sans-serif; }
 /* Quiz panel — one collapsible section per feature (reuses the Explore
    .feat-sec / .sb-fold / .feat-body header chrome). The open section holds the
    shared question UI; disabled sections are greyed "coming soon" placeholders. */
-.quiz-sec-body { padding: 4px 14px 12px; }
-#quiz-type, #mtn-type, #city-type, #lake-type, #river-type { display: flex; flex-wrap: wrap; gap: 6px; }
-#quiz-type .qt-btn, #mtn-type .qt-btn, #city-type .qt-btn, #lake-type .qt-btn, #river-type .qt-btn {
-  padding: 4px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
+/* A phase title names which state you're in (Set up your quiz / Playing). */
+.qz-phase-title { font: 700 14px system-ui, sans-serif; color: #1b3a5c; }
+.qz-phase-hint { margin: 4px 0 14px; font-size: 12px; color: #8a8a8a; }
+
+/* Challenge START screen: configure category / type / length before playing. */
+#quiz-start { padding: 14px; }
+#quiz-start[hidden], #quiz-ui[hidden] { display: none; }
+.qz-field { margin-bottom: 14px; }
+.qz-label { display: block; margin-bottom: 6px; font: 600 11px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #5a6b7a; }
+#quiz-cat, #round-size, .type-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.type-row[hidden] { display: none; }
+.type-none { margin: 0; font-size: 12px; color: #8a8a8a; }
+#quiz-cat .cat-btn, #round-size .rs-btn, .type-row .qt-btn {
+  padding: 5px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
   border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
 }
-#quiz-type .qt-btn.active, #mtn-type .qt-btn.active, #city-type .qt-btn.active,
-#lake-type .qt-btn.active, #river-type .qt-btn.active { background: #3878c7; color: #fff; border-color: #3878c7; }
+#quiz-cat .cat-btn.active, #round-size .rs-btn.active, .type-row .qt-btn.active {
+  background: #3878c7; color: #fff; border-color: #3878c7;
+}
+#quiz-start-foot { display: flex; align-items: center; gap: 10px; min-height: 22px; margin-bottom: 10px; }
+#quiz-start-best { font: 600 12px system-ui, sans-serif; color: #5a6b7a; }
+#quiz-start-btn {
+  width: 100%; padding: 10px; font: 700 14px system-ui, sans-serif; cursor: pointer;
+  border-radius: 8px; border: 1px solid #3878c7; background: #3878c7; color: #fff;
+}
+#quiz-start-btn:hover { background: #2f66ad; }
+
+/* Playing header: "Category · Type" on the left, Quit on the right. */
+#quiz-ui { padding: 14px; }
+#quiz-playhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#quiz-playinfo { margin-top: 4px; font: 700 11px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #5a6b7a; }
+#quiz-quit { padding: 3px 9px; font: 600 11px system-ui, sans-serif; cursor: pointer; border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px; }
+#quiz-quit:hover { border-color: #b3261e; color: #b3261e; }
+
 #quiz-prompt { margin-top: 12px; display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; color: #1b3a5c; min-height: 28px; }
 #quiz-prompt img { width: 34px; height: 26px; box-shadow: 0 0 2px rgba(0,0,0,.4); border-radius: 2px; flex: 0 0 auto; }
 #quiz-prompt .quiz-bigflag { width: 96px; height: 72px; box-shadow: 0 0 3px rgba(0,0,0,.4); border-radius: 3px; }
@@ -93,19 +119,43 @@ body { display: flex; font-family: system-ui, sans-serif; }
   opacity: .9; text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff;
 }
 .quiz-actions { display: flex; gap: 8px; margin-top: 6px; }
+.quiz-actions[hidden] { display: none; } /* the display:flex above would otherwise beat [hidden] */
 .quiz-actions button {
   flex: 1; padding: 8px; font: 600 13px system-ui, sans-serif; cursor: pointer;
   border-radius: 6px; border: 1px solid #cdd6df; background: #fff; color: #23323f;
 }
 .quiz-actions #quiz-next { background: #3878c7; color: #fff; border-color: #3878c7; }
 .quiz-actions button:disabled { opacity: .45; cursor: default; }
-#quiz-score-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; }
+
+/* FINISHED: end-of-round summary card. */
+#quiz-summary { margin: 14px; padding: 16px; border: 1px solid #d7e3f0; border-radius: 10px; background: #f5f9fe; text-align: center; }
+#quiz-summary[hidden] { display: none; }
+#quiz-summary .qs-title { font: 700 16px system-ui, sans-serif; color: #23323f; }
+#quiz-summary .qs-score { margin-top: 8px; font: 600 14px system-ui, sans-serif; color: #3878c7; }
+#quiz-summary .qs-best { margin-top: 4px; font-size: 13px; color: #5a6b7a; min-height: 18px; }
+#quiz-summary .qs-actions { display: flex; gap: 8px; margin-top: 12px; }
+#quiz-summary .qs-actions button {
+  flex: 1; padding: 8px; font: 600 13px system-ui, sans-serif; cursor: pointer; border-radius: 6px;
+}
+#quiz-summary #quiz-again { border: 1px solid #3878c7; background: #3878c7; color: #fff; }
+#quiz-summary #quiz-newquiz { border: 1px solid #cdd6df; background: #fff; color: #23323f; }
+#quiz-score-row { margin-top: 16px; }
 #quiz-score { font-size: 13px; color: #5a6b7a; }
 #quiz-reset {
-  flex: 0 0 auto; padding: 4px 9px; font: 600 11px system-ui, sans-serif; cursor: pointer;
+  flex: 0 0 auto; padding: 3px 9px; font: 600 11px system-ui, sans-serif; cursor: pointer;
   border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
 }
+#quiz-reset[hidden] { display: none; }
 #quiz-reset:hover { border-color: #b3261e; color: #b3261e; }
+
+/* Quiz help: trade full points for a 5-option list (subtle, opt-in look). Shared
+   by the "Name it" and "Which country" rounds. */
+#quiz-help {
+  margin-top: 10px; padding: 5px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
+  border: 1px dashed #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
+}
+#quiz-help:hover { border-color: #3878c7; color: #3878c7; }
+#quiz-help[hidden] { display: none; }
 
 /* Neighbour quiz: search + chips + check; locate + name-search share the styling */
 #nb-box, #loc-box, #name-box { margin-top: 12px; }

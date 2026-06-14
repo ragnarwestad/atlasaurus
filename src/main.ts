@@ -17,9 +17,11 @@ import {
   setActiveTab, markActiveContinent, initSidebarSections, buildFeatureLists, setSectionEnabled,
 } from "./sidebar";
 import {
-  setMode, nextQuestion, openQuizSection, renderNbResults,
+  setMode, nextQuestion, renderNbResults,
   renderLocResults, renderNameResults, nbCheckAnswers, nbInput, nbCheck, locInput, nameInput,
-  quizNextBtn, quizSkipBtn, quizResetBtn, resetScores,
+  showChoices, playAgain, setRoundSize, selectCategory, selectType, startQuiz, quitQuiz, showStart,
+  quizNextBtn, quizAgainBtn, quizNewQuizBtn, quizStartBtn, quizQuitBtn, quizResetBtn, resetScore,
+  type ScoreCat,
 } from "./quiz";
 
 // ---------------------------------------------------------------------------
@@ -77,24 +79,32 @@ document.querySelectorAll<HTMLInputElement>('#quiz-subtabs input[name="quizsub"]
     enterMode(lastQuizSub);
   });
 });
+// Playing-phase controls.
 quizNextBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
-quizSkipBtn.addEventListener("click", () => { if (app.mode === "quiz") nextQuestion(); });
-quizResetBtn.addEventListener("click", resetScores);
+quizQuitBtn.addEventListener("click", quitQuiz);
 nbInput.addEventListener("input", () => renderNbResults(nbInput.value));
 nbCheck.addEventListener("click", nbCheckAnswers);
 locInput.addEventListener("input", () => renderLocResults(locInput.value));
 nameInput.addEventListener("input", () => renderNameResults(nameInput.value));
+document.getElementById("quiz-help")!.addEventListener("click", () => { if (app.mode === "quiz") showChoices(); });
+// Finished-phase controls.
+quizAgainBtn.addEventListener("click", playAgain);
+quizNewQuizBtn.addEventListener("click", showStart);
+// Start-phase controls: category, type, length, reset, and Start.
+document.querySelectorAll<HTMLElement>("#quiz-cat .cat-btn").forEach((b) => {
+  b.addEventListener("click", () => selectCategory(b.dataset.cat as ScoreCat));
+});
 document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
   b.addEventListener("click", () => {
-    app.quizType = b.dataset.qtype as QuizType;
-    // Scope the active state to the button's own row (Country vs Mountains).
     b.parentElement!.querySelectorAll<HTMLElement>(".qt-btn").forEach((x) => { x.classList.toggle("active", x === b); });
-    if (app.mode === "quiz") nextQuestion();
+    selectType(b.dataset.qtype as QuizType);
   });
 });
-document.querySelectorAll<HTMLElement>("[data-quiz-sec]").forEach((b) => {
-  b.addEventListener("click", () => openQuizSection(b.dataset.quizSec!));
+document.querySelectorAll<HTMLElement>("#round-size .rs-btn").forEach((b) => {
+  b.addEventListener("click", () => setRoundSize(Number(b.dataset.size)));
 });
+quizResetBtn.addEventListener("click", resetScore);
+quizStartBtn.addEventListener("click", startQuiz);
 
 const flagToggle = document.getElementById("show-flags") as HTMLInputElement;
 flagToggle.addEventListener("change", () => { app.showFlags = flagToggle.checked; refreshFlags(); });

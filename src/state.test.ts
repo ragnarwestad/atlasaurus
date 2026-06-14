@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import {
   app, countries, fmtInt, featureLabel, realCountries, entryForLayer, popOf, areaOf,
   layerCenter, placeMinZoom, quizRevealsCountries, quizRevealsCities,
-  quizRevealsPeaks, quizRevealsRivers, quizRevealsLakes, type CountryEntry,
+  quizRevealsPeaks, quizRevealsRivers, quizRevealsLakes,
+  pointsFor, roundComplete, questionNumber, nearestDistractors, type NamedPoint, type CountryEntry,
 } from "./state";
 
 // Minimal fake CountryEntry — only the properties the helpers actually read.
@@ -145,5 +146,65 @@ describe("placeMinZoom", () => {
     expect(placeMinZoom({ pop_max: 2e6 })).toBe(3);
     expect(placeMinZoom({ pop_max: 3e5 })).toBe(5);
     expect(placeMinZoom({})).toBe(7);
+  });
+});
+
+describe("pointsFor", () => {
+  it("awards full points for an unaided correct answer", () => {
+    expect(pointsFor(true, false)).toBe(5);
+  });
+  it("awards reduced points when the options help was used", () => {
+    expect(pointsFor(true, true)).toBe(2);
+  });
+  it("awards nothing for a wrong answer, with or without help", () => {
+    expect(pointsFor(false, false)).toBe(0);
+    expect(pointsFor(false, true)).toBe(0);
+  });
+});
+
+describe("roundComplete", () => {
+  it("is true once the answered count reaches the round size", () => {
+    expect(roundComplete(9, 10)).toBe(false);
+    expect(roundComplete(10, 10)).toBe(true);
+    expect(roundComplete(11, 10)).toBe(true);
+  });
+});
+
+describe("questionNumber", () => {
+  it("points at the question being answered (total + 1) when unanswered", () => {
+    expect(questionNumber(0, false, 10)).toBe(1);
+    expect(questionNumber(3, false, 10)).toBe(4);
+  });
+  it("stays on the just-answered question (total) right after answering", () => {
+    expect(questionNumber(1, true, 10)).toBe(1);
+    expect(questionNumber(4, true, 10)).toBe(4);
+  });
+  it("never exceeds the round size", () => {
+    expect(questionNumber(10, true, 10)).toBe(10);
+    expect(questionNumber(10, false, 10)).toBe(10);
+  });
+});
+
+describe("nearestDistractors", () => {
+  const target: NamedPoint = { name: "Oslo", lat: 59.9, lng: 10.7 };
+  const pool: NamedPoint[] = [
+    { name: "Oslo", lat: 59.9, lng: 10.7 },        // the target itself
+    { name: "Stockholm", lat: 59.3, lng: 18.1 },
+    { name: "Copenhagen", lat: 55.7, lng: 12.6 },
+    { name: "Sydney", lat: -33.9, lng: 151.2 },
+    { name: "Tokyo", lat: 35.7, lng: 139.7 },
+  ];
+
+  it("returns the n nearest names, closest first, excluding the target", () => {
+    expect(nearestDistractors(target, pool, 2)).toEqual(["Stockholm", "Copenhagen"]);
+  });
+  it("never includes the target name", () => {
+    expect(nearestDistractors(target, pool, 4)).not.toContain("Oslo");
+  });
+  it("de-duplicates names and caps at n", () => {
+    const dupes: NamedPoint[] = [...pool, { name: "Stockholm", lat: 59.3, lng: 18.1 }];
+    const out = nearestDistractors(target, dupes, 3);
+    expect(out).toHaveLength(3);
+    expect(out.filter((x) => x === "Stockholm")).toHaveLength(1);
   });
 });

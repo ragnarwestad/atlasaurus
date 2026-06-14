@@ -507,14 +507,21 @@ function drawQuizPeak(withLabel: boolean): void {
   }
   m.addTo(quizLayer);
 }
-function nextPeakQuestion(): void {
-  const pool = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
-  if (!pool.length) return;
-  app.quizPeak = pickNext("peak", pool);
-  app.quizTarget = null; app.quizGuess = null; app.quizAnswered = false;
+// Clear the per-question selection + reveal state before a fresh question is set
+// up. Callers set their specific target (quizPeak / quizCity / …) right after,
+// then call renderQuizPrompt().
+function resetForQuestion(): void {
+  app.quizTarget = null; app.quizPeak = null; app.quizCity = null; app.quizGuess = null;
+  app.quizAnswered = false;
   app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
   nbBox.hidden = true; quizChoicesEl.hidden = true;
   quizContLayer.clearLayers();
+}
+function nextPeakQuestion(): void {
+  const pool = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
+  if (!pool.length) return;
+  resetForQuestion();
+  app.quizPeak = pickNext("peak", pool);
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   if (app.quizType === "peakname") {
@@ -604,12 +611,9 @@ function nextCityQuestion(): void {
     ? cityQuizPool().filter((c) => c.iso && byIso[c.iso])
     : cityQuizPool();
   if (!pool.length) return;
+  resetForQuestion();
   const c = pickNext("city", pool);
   app.quizCity = c;
-  app.quizTarget = null; app.quizPeak = null; app.quizGuess = null; app.quizAnswered = false;
-  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
-  nbBox.hidden = true; quizChoicesEl.hidden = true;
-  quizContLayer.clearLayers();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   if (app.quizType === "cityname") {
@@ -734,8 +738,7 @@ function nextWaterQuestion(): void {
   // Reset state and show the answer UI immediately, so the panel isn't blank
   // while the river/lake dataset loads.
   quizWaterTarget = null; quizWaterCountries = []; app.quizWaterIso = [];
-  app.quizTarget = null; app.quizPeak = null; app.quizCity = null; app.quizGuess = null; app.quizAnswered = false;
-  app.quizContCorrect = null; app.quizContWrong = null; app.quizNeighbourSet = new Set();
+  resetForQuestion();
   renderQuizPrompt();
   quizFeedbackEl.className = "";
   if (isCountry) setupCountryAnswerBox(); else setupNameBox();

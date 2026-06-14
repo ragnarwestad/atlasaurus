@@ -226,9 +226,6 @@ body { display: flex; flex-direction: column; font-family: system-ui, sans-serif
 /* Hover doesn't exist on touch devices, so hide the Hover-info toggle there. */
 @media (hover: none) { #hover-toggle { display: none; } }
 
-/* Quiz category tab row (Country / Continent / Mountains) */
-.sb-tabs { display: flex; gap: 18px; border-bottom: 1px solid #e1e7ec; }
-
 #sort-row, #scheme-row {
   display: flex; align-items: center; gap: 6px; margin-top: 9px;
   font-size: 12px; color: #5a6b7a;

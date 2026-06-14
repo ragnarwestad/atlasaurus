@@ -10,6 +10,7 @@ declare const process: { env: Record<string, string | undefined> };
 // build-script restriction doesn't block setup. Keep these tests offline-safe:
 // the app pulls geodata from CDNs at runtime, so assert on static UI (the help
 // modal, toggles, sidebar structure) rather than data-dependent counts.
+// noinspection JSUnusedGlobalSymbols
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,

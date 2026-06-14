@@ -211,6 +211,7 @@ map.on("moveend", refreshCountryLabels); // re-evaluate which country names fit 
 map.on("moveend", schedulePhysicalUpdate); // reveal more rivers/lakes as you zoom in (deferred; canvas must settle)
 
 // Zoom-level readout, stacked under the +/- control.
+// noinspection JSUnusedGlobalSymbols
 const ZoomReadout = L.Control.extend({
   onAdd() {
     const div = L.DomUtil.create("div", "leaflet-bar zoom-level");

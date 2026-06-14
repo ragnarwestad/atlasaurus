@@ -133,8 +133,7 @@ export function fmtInt(n: number): string { return Math.round(n).toLocaleString(
 // options" help on the hard "Name it" rounds drops the reward to QUIZ_HELP_POINTS.
 export const QUIZ_FULL_POINTS = 5;
 export const QUIZ_HELP_POINTS = 2;
-export const QUIZ_ROUND_SIZE = 10; // default questions per round
-export const QUIZ_ROUND_SIZES = [5, 10, 20]; // selectable round lengths
+export const QUIZ_ROUND_SIZES = [5, 10, 20]; // selectable round lengths (app.roundSize defaults to 10)
 export function pointsFor(correct: boolean, usedHelp: boolean): number {
   if (!correct) return 0;
   return usedHelp ? QUIZ_HELP_POINTS : QUIZ_FULL_POINTS;

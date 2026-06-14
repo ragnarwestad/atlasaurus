@@ -36,6 +36,7 @@ export interface RestInfo { area?: number; currencies?: string; languages?: stri
 // standard continents.
 export type GroupScheme = "continent" | "unRegion" | "subregion" | "wbRegion";
 export type QuizType = "name" | "flag" | "capital" | "spot" | "continent" | "neighbour" | "peakname" | "peakcountry" | "cityname" | "citycountry" | "rivername" | "lakename" | "rivercountry" | "lakecountry";
+export type Difficulty = "easy" | "medium" | "hard";
 
 export const CONTINENT_ORDER = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania", "Antarctica", "Other"];
 
@@ -81,9 +82,12 @@ export const app = {
   quizAnswered: false,
   quizCorrect: 0,
   quizTotal: 0,
-  quizPoints: 0,        // points earned in the current round (5/question, 2 with help)
-  quizHelp: false,      // "Name it": the 5-option help was used on THIS question
+  quizPoints: 0,        // points earned in the current round so far
+  quizTier: "medium" as Difficulty, // difficulty of the CURRENT question (sets its value)
+  quizHelp: false,      // the 5-option help was used on THIS question
+  quizHintCountry: false, // "Name it": the reveal-country hint was used on THIS question
   roundSize: 10,        // questions per round (player-configurable; see QUIZ_ROUND_SIZES)
+  roundTiers: [] as Difficulty[], // the fixed difficulty sequence for the current round
   quizContCorrect: null as string | null, // continent quiz: correct continent (green)
   quizContWrong: null as string | null,   // continent quiz: wrongly guessed continent (red)
   // Names already carried by a reveal dot after an answer — skipped when the
@@ -129,14 +133,35 @@ export const territoriesBySov: Record<string, Territory[]> = {};
 // ---------------------------------------------------------------------------
 export function fmtInt(n: number): string { return Math.round(n).toLocaleString("en-US"); }
 
-// Quiz scoring. Every question is worth QUIZ_FULL_POINTS; using the "show 5
-// options" help on the hard "Name it" rounds drops the reward to QUIZ_HELP_POINTS.
-export const QUIZ_FULL_POINTS = 5;
-export const QUIZ_HELP_POINTS = 2;
+// Quiz scoring. Each question is worth points by its difficulty tier; every hint
+// used (5 options / reveal country) knocks QUIZ_HINT_COST off, floored at 1 so a
+// correct answer always earns something. All values are tunable.
 export const QUIZ_ROUND_SIZES = [5, 10, 20]; // selectable round lengths (app.roundSize defaults to 10)
-export function pointsFor(correct: boolean, usedHelp: boolean): number {
+export const QUIZ_TIER_POINTS: Record<Difficulty, number> = { easy: 5, medium: 8, hard: 10 };
+export const QUIZ_HINT_COST = 2;
+// Points for a correct answer at `tier` with `hintsUsed` hints (0 if wrong).
+export function questionPoints(correct: boolean, tier: Difficulty, hintsUsed: number): number {
   if (!correct) return 0;
-  return usedHelp ? QUIZ_HELP_POINTS : QUIZ_FULL_POINTS;
+  return Math.max(1, QUIZ_TIER_POINTS[tier] - hintsUsed * QUIZ_HINT_COST);
+}
+// Map a prominence rank (0 = most famous) to a difficulty tier by terciles, so
+// each tier always holds ~1/3 of the pool (enough for the balanced round mix).
+export function tierByRank(rank: number, total: number): Difficulty {
+  if (total <= 0) return "medium";
+  const p = rank / total;
+  return p < 1 / 3 ? "easy" : p < 2 / 3 ? "medium" : "hard";
+}
+// The fixed difficulty mix for a round of `size` (~40% easy / 40% medium / 20%
+// hard). Keeping the mix fixed makes a setup's max score deterministic.
+export function roundMix(size: number): Record<Difficulty, number> {
+  const easy = Math.round(size * 0.4);
+  const hard = Math.round(size * 0.2);
+  return { easy, hard, medium: size - easy - hard };
+}
+// The (deterministic) maximum points for a balanced round of `size`.
+export function roundMaxPoints(size: number): number {
+  const m = roundMix(size);
+  return m.easy * QUIZ_TIER_POINTS.easy + m.medium * QUIZ_TIER_POINTS.medium + m.hard * QUIZ_TIER_POINTS.hard;
 }
 // A round ends once `size` questions have been answered.
 export function roundComplete(total: number, size: number): boolean {

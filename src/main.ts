@@ -19,7 +19,7 @@ import {
 import {
   setMode, nextQuestion, renderNbResults,
   renderLocResults, renderNameResults, nbCheckAnswers, nbInput, nbCheck, locInput, nameInput,
-  showChoices, playAgain, setRoundSize, selectCategory, selectType, startQuiz, quitQuiz, showStart,
+  showChoices, revealQuestionCountry, playAgain, setRoundSize, selectCategory, selectType, startQuiz, quitQuiz, showStart,
   quizNextBtn, quizAgainBtn, quizNewQuizBtn, quizStartBtn, quizQuitBtn,
   openScores, closeScores, resetAllScores,
   type ScoreCat,
@@ -88,6 +88,7 @@ nbCheck.addEventListener("click", nbCheckAnswers);
 locInput.addEventListener("input", () => renderLocResults(locInput.value));
 nameInput.addEventListener("input", () => renderNameResults(nameInput.value));
 document.getElementById("quiz-help")!.addEventListener("click", () => { if (app.mode === "quiz") showChoices(); });
+document.getElementById("quiz-hint-country")!.addEventListener("click", () => { if (app.mode === "quiz") revealQuestionCountry(); });
 // Finished-phase controls.
 quizAgainBtn.addEventListener("click", playAgain);
 quizNewQuizBtn.addEventListener("click", showStart);

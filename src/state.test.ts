@@ -3,7 +3,8 @@ import {
   app, countries, fmtInt, featureLabel, realCountries, entryForLayer, popOf, areaOf,
   layerCenter, placeMinZoom, quizRevealsCountries, quizRevealsCities,
   quizRevealsPeaks, quizRevealsRivers, quizRevealsLakes,
-  pointsFor, roundComplete, questionNumber, nearestDistractors, type NamedPoint, type CountryEntry,
+  questionPoints, tierByRank, roundMix, roundMaxPoints, roundComplete, questionNumber,
+  nearestDistractors, type NamedPoint, type CountryEntry,
 } from "./state";
 
 // Minimal fake CountryEntry — only the properties the helpers actually read.
@@ -149,16 +150,41 @@ describe("placeMinZoom", () => {
   });
 });
 
-describe("pointsFor", () => {
-  it("awards full points for an unaided correct answer", () => {
-    expect(pointsFor(true, false)).toBe(5);
+describe("questionPoints", () => {
+  it("awards the tier value for an unaided correct answer", () => {
+    expect(questionPoints(true, "easy", 0)).toBe(5);
+    expect(questionPoints(true, "medium", 0)).toBe(8);
+    expect(questionPoints(true, "hard", 0)).toBe(10);
   });
-  it("awards reduced points when the options help was used", () => {
-    expect(pointsFor(true, true)).toBe(2);
+  it("knocks 2 off per hint used", () => {
+    expect(questionPoints(true, "hard", 1)).toBe(8);
+    expect(questionPoints(true, "hard", 2)).toBe(6);
+    expect(questionPoints(true, "medium", 1)).toBe(6);
   });
-  it("awards nothing for a wrong answer, with or without help", () => {
-    expect(pointsFor(false, false)).toBe(0);
-    expect(pointsFor(false, true)).toBe(0);
+  it("floors a correct answer at 1, never 0", () => {
+    expect(questionPoints(true, "easy", 2)).toBe(1); // 5 - 4 = 1
+  });
+  it("awards nothing for a wrong answer", () => {
+    expect(questionPoints(false, "hard", 0)).toBe(0);
+  });
+});
+
+describe("tierByRank", () => {
+  it("splits a pool into terciles (most famous = easy)", () => {
+    expect(tierByRank(0, 99)).toBe("easy");
+    expect(tierByRank(40, 99)).toBe("medium");
+    expect(tierByRank(80, 99)).toBe("hard");
+  });
+});
+
+describe("roundMix / roundMaxPoints", () => {
+  it("uses a fixed ~40/40/20 mix", () => {
+    expect(roundMix(10)).toEqual({ easy: 4, medium: 4, hard: 2 });
+    expect(roundMix(5)).toEqual({ easy: 2, medium: 2, hard: 1 });
+    expect(roundMix(20)).toEqual({ easy: 8, medium: 8, hard: 4 });
+  });
+  it("gives a deterministic max for a balanced round", () => {
+    expect(roundMaxPoints(10)).toBe(4 * 5 + 4 * 8 + 2 * 10); // 72
   });
 });
 

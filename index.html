@@ -264,7 +264,10 @@
           <input id="name-input" type="search" aria-label="Type the name" placeholder="Type the name…" autocomplete="off" />
           <ul id="name-results"></ul>
         </div>
-        <button id="quiz-help" type="button" hidden>Stuck? Show 5 options (2 pts)</button>
+        <div id="quiz-hints">
+          <button id="quiz-hint-country" type="button" hidden>Reveal country (−2 pts)</button>
+          <button id="quiz-help" type="button" hidden>Show 5 options (−2 pts)</button>
+        </div>
         <div id="quiz-choices" hidden></div>
         <div id="nb-box" hidden>
           <input id="nb-input" type="search" aria-label="Add a bordering country" placeholder="Add a bordering country…" autocomplete="off" />

@@ -79,24 +79,37 @@ test("Mountains 'Which country' answers via the country search box", async ({ pa
   await expect(page.locator("#name-box")).toBeHidden();
 });
 
-test("the instruction states the full reward up front, then the result replaces it", async ({ page }) => {
+test("the instruction states the live value up front, then the result replaces it", async ({ page }) => {
   await startMountains(page);
   const feedback = page.locator("#quiz-feedback");
-  await expect(feedback).toHaveText("Which mountain is marked? Search and pick it. (5 pts)");
+  // The value is the question's tier (5/8/10) — assert the shape, not a fixed number.
+  await expect(feedback).toHaveText(/^Which mountain is marked\? Search and pick it\. \(\d+ pts\)$/);
   await page.fill("#name-input", "ever");
   await page.locator("#name-results li").first().click();
-  await expect(feedback).not.toContainText("(5 pts)");
+  await expect(feedback).toContainText("(+"); // result feedback shows points won (+N pts)
 });
 
-test("the 5-option help is worth fewer points and shows its own hint", async ({ page }) => {
+test("the 5-option help reduces the live value and shows its own hint", async ({ page }) => {
   await startMountains(page);
   await page.click("#quiz-help");
   await expect(page.locator("#name-box")).toBeHidden();
-  await expect(page.locator("#quiz-feedback")).toHaveText("Pick the right one (2 pts)");
+  await expect(page.locator("#quiz-feedback")).toHaveText(/^Pick the right one \(\d+ pts\)$/);
   const choices = page.locator("#quiz-choices button");
   await expect(choices).toHaveCount(5);
   await choices.first().click();
-  await expect(page.locator("#quiz-score")).toHaveText(/^[02] pts/);
+  await expect(page.locator("#quiz-score")).toHaveText(/^\d+ pts/);
+});
+
+test("the reveal-country hint counts the value down before naming it", async ({ page }) => {
+  await startMountains(page);
+  const before = await page.locator("#quiz-feedback").textContent();
+  const v0 = Number(/\((\d+) pts\)/.exec(before || "")?.[1] ?? "0");
+  await page.click("#quiz-hint-country");
+  await expect(page.locator("#quiz-feedback")).toContainText("It's in");
+  const after = await page.locator("#quiz-feedback").textContent();
+  const v1 = Number(/\((\d+) pts\)/.exec(after || "")?.[1] ?? "0");
+  expect(v1).toBe(v0 - 2); // one hint = −2
+  await expect(page.locator("#quiz-hint-country")).toBeHidden(); // single use
 });
 
 test("Quit returns to the Start screen", async ({ page }) => {
@@ -111,7 +124,8 @@ test("choosing a length runs the round to that length", async ({ page }) => {
   await expect(page.locator("#quiz-playphase")).toHaveText("Playing — Q 1/5");
   await playRound(page, 5);
   await expect(page.locator("#quiz-summary")).toBeVisible();
-  await expect(page.locator("#quiz-summary .qs-score")).toContainText("/ 25 pts");
+  // A 5-round's balanced mix (2 easy + 2 medium + 1 hard) gives a fixed max of 36.
+  await expect(page.locator("#quiz-summary .qs-score")).toContainText("/ 36 pts");
   await expect(page.locator("#quiz-summary .qs-score")).toContainText("/ 5 correct");
 });
 
@@ -142,7 +156,7 @@ test("a record persists across a reload (seen in the Score modal)", async ({ pag
   await page.click('.app-menu-item[data-menu="score"]');
   const row = page.locator(".score-row").first();
   await expect(row.locator(".sc-label")).toHaveText("Name it · 5");
-  await expect(row.locator(".sc-pts")).toHaveText(best + "/25");
+  await expect(row.locator(".sc-pts")).toHaveText(best + "/36");
 });
 
 test("resetting a record in the Score modal clears it everywhere", async ({ page }) => {

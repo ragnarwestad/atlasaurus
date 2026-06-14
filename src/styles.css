@@ -163,14 +163,15 @@ body { display: flex; flex-direction: column; font-family: system-ui, sans-serif
 #quiz-score-row { margin-top: 16px; }
 #quiz-score { font-size: 13px; color: #5a6b7a; }
 
-/* Quiz help: trade full points for a 5-option list (subtle, opt-in look). Shared
-   by the "Name it" and "Which country" rounds. */
-#quiz-help {
-  margin-top: 10px; padding: 5px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
+/* Quiz hints: trade points for help (reveal country / 5 options) — subtle, opt-in. */
+#quiz-hints { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+#quiz-hints:empty { display: none; }
+#quiz-help, #quiz-hint-country {
+  padding: 5px 10px; font: 600 12px system-ui, sans-serif; cursor: pointer;
   border: 1px dashed #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
 }
-#quiz-help:hover { border-color: #3878c7; color: #3878c7; }
-#quiz-help[hidden] { display: none; }
+#quiz-help:hover, #quiz-hint-country:hover { border-color: #3878c7; color: #3878c7; }
+#quiz-help[hidden], #quiz-hint-country[hidden] { display: none; }
 
 /* Neighbour quiz: search + chips + check; locate + name-search share the styling */
 #nb-box, #loc-box, #name-box { margin-top: 12px; }

@@ -7,10 +7,10 @@ import { wikiUrl, cityWikiUrl, escapeHtml } from "./wiki";
 import { PEAKS } from "./peaks";
 import { map, quizLayer, quizContLayer } from "./map";
 import {
-  app, hooks, byIso, realCountries, layerCenter, fmtInt, loadCountryData,
-  pointsFor, roundComplete, questionNumber, nearestDistractors,
-  QUIZ_FULL_POINTS, QUIZ_HELP_POINTS, QUIZ_ROUND_SIZES,
-  type CountryEntry, type QuizType, type NamedPoint,
+  app, hooks, byIso, realCountries, layerCenter, fmtInt, popOf, loadCountryData,
+  questionPoints, tierByRank, roundMix, roundMaxPoints, roundComplete, questionNumber, nearestDistractors,
+  QUIZ_TIER_POINTS, QUIZ_HINT_COST, QUIZ_ROUND_SIZES,
+  type CountryEntry, type QuizType, type NamedPoint, type Difficulty,
 } from "./state";
 import { hideHoverInfo } from "./panel";
 import {
@@ -42,10 +42,9 @@ const scoreModalEl = document.getElementById("score-modal")!;
 const scoreListEl = document.getElementById("score-list")!;
 const scoreFootEl = document.getElementById("score-foot")!;
 
-// Append the full-points reward to a pre-answer instruction, so every round shows
-// what a correct answer is worth right in the hint. Only used on the pre-answer
-// instructions — the answered/help paths set their own feedback.
-function instr(text: string): string { return text + " (" + QUIZ_FULL_POINTS + " pts)"; }
+// Append the LIVE value to a pre-answer instruction (the tier value, minus any
+// hints already spent), so it counts down as the player uses hints.
+function instr(text: string): string { return text + " (" + currentValue() + " pts)"; }
 function renderQuizPrompt(): void {
   renderQuizScore(); // keep the "Q n/10 · pts · Best" readout in step with each question
   if (app.quizType === "peakname") {
@@ -119,7 +118,11 @@ let roundNewBest = false;    // did this round beat the previous best
 let roundPrevBest: number | null = null; // the best before this round (for the summary)
 // A best belongs to one exact setup: category + question type + round length.
 function bestKey(): string { return scoreCat + ":" + app.quizType + ":" + app.roundSize; }
-function roundMax(): number { return app.roundSize * QUIZ_FULL_POINTS; }
+// Deterministic max for a setup: the balanced mix (or flat medium for Regions),
+// so replaying the same setup always has the same ceiling.
+function roundMax(): number {
+  return scoreCat === "continent" ? app.roundSize * QUIZ_TIER_POINTS.medium : roundMaxPoints(app.roundSize);
+}
 
 // Show exactly one phase block (start / playing / finished).
 function setPhase(phase: "start" | "playing" | "finished"): void {
@@ -127,10 +130,33 @@ function setPhase(phase: "start" | "playing" | "finished"): void {
   quizUiEl.hidden = phase !== "playing";
   quizSummaryEl.hidden = phase !== "finished";
 }
-// Zero the live counters for a fresh round.
+// The fixed difficulty sequence for a round (Regions is flat medium; the rest use
+// the balanced 40/40/20 mix, shuffled). Keeping the mix fixed makes the max score
+// deterministic per setup.
+function buildRoundTiers(): Difficulty[] {
+  if (scoreCat === "continent") return Array(app.roundSize).fill("medium") as Difficulty[];
+  const m = roundMix(app.roundSize);
+  const tiers: Difficulty[] = [
+    ...Array<Difficulty>(m.easy).fill("easy"),
+    ...Array<Difficulty>(m.medium).fill("medium"),
+    ...Array<Difficulty>(m.hard).fill("hard"),
+  ];
+  for (let i = tiers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tiers[i], tiers[j]] = [tiers[j], tiers[i]];
+  }
+  return tiers;
+}
+// The tier of the question about to be asked (0-indexed by answered count).
+function nextTier(): Difficulty { return app.roundTiers[app.quizTotal] || "medium"; }
+function hintsUsed(): number { return (app.quizHelp ? 1 : 0) + (app.quizHintCountry ? 1 : 0); }
+// What a correct answer is worth RIGHT NOW (tier value minus the hints spent).
+function currentValue(): number { return Math.max(1, QUIZ_TIER_POINTS[app.quizTier] - hintsUsed() * QUIZ_HINT_COST); }
+// Zero the live counters and lay out the round's difficulty sequence.
 function startRound(): void {
   app.quizPoints = 0; app.quizCorrect = 0; app.quizTotal = 0;
-  app.quizAnswered = false; app.quizHelp = false;
+  app.quizAnswered = false; app.quizHelp = false; app.quizHintCountry = false;
+  app.roundTiers = buildRoundTiers();
   roundRecorded = false; roundNewBest = false; roundPrevBest = null;
 }
 function setScoreCategory(cat: ScoreCat): void { scoreCat = cat; }
@@ -188,7 +214,8 @@ function renderScores(): void {
       .forEach((key) => {
         const [, type, size] = key.split(":");
         const best = bestByCat[key];
-        const max = Number(size) * QUIZ_FULL_POINTS;
+        const n = Number(size);
+        const max = cat === "continent" ? n * QUIZ_TIER_POINTS.medium : roundMaxPoints(n);
         const row = document.createElement("div");
         row.className = "score-row";
         const label = cat === "continent" ? size + " questions" : QTYPE_LABEL[type] + " · " + size;
@@ -251,11 +278,11 @@ function renderQuizScore(): void {
   quizScoreEl.textContent = app.quizPoints + " pts" + (best ? " · Best: " + best.points : "");
 }
 // Tally one answered question into the round counters and return the points won
-// (5 normally, 2 if the "show options" help was used, 0 if wrong).
+// (tier value minus hints spent, floored at 1; 0 if wrong).
 function scoreAnswer(ok: boolean): number {
   app.quizTotal++;
   if (ok) app.quizCorrect++;
-  const pts = pointsFor(ok, app.quizHelp);
+  const pts = questionPoints(ok, app.quizTier, hintsUsed());
   app.quizPoints += pts;
   return pts;
 }
@@ -300,6 +327,7 @@ function finishChoices(correctNames: string[], pickedName: string): void {
 // Close-out for "Name it": lock the search box, then settle the choice buttons.
 function endNameAnswer(correctName: string, pickedName: string): void {
   nameInput.disabled = true; nameResults.innerHTML = "";
+  quizCountryBtn.hidden = true;
   finishChoices([correctName], pickedName);
 }
 // Close-out for "Which country": lock the country search box, then settle the
@@ -335,7 +363,7 @@ function renderChoices(options: { label: string; pick: () => void }[]): void {
     quizChoicesEl.appendChild(btn);
   });
   quizChoicesEl.hidden = false;
-  quizFeedbackEl.textContent = "Pick the right one (" + QUIZ_HELP_POINTS + " pts)";
+  quizFeedbackEl.textContent = instr("Pick the right one"); // live value (tier − hints)
 }
 // Persist the best round per category across reloads (localStorage). The current
 // round is ephemeral — a reload starts a new round but the bests survive.
@@ -379,6 +407,28 @@ function neighbourEntries(entry: CountryEntry): CountryEntry[] {
   return codes.map((c) => byIso[c]).filter(Boolean) as CountryEntry[];
 }
 
+// --- Difficulty: each feature gets a tier by prominence terciles (most famous =
+// easy), computed over the round type's own pool so each tier is always fillable.
+// A curated name→tier table overrides the automatic call where it's off (extend
+// freely as you tune). ---
+const DIFFICULTY_OVERRIDES: Record<string, Difficulty> = {
+  // Famous despite small size (would otherwise rank "hard" by population):
+  Iceland: "easy", Singapore: "easy", Luxembourg: "medium", Monaco: "medium",
+};
+const diffCache: Record<string, { n: number; get: (item: unknown) => Difficulty }> = {};
+// Returns a tier lookup for `items`, ranked by `prominence` (higher = more
+// famous = easier). Cached by `key`, rebuilt when the pool size changes.
+function tierLookup<T>(key: string, items: T[], name: (t: T) => string, prominence: (t: T) => number): (t: T) => Difficulty {
+  const c = diffCache[key];
+  if (c && c.n === items.length) return c.get as (t: T) => Difficulty;
+  const sorted = items.slice().sort((a, b) => prominence(b) - prominence(a));
+  const map = new Map<T, Difficulty>();
+  sorted.forEach((it, i) => map.set(it, DIFFICULTY_OVERRIDES[name(it)] || tierByRank(i, sorted.length)));
+  const get = (t: T): Difficulty => map.get(t) || "medium";
+  diffCache[key] = { n: items.length, get: get as (item: unknown) => Difficulty };
+  return get;
+}
+
 // Pick a random pool member while avoiding the recently-asked ones (up to half
 // the pool), so questions don't repeat soon after each other. History is kept
 // per key (country / peak / city / river / lake). Callers guard pool.length > 0.
@@ -413,8 +463,8 @@ export function nextQuestion(): void {
   // and, with quizAnswered now false, re-run the reveal refreshes so they hide the
   // names/features that were shown after the last answer.
   app.quizAnswered = false;
-  app.quizHelp = false; // every question starts at full points until help is used
-  quizHelpBtn.hidden = true; // shown again only by the rounds that support the help
+  app.quizHelp = false; app.quizHintCountry = false; // fresh question = full value
+  quizHelpBtn.hidden = true; quizCountryBtn.hidden = true; // shown again by the rounds that support them
   app.quizDotCountries.clear();
   app.quizDotCities.clear();
   app.quizDotFeatures.clear();
@@ -436,11 +486,20 @@ export function nextQuestion(): void {
   }
   if (isWaterQuiz()) { nextWaterQuestion(); return; }
   // Restrict the pool to countries that have what the prompt needs.
-  const pool = app.quizType === "flag" ? realCountries().filter((c) => c.iso2)
+  const base = app.quizType === "flag" ? realCountries().filter((c) => c.iso2)
     : app.quizType === "capital" ? realCountries().filter((c) => c.capitalName)
     : app.quizType === "neighbour" ? realCountries().filter((c) => neighbourEntries(c).length > 0)
     : realCountries();
+  if (!base.length) return;
+  // Regions (continent) is flat medium; the rest filter to this question's tier.
+  let pool = base, tier: Difficulty = "medium";
+  if (app.quizType !== "continent") {
+    tier = nextTier();
+    const diff = tierLookup(app.quizType, base, (c) => c.name, popOf);
+    pool = base.filter((c) => diff(c) === tier);
+  }
   if (!pool.length) return;
+  app.quizTier = tier;
   const t = pickNext("country", pool);
   app.quizTarget = t;
   app.quizGuess = null;
@@ -518,9 +577,14 @@ function resetForQuestion(): void {
   quizContLayer.clearLayers();
 }
 function nextPeakQuestion(): void {
-  const pool = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
+  const base = app.quizType === "peakcountry" ? PEAKS.filter((p) => p.iso.length) : PEAKS;
+  if (!base.length) return;
+  const tier = nextTier();
+  const diff = tierLookup(app.quizType, base, (p) => p.name, (p) => p.elevation);
+  const pool = base.filter((p) => diff(p) === tier);
   if (!pool.length) return;
   resetForQuestion();
+  app.quizTier = tier;
   app.quizPeak = pickNext("peak", pool);
   renderQuizPrompt();
   quizFeedbackEl.className = "";
@@ -607,11 +671,16 @@ function drawQuizCity(withLabel: boolean): void {
 }
 function nextCityQuestion(): void {
   // "Which country" needs cities whose country resolves to a map entry.
-  const pool = app.quizType === "citycountry"
+  const base = app.quizType === "citycountry"
     ? cityQuizPool().filter((c) => c.iso && byIso[c.iso])
     : cityQuizPool();
+  if (!base.length) return;
+  const tier = nextTier();
+  const diff = tierLookup(app.quizType, base, (c) => c.name, (c) => c.pop);
+  const pool = base.filter((c) => diff(c) === tier);
   if (!pool.length) return;
   resetForQuestion();
+  app.quizTier = tier;
   const c = pickNext("city", pool);
   app.quizCity = c;
   renderQuizPrompt();
@@ -754,8 +823,14 @@ function nextWaterQuestion(): void {
     return;
   }
 
-  const pool = isRiver ? riverQuizPool() : lakeQuizPool();
+  const base = isRiver ? riverQuizPool() : lakeQuizPool();
+  if (!base.length) return;
+  // Filter to this question's tier (lower mz = more prominent = easier).
+  const tier = nextTier();
+  const diff = tierLookup(app.quizType, base, (it) => it.name, (it) => -it.mz);
+  const pool = base.filter((it) => diff(it) === tier);
   if (!pool.length) return;
+  app.quizTier = tier;
   // Pick a fresh target; for "which country" require one that resolves to ≥1 country.
   const key = isRiver ? "river" : "lake";
   let item: WaterQuizItem | null = null;
@@ -981,6 +1056,7 @@ const nameBox = document.getElementById("name-box") as HTMLElement;
 export const nameInput = document.getElementById("name-input") as HTMLInputElement;
 const nameResults = document.getElementById("name-results")!;
 const quizHelpBtn = document.getElementById("quiz-help") as HTMLButtonElement;
+const quizCountryBtn = document.getElementById("quiz-hint-country") as HTMLButtonElement;
 // Reset + show the feature-name search box (hides the other answer widgets).
 function setupNameBox(): void {
   quizChoicesEl.hidden = true;
@@ -989,8 +1065,27 @@ function setupNameBox(): void {
   quizContLayer.clearLayers();
   nameInput.value = ""; nameInput.disabled = false;
   nameResults.innerHTML = "";
-  quizHelpBtn.hidden = false; // offer the 5-option help until the round is answered
+  quizHelpBtn.hidden = false;   // both hints available until the round is answered
+  quizCountryBtn.hidden = false; // "Name it" also offers "reveal country"
   nameBox.hidden = false;
+}
+// The country/countries the current "Name it" feature lies in (for the hint).
+function nameRoundCountryText(): string {
+  if (app.quizType === "peakname" && app.quizPeak) return peakCountryNames(app.quizPeak);
+  if (app.quizType === "cityname" && app.quizCity) { const c = byIso[app.quizCity.iso]; return (c && c.name) || app.quizCity.adm0 || ""; }
+  if ((app.quizType === "rivername" || app.quizType === "lakename") && quizWaterTarget) return waterCountries(quizWaterTarget).map((c) => c.name).join(" / ");
+  return "";
+}
+// "Reveal country" hint (Name it only): tell the player the country, drop the
+// value by one hint, and retire the button. Stacks with "Show 5 options".
+export function revealQuestionCountry(): void {
+  if (app.mode !== "quiz" || app.quizAnswered || app.quizHintCountry) return;
+  const where = nameRoundCountryText();
+  if (!where) return;
+  app.quizHintCountry = true;
+  quizCountryBtn.hidden = true;
+  quizFeedbackEl.className = "";
+  quizFeedbackEl.textContent = instr("It's in " + where + " — now name it.");
 }
 
 // --- "Show 5 options" help (Name it only): the user trades full points for a

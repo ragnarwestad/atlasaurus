@@ -7,11 +7,18 @@
   <title>Atlasaurus — Countries, Borders &amp; Capitals</title>
 </head>
 <body>
-  <aside id="sidebar">
-    <div id="brand">
-      <span class="brand-globe">🌐</span> Atlasaurus
-      <button class="help-btn" type="button" title="About this map" aria-label="About this map">?</button>
+  <header id="app-header">
+    <div id="brand"><span class="brand-globe">🌐</span> Atlasaurus</div>
+    <div id="app-menu-wrap">
+      <button id="app-menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">⋮</button>
+      <div id="app-menu" role="menu" hidden>
+        <button type="button" class="app-menu-item" data-menu="score" role="menuitem">Score</button>
+        <button type="button" class="app-menu-item" data-menu="about" role="menuitem">About</button>
+      </div>
     </div>
+  </header>
+  <div id="app-body">
+  <aside id="sidebar">
     <div id="mode-tabs">
       <button type="button" class="mode-tab active" data-mode="explore">Explore</button>
       <button type="button" class="mode-tab" data-mode="quiz">Quiz</button>
@@ -239,7 +246,6 @@
         </div>
         <div id="quiz-start-foot">
           <span id="quiz-start-best"></span>
-          <button id="quiz-reset" type="button" hidden title="Clear this setup's best score">Reset</button>
         </div>
         <button id="quiz-start-btn" type="button">Start quiz</button>
       </div>
@@ -292,9 +298,21 @@
     </div>
   </aside>
   <div id="map"></div>
+  </div><!-- #app-body -->
   <div id="status">Loading world data… (detailed borders, may take a few seconds)</div>
   <div id="hoverinfo" hidden></div>
   <div id="countryinfo" hidden></div>
+
+  <div id="score-modal" hidden>
+    <div class="score-card" role="dialog" aria-modal="true" aria-label="Your scores">
+      <button class="score-close" type="button" aria-label="Close">×</button>
+      <h2>Your scores</h2>
+      <div id="score-list"></div>
+      <div id="score-foot" hidden>
+        <button id="score-reset-all" type="button">Reset all</button>
+      </div>
+    </div>
+  </div>
 
   <div id="help-modal" hidden>
     <div class="help-card" role="dialog" aria-modal="true" aria-label="About this map">

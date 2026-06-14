@@ -39,7 +39,9 @@ export const quizAgainBtn = document.getElementById("quiz-again") as HTMLButtonE
 export const quizNewQuizBtn = document.getElementById("quiz-newquiz") as HTMLButtonElement;
 export const quizStartBtn = document.getElementById("quiz-start-btn") as HTMLButtonElement;
 export const quizQuitBtn = document.getElementById("quiz-quit") as HTMLButtonElement;
-export const quizResetBtn = document.getElementById("quiz-reset") as HTMLButtonElement;
+const scoreModalEl = document.getElementById("score-modal")!;
+const scoreListEl = document.getElementById("score-list")!;
+const scoreFootEl = document.getElementById("score-foot")!;
 
 // Append the full-points reward to a pre-answer instruction, so every round shows
 // what a correct answer is worth right in the hint. Only used on the pre-answer
@@ -139,7 +141,6 @@ function setScoreCategory(cat: ScoreCat): void { scoreCat = cat; }
 function updateStartBest(): void {
   const best = bestByCat[bestKey()];
   quizStartBestEl.textContent = best ? "Best for this setup: " + best.points + "/" + roundMax() : "No record yet";
-  quizResetBtn.hidden = !best;
 }
 // Select a category: reflect it on the buttons, swap in its type row (Regions has
 // none), set the active type, and refresh the best line.
@@ -162,10 +163,70 @@ export function selectType(qtype: QuizType): void {
   app.quizType = qtype;
   updateStartBest();
 }
-// Reset only THIS setup's best (category + type + length).
-export function resetScore(): void {
-  delete bestByCat[bestKey()];
+// --- Score overview (the ⋮ → Score modal): every recorded best in one place. ---
+const QTYPE_LABEL: Record<string, string> = {
+  name: "By name", flag: "By flag", capital: "By capital", spot: "Spot it", neighbour: "Neighbour",
+  cityname: "Name it", citycountry: "Which country", peakname: "Name it", peakcountry: "Which country",
+  rivername: "Name it", rivercountry: "Which country", lakename: "Name it", lakecountry: "Which country",
+  continent: "Regions",
+};
+const CAT_ORDER: ScoreCat[] = ["country", "city", "continent", "lake", "mountains", "river"];
+// Render the grouped list of bests into the modal (and toggle the "Reset all" foot).
+function renderScores(): void {
+  const keys = Object.keys(bestByCat);
+  if (!keys.length) {
+    scoreListEl.innerHTML = '<p class="score-empty">No quizzes played yet.</p>';
+    scoreFootEl.hidden = true;
+    return;
+  }
+  scoreFootEl.hidden = false;
+  // Group keys ("cat:type:size") by category, in the canonical category order.
+  const byCat: Record<string, string[]> = {};
+  for (const k of keys) (byCat[k.split(":")[0]] = byCat[k.split(":")[0]] || []).push(k);
+  scoreListEl.innerHTML = "";
+  for (const cat of CAT_ORDER) {
+    const group = byCat[cat];
+    if (!group || !group.length) continue;
+    const h = document.createElement("div");
+    h.className = "score-cat";
+    h.textContent = CAT_LABEL[cat as ScoreCat];
+    scoreListEl.appendChild(h);
+    group
+      .sort((a, b) => Number(a.split(":")[2]) - Number(b.split(":")[2]))
+      .forEach((key) => {
+        const [, type, size] = key.split(":");
+        const best = bestByCat[key];
+        const max = Number(size) * QUIZ_FULL_POINTS;
+        const row = document.createElement("div");
+        row.className = "score-row";
+        const label = cat === "continent" ? size + " questions" : QTYPE_LABEL[type] + " · " + size;
+        row.innerHTML = '<span class="sc-label">' + escapeHtml(label) + "</span>"
+          + '<span class="sc-pts">' + best.points + "/" + max + "</span>"
+          + '<span class="sc-acc">' + best.correct + "/" + size + "</span>";
+        const btn = document.createElement("button");
+        btn.type = "button"; btn.className = "sc-reset"; btn.textContent = "Reset";
+        btn.addEventListener("click", () => resetBest(key));
+        row.appendChild(btn);
+        scoreListEl.appendChild(row);
+      });
+  }
+}
+export function openScores(): void {
+  renderScores();
+  scoreModalEl.hidden = false;
+}
+export function closeScores(): void { scoreModalEl.hidden = true; }
+// Clear one recorded best (Score modal), then re-render and refresh the Start line.
+function resetBest(key: string): void {
+  delete bestByCat[key];
   saveBest();
+  renderScores();
+  updateStartBest();
+}
+export function resetAllScores(): void {
+  for (const k of Object.keys(bestByCat)) delete bestByCat[k];
+  saveBest();
+  renderScores();
   updateStartBest();
 }
 // Return to the Start screen (also used by Quit and New quiz). Clears reveals.

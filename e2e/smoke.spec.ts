@@ -10,12 +10,24 @@ test("app loads with brand, sidebar and map", async ({ page }) => {
   await expect(page.locator("#map")).toBeVisible();
 });
 
-test("the ? button opens and closes the help modal", async ({ page }) => {
+test("the ⋮ menu's About opens and closes the help modal", async ({ page }) => {
   await page.goto("/");
-  await page.click("#brand .help-btn");
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="about"]');
   await expect(page.locator("#help-modal")).toBeVisible();
   await page.click(".help-close");
   await expect(page.locator("#help-modal")).toBeHidden();
+});
+
+test("the ⋮ menu opens Score, listing records with a reset", async ({ page }) => {
+  await page.goto("/");
+  await page.click("#app-menu-btn");
+  await expect(page.locator("#app-menu")).toBeVisible();
+  await page.click('.app-menu-item[data-menu="score"]');
+  await expect(page.locator("#score-modal")).toBeVisible();
+  await expect(page.locator("#score-list")).toContainText("No quizzes played yet."); // empty state
+  await page.click(".score-close");
+  await expect(page.locator("#score-modal")).toBeHidden();
 });
 
 test("Map-options toggles persist across a reload", async ({ page }) => {

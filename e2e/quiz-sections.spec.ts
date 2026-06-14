@@ -145,14 +145,19 @@ test("the best for the chosen setup persists across a reload", async ({ page }) 
   await expect(page.locator("#quiz-start-best")).toHaveText("Best for this setup: " + best + "/25");
 });
 
-test("reset clears only the selected setup's best", async ({ page }) => {
+test("resetting a record in the Score modal clears it everywhere", async ({ page }) => {
   await startMountains(page, 5);
   await playRound(page, 5);
-  await page.click("#quiz-newquiz"); // back to Start, Mountains/5 still selected
+  // Open Score from the header menu and reset the one record.
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="score"]');
+  await expect(page.locator(".score-row")).toHaveCount(1);
+  await page.locator(".score-row .sc-reset").click();
+  await expect(page.locator("#score-list")).toContainText("No quizzes played yet.");
+  await page.click(".score-close");
+  // Back on the Start screen the best is gone too.
+  await page.click("#quiz-newquiz");
   await page.click('#quiz-cat .cat-btn[data-cat="mountains"]');
   await page.click('#round-size .rs-btn[data-size="5"]');
-  await expect(page.locator("#quiz-reset")).toBeVisible();
-  await page.click("#quiz-reset");
   await expect(page.locator("#quiz-start-best")).toHaveText("No record yet");
-  await expect(page.locator("#quiz-reset")).toBeHidden();
 });

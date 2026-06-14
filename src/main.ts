@@ -20,7 +20,8 @@ import {
   setMode, nextQuestion, renderNbResults,
   renderLocResults, renderNameResults, nbCheckAnswers, nbInput, nbCheck, locInput, nameInput,
   showChoices, playAgain, setRoundSize, selectCategory, selectType, startQuiz, quitQuiz, showStart,
-  quizNextBtn, quizAgainBtn, quizNewQuizBtn, quizStartBtn, quizQuitBtn, quizResetBtn, resetScore,
+  quizNextBtn, quizAgainBtn, quizNewQuizBtn, quizStartBtn, quizQuitBtn,
+  openScores, closeScores, resetAllScores,
   type ScoreCat,
 } from "./quiz";
 
@@ -103,7 +104,6 @@ document.querySelectorAll<HTMLElement>(".qt-btn").forEach((b) => {
 document.querySelectorAll<HTMLElement>("#round-size .rs-btn").forEach((b) => {
   b.addEventListener("click", () => setRoundSize(Number(b.dataset.size)));
 });
-quizResetBtn.addEventListener("click", resetScore);
 quizStartBtn.addEventListener("click", startQuiz);
 
 const flagToggle = document.getElementById("show-flags") as HTMLInputElement;
@@ -226,12 +226,34 @@ helpTabs.forEach((t) => { t.addEventListener("click", () => setHelpTab(t.dataset
 // Open on whichever section matches the sidebar's current mode.
 const openHelp = () => { setHelpTab(app.mode === "explore" ? "explore" : "quiz"); helpModal.hidden = false; };
 const closeHelp = () => { helpModal.hidden = true; };
-document.querySelectorAll<HTMLElement>(".help-btn").forEach((b) => { b.addEventListener("click", openHelp); });
 helpModal.addEventListener("click", (e) => {
   const t = e.target as HTMLElement;
   if (t === helpModal || t.classList.contains("help-close")) closeHelp();
 });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHelp(); });
+
+// Header ⋮ menu → Score / About.
+const appMenu = document.getElementById("app-menu") as HTMLElement;
+const appMenuBtn = document.getElementById("app-menu-btn") as HTMLButtonElement;
+const setMenuOpen = (open: boolean) => { appMenu.hidden = !open; appMenuBtn.setAttribute("aria-expanded", String(open)); };
+appMenuBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenuOpen(appMenu.hidden); });
+document.querySelectorAll<HTMLElement>(".app-menu-item").forEach((b) => {
+  b.addEventListener("click", () => {
+    setMenuOpen(false);
+    if (b.dataset.menu === "score") openScores(); else openHelp();
+  });
+});
+// Click outside the menu closes it.
+document.addEventListener("click", () => { if (!appMenu.hidden) setMenuOpen(false); });
+
+// Score modal close (backdrop or ×).
+const scoreModal = document.getElementById("score-modal") as HTMLElement;
+scoreModal.addEventListener("click", (e) => {
+  const t = e.target as HTMLElement;
+  if (t === scoreModal || t.classList.contains("score-close")) closeScores();
+});
+document.getElementById("score-reset-all")!.addEventListener("click", resetAllScores);
+
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeHelp(); closeScores(); setMenuOpen(false); } });
 
 // Track the cursor so the hover info panel can float next to it.
 map.getContainer().addEventListener("mousemove", (ev: MouseEvent) => trackMouse(ev.clientX, ev.clientY));

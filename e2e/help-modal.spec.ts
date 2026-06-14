@@ -5,11 +5,12 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await page.waitForSelector("#brand .help-btn");
+  await page.waitForSelector("#app-menu-btn");
 });
 
 test("Explore and Quiz show as two side-by-side tabs, Explore active", async ({ page }) => {
-  await page.click("#brand .help-btn");
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="about"]');
   await expect(page.locator("#help-modal")).toBeVisible();
 
   const tabs = page.locator(".help-tab");
@@ -29,7 +30,8 @@ test("Explore and Quiz show as two side-by-side tabs, Explore active", async ({ 
 });
 
 test("clicking a tab swaps the visible panel", async ({ page }) => {
-  await page.click("#brand .help-btn");
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="about"]');
   await page.click('.help-tab[data-help-tab="quiz"]');
 
   await expect(page.locator('.help-tab[data-help-tab="quiz"]')).toHaveClass(/active/);
@@ -39,7 +41,8 @@ test("clicking a tab swaps the visible panel", async ({ page }) => {
 
 test("the panel scrolls internally while the card frame stays put", async ({ page }) => {
   await page.setViewportSize({ width: 880, height: 520 });
-  await page.click("#brand .help-btn");
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="about"]');
   await page.click('.help-tab[data-help-tab="quiz"]'); // the taller panel
 
   const m = await page.evaluate(() => {
@@ -67,7 +70,8 @@ test("the panel scrolls internally while the card frame stays put", async ({ pag
 
 test("the modal opens on the tab matching the sidebar mode", async ({ page }) => {
   await page.click('.mode-tab[data-mode="quiz"]'); // put the sidebar in Quiz mode
-  await page.click("#brand .help-btn");
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="about"]');
 
   await expect(page.locator(".help-tab.active")).toHaveText("Quiz");
   await expect(page.locator('.help-panel[data-help-panel="quiz"]')).toBeVisible();

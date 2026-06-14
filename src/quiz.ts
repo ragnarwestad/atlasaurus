@@ -24,7 +24,6 @@ import { refreshPolygons, countryAt } from "./countries";
 
 const quizStartEl = document.getElementById("quiz-start")!;
 const quizUiEl = document.getElementById("quiz-ui")!;
-const quizStartBestEl = document.getElementById("quiz-start-best")!;
 const quizPlayinfoEl = document.getElementById("quiz-playinfo")!;
 const quizPlayPhaseEl = document.getElementById("quiz-playphase")!;
 const quizPromptEl = document.getElementById("quiz-prompt")!;
@@ -137,13 +136,8 @@ function startRound(): void {
 function setScoreCategory(cat: ScoreCat): void { scoreCat = cat; }
 
 // --- Start phase: pick category/type/length, then Start. ---
-// "Best for this setup" line + the (conditional) reset button.
-function updateStartBest(): void {
-  const best = bestByCat[bestKey()];
-  quizStartBestEl.textContent = best ? "Best for this setup: " + best.points + "/" + roundMax() : "No record yet";
-}
 // Select a category: reflect it on the buttons, swap in its type row (Regions has
-// none), set the active type, and refresh the best line.
+// none), and set the active type.
 export function selectCategory(cat: ScoreCat): void {
   setScoreCategory(cat);
   document.querySelectorAll<HTMLElement>("#quiz-cat .cat-btn").forEach((b) => b.classList.toggle("active", b.dataset.cat === cat));
@@ -156,12 +150,10 @@ export function selectCategory(cat: ScoreCat): void {
   const note = document.querySelector<HTMLElement>("#quiz-type-field .type-none");
   if (note) note.hidden = cat !== "continent";
   app.quizType = cat === "continent" ? "continent" : activeType;
-  updateStartBest();
 }
 // Select a question type within the open category's row.
 export function selectType(qtype: QuizType): void {
   app.quizType = qtype;
-  updateStartBest();
 }
 // --- Score overview (the ⋮ → Score modal): every recorded best in one place. ---
 const QTYPE_LABEL: Record<string, string> = {
@@ -216,18 +208,16 @@ export function openScores(): void {
   scoreModalEl.hidden = false;
 }
 export function closeScores(): void { scoreModalEl.hidden = true; }
-// Clear one recorded best (Score modal), then re-render and refresh the Start line.
+// Clear one recorded best (Score modal), then re-render the list.
 function resetBest(key: string): void {
   delete bestByCat[key];
   saveBest();
   renderScores();
-  updateStartBest();
 }
 export function resetAllScores(): void {
   for (const k of Object.keys(bestByCat)) delete bestByCat[k];
   saveBest();
   renderScores();
-  updateStartBest();
 }
 // Return to the Start screen (also used by Quit and New quiz). Clears reveals.
 export function showStart(): void {
@@ -235,7 +225,6 @@ export function showStart(): void {
   app.quizAnswered = false;
   quizLayer.clearLayers(); quizContLayer.clearLayers();
   revealSurroundings();
-  updateStartBest();
   syncRoundSizeButtons();
 }
 export function quitQuiz(): void { showStart(); }
@@ -376,14 +365,13 @@ function syncRoundSizeButtons(): void {
     b.classList.toggle("active", Number(b.dataset.size) === app.roundSize);
   });
 }
-// Change the round length on the Start screen: persist it and refresh the best
-// line (it's locked once a quiz is underway, so no in-round restart needed).
+// Change the round length on the Start screen: persist it (it's locked once a
+// quiz is underway, so no in-round restart is needed).
 export function setRoundSize(n: number): void {
   if (!QUIZ_ROUND_SIZES.includes(n) || n === app.roundSize) return;
   app.roundSize = n;
   try { localStorage.setItem(ROUNDSIZE_KEY, String(n)); } catch { /* storage unavailable */ }
   syncRoundSizeButtons();
-  updateStartBest();
 }
 // Neighbouring countries (mledoze `borders`, resolved to entries we have).
 function neighbourEntries(entry: CountryEntry): CountryEntry[] {
@@ -1317,6 +1305,5 @@ export function setMode(m: "explore" | "practice" | "quiz"): void {
   hooks.refreshAll();
 }
 
-// Reflect the restored round length on the size buttons (the bests follow the
-// current selection and are refreshed by updateStartBest on Start entry).
+// Reflect the restored round length on the size buttons.
 syncRoundSizeButtons();

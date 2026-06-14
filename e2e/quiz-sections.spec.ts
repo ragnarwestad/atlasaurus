@@ -131,18 +131,18 @@ test("a finished round offers Play again and New quiz", async ({ page }) => {
   await expect(page.locator("#quiz-score")).toHaveText(/^0 pts/);
 });
 
-test("the best for the chosen setup persists across a reload", async ({ page }) => {
+test("a record persists across a reload (seen in the Score modal)", async ({ page }) => {
   await startMountains(page, 5);
   await playRound(page, 5);
   const summary = await page.locator("#quiz-summary .qs-score").textContent();
   const best = Number(/^(\d+) \//.exec(summary || "")?.[1] ?? "-1");
   await page.reload();
-  await page.waitForSelector("#mode-tabs .mode-tab");
-  await page.click('.mode-tab[data-mode="quiz"]');
-  await page.check('#quiz-subtabs input[value="challenge"]');
-  await page.click('#quiz-cat .cat-btn[data-cat="mountains"]');
-  await page.click('#round-size .rs-btn[data-size="5"]');
-  await expect(page.locator("#quiz-start-best")).toHaveText("Best for this setup: " + best + "/25");
+  await page.waitForSelector("#app-menu-btn");
+  await page.click("#app-menu-btn");
+  await page.click('.app-menu-item[data-menu="score"]');
+  const row = page.locator(".score-row").first();
+  await expect(row.locator(".sc-label")).toHaveText("Name it · 5");
+  await expect(row.locator(".sc-pts")).toHaveText(best + "/25");
 });
 
 test("resetting a record in the Score modal clears it everywhere", async ({ page }) => {
@@ -154,10 +154,4 @@ test("resetting a record in the Score modal clears it everywhere", async ({ page
   await expect(page.locator(".score-row")).toHaveCount(1);
   await page.locator(".score-row .sc-reset").click();
   await expect(page.locator("#score-list")).toContainText("No quizzes played yet.");
-  await page.click(".score-close");
-  // Back on the Start screen the best is gone too.
-  await page.click("#quiz-newquiz");
-  await page.click('#quiz-cat .cat-btn[data-cat="mountains"]');
-  await page.click('#round-size .rs-btn[data-size="5"]');
-  await expect(page.locator("#quiz-start-best")).toHaveText("No record yet");
 });

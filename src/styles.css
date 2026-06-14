@@ -76,8 +76,6 @@ body { display: flex; flex-direction: column; font-family: system-ui, sans-serif
 #quiz-cat .cat-btn.active, #round-size .rs-btn.active, .type-row .qt-btn.active {
   background: #3878c7; color: #fff; border-color: #3878c7;
 }
-#quiz-start-foot { display: flex; align-items: center; gap: 10px; min-height: 22px; margin-bottom: 10px; }
-#quiz-start-best { font: 600 12px system-ui, sans-serif; color: #5a6b7a; }
 #quiz-start-btn {
   width: 100%; padding: 10px; font: 700 14px system-ui, sans-serif; cursor: pointer;
   border-radius: 8px; border: 1px solid #3878c7; background: #3878c7; color: #fff;

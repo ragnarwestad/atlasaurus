@@ -52,7 +52,7 @@ body { display: flex; flex-direction: column; font-family: system-ui, sans-serif
 #quiz-subtabs label { display: flex; align-items: center; gap: 6px; font: 600 13px system-ui, sans-serif; color: #5a6b7a; cursor: pointer; user-select: none; }
 #quiz-subtabs input { margin: 0; cursor: pointer; }
 #practice-panel[hidden], #challenge-panel[hidden] { display: none; }
-.practice-hint { padding: 0 14px; margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: #8a97a3; }
+.practice-intro { padding: 12px 14px; margin: 0; font-size: 12px; line-height: 1.5; color: #8a97a3; }
 
 /* Quiz panel — one collapsible section per feature (reuses the Explore
    .feat-sec / .sb-fold / .feat-body header chrome). The open section holds the
@@ -219,7 +219,7 @@ body { display: flex; flex-direction: column; font-family: system-ui, sans-serif
 /* Full-width break + divider between the two toggle groups (features vs overlays). */
 .toggle-sep { height: 0; margin: 9px 0; border: 0; border-top: 1px solid #e1e7ec; }
 /* Hover doesn't exist on touch devices, so hide the Hover-info toggle there. */
-@media (hover: none) { #hover-toggle, #pr-hover-toggle { display: none; } }
+@media (hover: none) { #hover-toggle { display: none; } }
 
 /* Quiz category tab row (Country / Continent / Mountains) */
 .sb-tabs { display: flex; gap: 18px; border-bottom: 1px solid #e1e7ec; }

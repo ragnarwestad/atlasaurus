@@ -139,7 +139,6 @@ const PRACTICE_TOGGLES: [string, "showNames" | "showCities" | "showFlags" | "sho
   ["pr-show-lakes", "showLakes", refreshLakes],
   ["pr-show-mountains", "showPeaks", refreshPeaks],
   ["pr-show-rivers", "showRivers", refreshRivers],
-  ["pr-show-hover", "showHover", () => { if (!app.showHover) hideHoverInfo(); }],
 ];
 PRACTICE_TOGGLES.forEach(([id, prop, refresh]) => {
   const el = document.getElementById(id) as HTMLInputElement | null;
@@ -270,7 +269,7 @@ const EXPLORE_TOGGLE_IDS = [
 ];
 const PRACTICE_TOGGLE_IDS = [
   "pr-show-names", "pr-show-cities", "pr-show-lakes", "pr-show-mountains",
-  "pr-show-rivers", "pr-show-flags", "pr-show-hover",
+  "pr-show-rivers", "pr-show-flags",
 ];
 const EXPLORE_KEY = "atlasaurus.toggles", PRACTICE_KEY = "atlasaurus.toggles.practice";
 function saveSet(key: string, ids: string[]): void {

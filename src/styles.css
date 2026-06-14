@@ -53,6 +53,11 @@ body { display: flex; flex-direction: column; font-family: system-ui, sans-serif
 #quiz-subtabs input { margin: 0; cursor: pointer; }
 #practice-panel[hidden], #challenge-panel[hidden] { display: none; }
 .practice-intro { padding: 12px 14px; margin: 0; font-size: 12px; line-height: 1.5; color: #8a97a3; }
+#pr-reset {
+  margin: 2px 14px 14px; padding: 6px 12px; font: 600 12px system-ui, sans-serif; cursor: pointer;
+  border: 1px solid #cdd6df; background: #fff; color: #5a6b7a; border-radius: 6px;
+}
+#pr-reset:hover { border-color: #3878c7; color: #3878c7; }
 
 /* Quiz panel — one collapsible section per feature (reuses the Explore
    .feat-sec / .sb-fold / .feat-body header chrome). The open section holds the

@@ -144,6 +144,20 @@ PRACTICE_TOGGLES.forEach(([id, prop, refresh]) => {
   const el = document.getElementById(id) as HTMLInputElement | null;
   el?.addEventListener("change", () => { app[prop] = el.checked; refresh(); savePracticeToggles(); });
 });
+// Practice "Reset": re-hide everything — clear the per-feature reveals and turn
+// every reveal toggle back off.
+function resetPractice(): void {
+  app.revealedCountries.clear(); app.revealedCities.clear();
+  app.revealedPeaks.clear(); app.revealedRivers.clear(); app.revealedLakes.clear();
+  PRACTICE_TOGGLES.forEach(([id, prop, refresh]) => {
+    app[prop] = false;
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    if (el) el.checked = false;
+    refresh();
+  });
+  savePracticeToggles();
+}
+document.getElementById("pr-reset")!.addEventListener("click", resetPractice);
 
 let mapExpanded = true;
 function setMapExpanded(on: boolean): void {

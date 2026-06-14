@@ -32,6 +32,16 @@ test("the Mountains toggle reveals and re-hides all peak names", async ({ page }
   expect(reHidden.every((t) => t === "Mountain ?")).toBe(true);
 });
 
+test("Reset hides everything and clears the toggles", async ({ page }) => {
+  const labels = page.locator(".peak-label");
+  await page.check("#pr-show-mountains");
+  expect((await labels.allTextContents()).some((t) => t.trim() === "Mount Everest")).toBe(true);
+  await page.click("#pr-reset");
+  await expect(page.locator("#pr-show-mountains")).not.toBeChecked();
+  const reHidden = (await labels.allTextContents()).map((t) => t.trim());
+  expect(reHidden.every((t) => t === "Mountain ?")).toBe(true);
+});
+
 test("clicking a peak reveals just that one and opens its detail box", async ({ page }) => {
   // Click the centre of a peak icon that sits inside the viewport AND is the
   // topmost element there — so an overlapping city/capital marker (the map shows

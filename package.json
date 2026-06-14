@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "lint": "biome lint"
+    "lint": "biome lint",
+    "knip": "knip",
+    "check": "pnpm typecheck && pnpm lint && pnpm knip && pnpm test && pnpm build"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
@@ -24,6 +26,7 @@
     "@types/leaflet": "^1.9.12",
     "happy-dom": "^20.10.2",
     "javascript-obfuscator": "^5.4.3",
+    "knip": "^6.16.1",
     "typescript": "^5.5.0",
     "vite": "8.0.5",
     "vite-plugin-singlefile": "^2.0.0",

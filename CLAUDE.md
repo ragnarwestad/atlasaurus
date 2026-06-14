@@ -5,8 +5,10 @@ self-contained HTML file. Geodata/flags are fetched from CDNs at runtime.
 
 ## Workflow — do this for every change
 1. Edit source under `src/` (and `index.html` / `vite.config.ts`).
-2. Verify before committing: `pnpm typecheck`, `pnpm test` (Vitest),
-   `pnpm lint` (Biome) — all must pass — **and** `pnpm build` (must succeed).
+2. Verify before committing: **`pnpm check`** — runs `typecheck`, `lint` (Biome),
+   `knip` (unused exports/files/deps), `test` (Vitest) and `build`; all must pass.
+   (Run the individual scripts to isolate a failure.) The `e2e` (Playwright) suite
+   is separate — run `pnpm test:e2e` when interaction behaviour changed.
 3. Commit one logical change with a short, descriptive message.
 
 - `src/` is the single source of truth.

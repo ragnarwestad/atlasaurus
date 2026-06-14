@@ -18,7 +18,7 @@ function countryRevealed(e: CountryEntry): boolean {
 // land area across the zoom range (biggest at min zoom, smallest at max). This
 // makes a name's visibility depend only on zoom + being on screen — NOT on which
 // other countries happen to be in view, so panning no longer flickers labels.
-export function assignLabelZooms(): void {
+function assignLabelZooms(): void {
   const ranked = realCountries().filter((e) => e.labelArea != null)
     .sort((a, c) => (c.labelArea as number) - (a.labelArea as number));
   const n = Math.max(1, ranked.length - 1);
@@ -61,7 +61,7 @@ export function refreshCountryLabels(): void {
 // ---------------------------------------------------------------------------
 // Flags (scale with zoom)
 // ---------------------------------------------------------------------------
-export function flagIcon(iso2: string, zoom: number): L.DivIcon {
+function flagIcon(iso2: string, zoom: number): L.DivIcon {
   // Grow with zoom: tiny when zoomed out (~12px at z2, so the world view isn't a
   // wall of flags), up to ~3.2× when zoomed in.
   const scale = Math.min(0.5 + (zoom - 2) * 0.38, 3.2);

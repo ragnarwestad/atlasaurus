@@ -40,6 +40,11 @@
 				"useOptionalChain": "off",
 				// !important is required to override Leaflet's inline/default styles.
 				"noImportantStyles": "off"
+			},
+			"nursery": {
+				// Flag promises never awaited/handled/`void`-marked. The lazy-preload
+				// calls are deliberately ignored via `void`, which this rule accepts.
+				"noFloatingPromises": "error"
 			}
 		}
 	}

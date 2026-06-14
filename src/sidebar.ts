@@ -11,7 +11,7 @@ import { selectLayer, selectContinent, deselect } from "./countries";
 import { peakList, riverList, lakeList, type PhysFeature } from "./physical";
 import { cityList } from "./places";
 
-export function focusCountry(entry: CountryEntry): void {
+function focusCountry(entry: CountryEntry): void {
   try { map.fitBounds(entry.layer.getBounds(), { maxZoom: 6, padding: [40, 40] }); } catch {}
   selectLayer(entry.layer, false); // sidebar click always selects (no toggle)
 }
@@ -243,7 +243,7 @@ export function buildFeatureLists(): void {
 }
 
 // Wire the collapse headers + search boxes once (DOM is static scaffolding).
-export function initFeatureLists(): void {
+function initFeatureLists(): void {
   FEATURE_SECTIONS.forEach((sec) => {
     const secEl = document.getElementById("feat-sec-" + sec.id);
     document.getElementById("feat-head-" + sec.id)?.addEventListener("click", () => secEl?.classList.toggle("collapsed"));

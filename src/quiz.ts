@@ -877,7 +877,7 @@ const nbResults = document.getElementById("nb-results")!;
 const nbChips = document.getElementById("nb-chips")!;
 export const nbCheck = document.getElementById("nb-check") as HTMLButtonElement;
 // Neighbour round: clicking the map and searching both add picks (no toggle).
-export function applyNbMode(): void {
+function applyNbMode(): void {
   nbBox.classList.toggle("map-mode", app.nbMode === "map");
   if (app.nbMode === "map") { nbInput.value = ""; renderNbResults(""); }
   if (app.mode === "quiz" && app.quizType === "neighbour" && !app.quizAnswered) {
@@ -917,7 +917,7 @@ function setupCountryAnswerBox(): void {
   quizHelpBtn.hidden = false; // "Which country" supports the 5-option help too
   applyLocMode();
 }
-export function applyLocMode(): void {
+function applyLocMode(): void {
   locBox.classList.toggle("map-mode", app.locMode === "map");
   if (app.locMode === "map") { locInput.value = ""; renderLocResults(""); }
   if (app.mode !== "quiz" || app.quizAnswered) return;

@@ -55,7 +55,7 @@ function sovOf(layer: any): string | null {
   return p.SOV_A3 || p.sov_a3 || null;
 }
 /** Same sovereign state (e.g. Denmark ↔ Greenland/Faroe), different unit. */
-export function sameRealm(e: CountryEntry): boolean {
+function sameRealm(e: CountryEntry): boolean {
   if (!app.selectedLayer || e.layer === app.selectedLayer) return false;
   const s = sovOf(app.selectedLayer), x = sovOf(e.layer);
   return !!s && s === x;

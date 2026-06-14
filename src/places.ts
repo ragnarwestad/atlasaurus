@@ -174,7 +174,7 @@ function updateCities(): void {
   const quizReveal = quizRevealsCities();
   const on = app.mode === "practice" || (app.mode === "explore" && app.showCities) || quizReveal;
   if (!on) { cityLayer.clearLayers(); cityLabelLayer.clearLayers(); return; }
-  if (!cityDataLoaded) { loadCities(); return; }
+  if (!cityDataLoaded) { void loadCities(); return; }
   cityLayer.clearLayers();
   cityLabelLayer.clearLayers();
   const zReal = map.getZoom();

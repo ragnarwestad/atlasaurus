@@ -30,8 +30,8 @@ function wireFeatureClick(layer: L.Layer, open: () => void): void {
 export function loadPhysicalData(): void {
   buildPeakList();
   hooks.rebuildFeatureLists();
-  if (!riverGeo) loadRivers();
-  if (!lakeGeo) loadLakes();
+  if (!riverGeo) void loadRivers(); // lazy preload — errors handled inside loadRivers
+  if (!lakeGeo) void loadLakes();
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ function updateRiverVisibility(): void {
   });
 }
 export function refreshRivers(): void {
-  if (app.mode !== "quiz" && !riverGeo) { loadRivers(); return; }
+  if (app.mode !== "quiz" && !riverGeo) { void loadRivers(); return; }
   updateRiverVisibility();
 }
 
@@ -302,7 +302,7 @@ function updateLakeVisibility(): void {
   });
 }
 export function refreshLakes(): void {
-  if (app.mode !== "quiz" && !lakeGeo) { loadLakes(); return; }
+  if (app.mode !== "quiz" && !lakeGeo) { void loadLakes(); return; }
   updateLakeVisibility();
 }
 

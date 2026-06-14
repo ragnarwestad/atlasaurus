@@ -306,5 +306,5 @@ applyStored(PRACTICE_KEY, PRACTICE_TOGGLE_IDS);
 // Apply the Explore toggles' effects now (Explore is the active panel at startup).
 EXPLORE_TOGGLE_IDS.forEach((id) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el?.checked) el.dispatchEvent(new Event("change")); });
 loadPhysicalData();   // populate those lists (peaks now; rivers/lakes when fetched)
-loadCityData();       // populate the Cities list (independent of the Cities map layer)
+void loadCityData();  // populate the Cities list (independent of the Cities map layer)
 loadBorders();

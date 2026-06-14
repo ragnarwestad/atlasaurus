@@ -1,5 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
+// This config runs under Node, but the project deliberately omits @types/node
+// (it's a browser app) — declare the one Node global we use so editors don't
+// flag `process` as TS2591. The CLI typecheck doesn't include this file anyway.
+declare const process: { env: Record<string, string | undefined> };
+
 // E2E tests run against the dev server (auto-started below) in the system
 // Chrome — no bundled browser download, so `pnpm-workspace.yaml`'s
 // build-script restriction doesn't block setup. Keep these tests offline-safe:

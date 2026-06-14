@@ -296,7 +296,7 @@ function savePracticeToggles(): void { saveSet(PRACTICE_KEY, PRACTICE_TOGGLE_IDS
 function applyStored(key: string, ids: string[]): void { // set checkboxes from storage (HTML default otherwise)
   let state: Record<string, boolean> = {};
   try { state = JSON.parse(localStorage.getItem(key) || "{}"); } catch { return; }
-  ids.forEach((id) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el && id in state) el.checked = !!state[id]; });
+  ids.forEach((id) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el && id in state) el.checked = state[id]; });
 }
 EXPLORE_TOGGLE_IDS.forEach((id) => document.getElementById(id)?.addEventListener("change", saveToggles));
 
